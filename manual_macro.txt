@@ -1,4 +1,4 @@
-MacroFire - BETA3 Version
+MacroFire - BETA5 Version
 
 
 Macro settings
@@ -37,6 +37,7 @@ Macro settings
 
   Save to MS (未実装)
     メモリースティックへ、現在記録しているマクロを保存する。
+
 
 Edit macro
 -------------------------------------------------
@@ -82,6 +83,14 @@ Edit macro
   また、マクロを全てDeleteで削除しようとしても、完全には消せません。
   具体的には必ず Delay 0 ms が残ります。
   マクロを完全に消去するには、マクロのメインメニューからClear macroを実行してください。
+
+
+注意
+-------------------------------------------------
+  Run once/Run inifinityによって実行中に、MacroFire EngineをOFFにすると、
+  マクロはコマンド実行位置を先頭にリセットして、実行を待ちます。
+  つまり、MacroFireEngineをOFFにしてからONにすると、マクロは再び先頭から実行されます。
+  MacroFire Toggle Buttonsと組み合わせると、擬似的にマクロをボタンで実行/停止できます。
 
 
 -------------------------------------------------

@@ -16,7 +16,7 @@ USE_KERNEL_LIBS = 1
 CLASSG_LIBS = libs
 
 INCDIR = $(CLASSG_LIBS)
-CFLAGS = -Os -G0 -Wall -fno-strict-aliasing -fno-builtin-printf
+CFLAGS = -g -Os -G0 -Wall -fno-strict-aliasing -fno-builtin-printf
 CXXFLAGS = $(CFLAGS) -fno-exceptions -fno-rtti
 ASFLAGS = $(CFLAGS)
 
@@ -40,7 +40,7 @@ OBJS = main.o \
        $(CLASSG_LIBS)/psp/memsce.o \
        $(CLASSG_LIBS)/psp/cmndlg.o \
        $(CLASSG_LIBS)/psp/cmndlg/getdigits.o \
-       $(CLASSG_LIBS)/psp/cmndlg/getbuttons.o
+       $(CLASSG_LIBS)/psp/cmndlg/getbuttons.o \
 
 PSPSDK = $(shell psp-config --pspsdk-path)
 include $(PSPSDK)/lib/build_prx.mak

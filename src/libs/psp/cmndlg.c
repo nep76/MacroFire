@@ -59,3 +59,10 @@ void cmndlgSetFcColor( u32 color )
 {
 	st_fccolor = color;
 }
+
+bool cmndlgErrorCodeIsSce( int errcode )
+{
+	if( ! errcode ) return false;
+	
+	return (unsigned int)errcode < 0xE0000000 ? true : false;
+}

@@ -95,7 +95,7 @@ void mfMenu( void )
 	
 	mfClearColor( MENU_BGCOLOR );
 	
-	/* わざと一度無駄に取得してゲーム側からの入力を捨てる */
+	/* わざと一度無駄にラッチデータを取得してゲーム側からの入力を捨てる */
 	( st_f_ctrlReadLatch )( st_pad_latch );
 	
 	while( gRunning ){
@@ -162,6 +162,8 @@ void mfMenu( void )
 		if( st_wait ){
 			sceKernelDelayThread( st_wait * 1000000 );
 			st_wait = 0;
+			/* わざと一度無駄にラッチデータを取得してウェイト中の入力を捨てる */
+			( st_f_ctrlReadLatch )( st_pad_latch );
 		}
 		if( st_clear_vsync ){
 			mfClearColor( MENU_BGCOLOR );

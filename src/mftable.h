@@ -20,7 +20,7 @@
 typedef void ( *MfFuncInitTerm )( void );
 typedef void ( *MfFuncHook )( HookCaller, SceCtrlData*, void* );
 typedef MfMenuReturnCode ( *MfFuncMenu )( SceCtrlLatch*, SceCtrlData*, void* );
-typedef void ( *MfFuncIntr )( void );
+typedef void ( *MfFuncIntr )( const int mfengine );
 
 typedef struct {
 	MfFuncHook func;
@@ -37,6 +37,7 @@ typedef struct {
 typedef struct {
 	MfFuncInitTerm initFunc;
 	MfFuncInitTerm termFunc;
+	MfFuncIntr intrFunc;
 	HookEntry hook;
 	MenuEntry menu;
 } MfEntry;
@@ -46,10 +47,12 @@ EXPORT MfEntry mftable[]
 = {
 	/*
 		機能を定義するテーブル
-		{ 初期化関数, 終了関数, { フック関数, 引数 }, { メニュー文字列, メニュー関数, メニュー中断関数, 引数 } }
+		{ 初期化関数, 終了関数, 割込関数, { フック関数, 引数 }, { メニュー文字列, メニュー関数, メニュー中断関数, 引数 } }
+		
+		割込関数は、MacroFire Engineが切り替えられた次のループで呼ばれる
 	*/
-	{ NULL,       NULL,      { rapidfireMain, NULL }, { "Rapidfire settings", rapidfireMenu, NULL, NULL } },
-	{ macroInit,  macroTerm, { macroMain,     NULL }, { "Macro settings",     macroMenu,     NULL, NULL } },
+	{ NULL,       NULL,      NULL,      { rapidfireMain, NULL }, { "Rapidfire settings", rapidfireMenu, NULL, NULL } },
+	{ macroInit,  macroTerm, macroIntr, { macroMain,     NULL }, { "Macro settings",     macroMenu,     NULL, NULL } },
 }
 #endif
 ;

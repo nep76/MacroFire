@@ -5,6 +5,7 @@
 #include <pspkernel.h>
 #include <pspctrl.h>
 #include <psprtc.h>
+#include "psp/cmndlg.h"
 #include "../menu.h"
 
 #include "macromgr.h"
@@ -25,6 +26,7 @@ typedef enum {
 void macroInit( void );
 void macroTerm( void );
 void macroMain( HookCaller caller, SceCtrlData *pad_data, void *argp );
+void macroIntr( const int mfengine );
 MfMenuReturnCode macroMenu( SceCtrlLatch *pad_latch, SceCtrlData *pad_data, void *argp );
 
 MfMenuReturnCode macroRunInterrupt( SceCtrlLatch *pad_latch, SceCtrlData *pad_data );

@@ -53,7 +53,7 @@ void rapidfireMain( HookCaller caller, SceCtrlData *pad_data, void *argp )
 	if( caller == CALL_PEEK_BUFFER_NEGATIVE || caller == CALL_READ_BUFFER_NEGATIVE )
 		pad_data->Buttons = ~pad_data->Buttons;
 	
-	memcpy( &st_dupe_pad, pad_data, sizeof( SceCtrlData ) );
+	st_dupe_pad = *pad_data;
 	
 	if( caller != CALL_PEEK_LATCH && caller != CALL_READ_LATCH ){
 		for( i = 0; i < ARRAY_NUM( st_rfConf ); i++ ){
@@ -82,7 +82,7 @@ MfMenuReturnCode rapidfireMenu( SceCtrlLatch *pad_latch, SceCtrlData *pad_data, 
 	switch( mfMenuVertical( blitOffsetChar( 5 ), blitOffsetLine( 4 ), BLIT_SCR_WIDTH, st_rfMenuTable, ARRAY_NUM( st_rfMenuTable ), &selected ) ){
 		case MR_CONTINUE:
 			blitString( blitOffsetChar( 3 ), blitOffsetLine(  2 ), MENU_FGCOLOR, MENU_BGCOLOR, "Please choose a rapidfire mode per buttons." );
-			blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "NORMAL: standard control mode.\nRAPID: hold the button to rapidfire.\nAUTO-RAPID: always to rapidfire.\nAUTO-HOLD: always to press and hold." );
+			blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "NORMAL    : standard control mode.\nRAPID     : hold the button to rapidfire.\nAUTO-RAPID: always to rapidfire.\nAUTO-HOLD : always to press and hold." );
 			blitString( blitOffsetChar( 3 ), blitOffsetLine( 31 ), MENU_FGCOLOR, MENU_BGCOLOR, "\x80\x82 = Move, \x83\x81 = Change mode, \x86 = Back, START = Exit" );
 			break;
 		case MR_ENTER:

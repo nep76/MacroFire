@@ -23,8 +23,9 @@ static int st_availAnalog = MACRO_ANALOG_OFF;
 #define MACRO_ANALOG_OPTION 6
 #define MACRO_EDIT          8
 #define MACRO_CLEAR         9
-#define MACRO_LOAD          11
-#define MACRO_SAVE          12
+#define MACRO_CREATE        10
+#define MACRO_LOAD          12
+#define MACRO_SAVE          13
 static MfMenuItem st_macroMenu[] = {
 	{ MT_ANCHOR, 0, "Run once",     { 0 } },
 	{ MT_ANCHOR, 0, "Run infinity", { 0 } },
@@ -36,6 +37,7 @@ static MfMenuItem st_macroMenu[] = {
 	{ MT_BORDER, 0, 0, { 0 } },
 	{ MT_ANCHOR, 0, "Edit macro", { 0 } },
 	{ MT_ANCHOR, 0, "Clear macro",  { 0 } },
+	{ MT_ANCHOR, 0, "Create macro", { 0 } },
 	{ MT_BORDER, 0, 0, { 0 } },
 	{ MT_ANCHOR, 0, "Load from MS (not implemented yet)", { 0 } },
 	{ MT_ANCHOR, 0, "Save to MS (not implemented yet)",   { 0 } }
@@ -56,6 +58,13 @@ void macroInit( void )
 void macroTerm( void )
 {
 	macromgrDestroy();
+}
+void macroIntr( const int mfengine )
+{
+	if( mfengine == MFENGINE_OFF && st_runMode == MRM_TRACE ){
+		/* マクロ実行位置を先頭に戻すのみ */
+		macro_trace( CALL_PEEK_BUFFER_POSITIVE, NULL, NULL );
+	}
 }
 
 MfMenuReturnCode macroRunInterrupt( SceCtrlLatch *pad_latch, SceCtrlData *pad_data )
@@ -148,6 +157,31 @@ MfMenuReturnCode macroClear( SceCtrlLatch *pad_latch, SceCtrlData *pad_data )
 	return MR_BACK;
 }
 
+MfMenuReturnCode macroCreate( SceCtrlLatch *pad_latch, SceCtrlData *pad_data )
+{
+	MacroData *macro;
+	
+	if( macro_is_busy() ) return MR_BACK;
+	
+	/* 既にマクロがあればクリア */
+	if( macromgrGetCount() ) macromgrDestroy();
+	
+	macro = macromgrNew();
+	if( ! macro ){
+		blitString( blitOffsetChar( 3 ), blitOffsetLine( 2 ), MENU_FGCOLOR, MENU_BGCOLOR, "Failed to create." );
+		mfWaitScreenReload( MACRO_NOTICE_DISPLAY_SEC );
+		return MR_BACK;
+	}
+	
+	macro->action = MA_DELAY;
+	macro->data   = 0;
+	
+	blitString( blitOffsetChar( 3 ), blitOffsetLine( 2 ), MENU_FGCOLOR, MENU_BGCOLOR, "Creating new macro..." );
+	mfWaitScreenReload( MACRO_NOTICE_DISPLAY_SEC );
+	
+	return MR_BACK;
+}
+
 MfMenuReturnCode macroRecordStop( SceCtrlLatch *pad_latch, SceCtrlData *pad_data )
 {
 	if( st_runMode == MRM_RECORD ){
@@ -214,10 +248,11 @@ MfMenuReturnCode macroMenu( SceCtrlLatch *pad_latch, SceCtrlData *pad_data, void
 					case MACRO_ANALOG_OPTION: blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "Recording the analog stick movement to macro." ); break;
 					case MACRO_EDIT         : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "Edit current macro." ); break;
 					case MACRO_CLEAR        : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "Clear current macro." ); break;
+					case MACRO_CREATE       : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "Create new macro." ); break;
 					case MACRO_LOAD         : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "Loading a macro from MemoryStick.\n\nIMPORTANT NOTICE:\n  Verify that MemoryStick access indicator is not blinking.\n  Otherwise, your current running game will CRASH!" ); break;
 					case MACRO_SAVE         : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "Saving a macro to MemoryStick.\n\nIMPORTANT NOTICE:\n  Verify that MemoryStick access indicator is not blinking.\n  Otherwise, your current running game will CRASH!" ); break;
 				}
-				blitString( blitOffsetChar( 3 ), blitOffsetLine( 31 ), MENU_FGCOLOR, MENU_BGCOLOR, "\x80\x82 = Move, \x81\x83 = Change toggle, \x85 = Enter, \x86 = Back, START = Exit" );
+				blitString( blitOffsetChar( 3 ), blitOffsetLine( 31 ), MENU_FGCOLOR, MENU_BGCOLOR, "\x80\x82 = Move, \x83\x81 = Change toggle, \x85 = Enter, \x86 = Back, START = Exit" );
 				old_selected = selected;
 				break;
 			case MR_ENTER:
@@ -229,6 +264,7 @@ MfMenuReturnCode macroMenu( SceCtrlLatch *pad_latch, SceCtrlData *pad_data, void
 					case MACRO_RECORD_STOP : function = macroRecordStop;  break;
 					case MACRO_EDIT        : function = macroEdit;        break;
 					case MACRO_CLEAR       : function = macroClear;       break;
+					case MACRO_CREATE      : function = macroCreate;      break;
 					case MACRO_LOAD        : function = macroLoad;        break;
 					case MACRO_SAVE        : function = macroSave;        break;
 				}

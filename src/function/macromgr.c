@@ -38,7 +38,7 @@ MacroData *macromgrInsert( MacroInsertPosition pos, MacroData *macro )
 		/* 前のコマンドが無い場合は先頭なので特別扱い */
 		if( ! macro->prev ){
 			/* 新規コマンドに現在の先頭コマンドをコピー */
-			addedcmd = macro;
+			*addedcmd = *macro;
 			
 			/* 新規コマンドの"前"は先頭を指す */
 			addedcmd->prev = macro;

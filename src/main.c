@@ -13,10 +13,18 @@ static SCE_CTRL_LATCH_FUNC ctrlGetPadLatch = sceCtrlReadLatch;
 static SCE_CTRL_DATA_FUNC  ctrlGetPadData  = sceCtrlPeekBufferPositive;
 
 static bool st_apihooked = false;
-static bool st_toggled = false;
+static bool st_for_wait_toggle_button_release = false;
 static unsigned int st_prev_pad_buttons;
 
-static void mfKeyHook( HookCaller caller, SceCtrlData *pad )
+static void mf_call_intr( const int mfengine )
+{
+	int i;
+	for( i = 0; i < mftableEntry; i++ ){
+		if( mftable[i].intrFunc ) ( mftable[i].intrFunc )( gMfEngine );
+	}
+}
+
+static void mf_key_hook( HookCaller caller, SceCtrlData *pad )
 {
 	int i;
 	
@@ -29,7 +37,7 @@ int mfCtrlPeekBufferPositive( SceCtrlData *pad, int count )
 {
 	int ret = ( (SCE_CTRL_DATA_FUNC)Hooktable[0].syscall.func )( pad, count );
 	
-	mfKeyHook( CALL_PEEK_BUFFER_POSITIVE, pad );
+	mf_key_hook( CALL_PEEK_BUFFER_POSITIVE, pad );
 	
 	return ret;
 }
@@ -38,7 +46,7 @@ int mfCtrlPeekBufferNegative( SceCtrlData *pad, int count )
 {
 	int ret = ( (SCE_CTRL_DATA_FUNC)Hooktable[1].syscall.func )( pad, count );
 	
-	mfKeyHook( CALL_PEEK_BUFFER_NEGATIVE, pad );
+	mf_key_hook( CALL_PEEK_BUFFER_NEGATIVE, pad );
 	
 	return ret;
 }
@@ -47,7 +55,7 @@ int mfCtrlReadBufferPositive( SceCtrlData *pad, int count )
 {
 	int ret = ( (SCE_CTRL_DATA_FUNC)Hooktable[2].syscall.func )( pad, count );
 	
-	mfKeyHook( CALL_READ_BUFFER_POSITIVE, pad );
+	mf_key_hook( CALL_READ_BUFFER_POSITIVE, pad );
 	
 	return ret;
 }
@@ -56,7 +64,7 @@ int mfCtrlReadBufferNegative( SceCtrlData *pad, int count )
 {
 	int ret = ( (SCE_CTRL_DATA_FUNC)Hooktable[3].syscall.func )( pad, count );
 	
-	mfKeyHook( CALL_READ_BUFFER_NEGATIVE, pad );
+	mf_key_hook( CALL_READ_BUFFER_NEGATIVE, pad );
 	
 	return ret;
 }
@@ -65,7 +73,7 @@ int mfCtrlPeekLatch( SceCtrlLatch *latch )
 {
 	SceCtrlData pad;
 	int ret = ( (SCE_CTRL_DATA_FUNC)Hooktable[0].syscall.func )( &pad, 1 ); // 0x80000023が返る。なぜ？
-	mfKeyHook( CALL_PEEK_LATCH, &pad );
+	mf_key_hook( CALL_PEEK_LATCH, &pad );
 	
 	latch->uiMake    |= ( st_prev_pad_buttons ^ pad.Buttons ) & pad.Buttons;
 	latch->uiBreak   |= ( st_prev_pad_buttons ^ pad.Buttons ) & st_prev_pad_buttons;
@@ -81,7 +89,7 @@ int mfCtrlReadLatch( SceCtrlLatch *latch )
 {
 	SceCtrlData pad;
 	int ret = ( (SCE_CTRL_DATA_FUNC)Hooktable[0].syscall.func )( &pad, 1 ); // 0x80000023が返る。なぜ？
-	mfKeyHook( CALL_READ_LATCH, &pad );
+	mf_key_hook( CALL_READ_LATCH, &pad );
 	
 	latch->uiMake    = ( st_prev_pad_buttons ^ pad.Buttons ) & pad.Buttons;
 	latch->uiBreak   = ( st_prev_pad_buttons ^ pad.Buttons ) & st_prev_pad_buttons;
@@ -142,14 +150,6 @@ int main_thread( SceSize arglen, void *argp )
 	while( gRunning ){
 		sceKernelDelayThread( 50000 );
 		
-		if( ! st_apihooked && gMfEngine ){
-			/* APIをフック */
-			mfHookApi();
-		} else if( st_apihooked && ! gMfEngine ){
-			/* APIをリストア */
-			mfRestoreApi();
-		}
-		
 		( ctrlGetPadData )( &st_pad_data, 1 );
 		
 		if( gMfToggle ){
@@ -157,13 +157,23 @@ int main_thread( SceSize arglen, void *argp )
 			st_pad_data.Buttons ^= ( st_pad_data.Buttons & ( PSP_CTRL_WLAN_UP | PSP_CTRL_REMOTE | PSP_CTRL_DISC | PSP_CTRL_MS ) );
 			
 			if( st_pad_data.Buttons == gMfToggle ){
-				if( ! st_toggled ){
+				if( ! st_for_wait_toggle_button_release ){
 					gMfEngine = gMfEngine == MFENGINE_ON ? MFENGINE_OFF : MFENGINE_ON;
-					st_toggled = true;
+					st_for_wait_toggle_button_release = true;
 				}
-			} else if( st_toggled ){
-				st_toggled = false;
+			} else if( st_for_wait_toggle_button_release ){
+				st_for_wait_toggle_button_release = false;
 			}
+		}
+		
+		if( ! st_apihooked && gMfEngine ){
+			/* APIをフック */
+			mfHookApi();
+			mf_call_intr( gMfEngine );
+		} else if( st_apihooked && ! gMfEngine ){
+			/* APIをリストア */
+			mfRestoreApi();
+			mf_call_intr( gMfEngine );
 		}
 		
 		if( st_pad_data.Buttons & PSP_CTRL_VOLUP && st_pad_data.Buttons & PSP_CTRL_VOLDOWN ) mfMenu();

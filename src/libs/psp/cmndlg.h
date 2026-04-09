@@ -18,7 +18,7 @@
 
 #include "psp/cmndlg/getdigits.h"
 #include "psp/cmndlg/getbuttons.h"
-
+	
 #endif
 
 #ifdef __cplusplus
@@ -36,6 +36,7 @@ u32 cmndlgGetFcColor( void );
 void cmndlgSetFgColor( u32 color );
 void cmndlgSetBgColor( u32 color );
 void cmndlgSetFcColor( u32 color );
+bool cmndlgErrorCodeIsSce( int errcode );
 
 
 #ifdef __cplusplus

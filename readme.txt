@@ -1,4 +1,4 @@
-MacroFire - BETA4 Version
+MacroFire - BETA5 Version
 
 
 はじめに
@@ -149,7 +149,6 @@ MacroFire - BETA4 Version
     - マクロをMSへ保存する機能の実装。
     - マクロをMSから読み込む機能の実装。
     - sceCtrl*Latch系の動作を改善。
-    - マクロにアナログスティックの操作も記録できるようにする。
     - マクロの実行を特定のボタンに割り当てる機能。
     - ボタンの割り当てそのものを変更する機能。
 
