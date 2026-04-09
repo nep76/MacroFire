@@ -198,10 +198,7 @@ int main_thread( SceSize arglen, void *argp )
 		}
 		
 		if( gMfToggle ){
-			/* 指定されたボタンフラグのみ取り出す */
-			st_pad_data.Buttons &= (~( ~0 ^ gMfToggle ));
-			
-			if( st_pad_data.Buttons == gMfToggle ){
+			if( ( st_pad_data.Buttons & (~( ~0 ^ gMfToggle )) ) == gMfToggle ){
 				if( ! wait_toggle_button_release ){
 					gMfEngine = ( gMfEngine == MFENGINE_ON ? MFENGINE_OFF : MFENGINE_ON );
 					wait_toggle_button_release = true;

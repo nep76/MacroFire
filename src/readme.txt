@@ -1,5 +1,5 @@
 単純にmakeを実行しても配布しているmacrofire.prxよりも容量の大きいものが作成されます。
 配布しているPRXは、CFW 4.01M33に同梱されているpsp-packerによって圧縮しています。
 
-psp-packerをしたい場合は、Dark_AleX氏の公式サイト http://www.dark-alex.org より
+psp-packerを使って圧縮したい場合は、Dark_AleX氏の公式サイト http://www.dark-alex.org より
 4.01M33をダウンロードしてpsp-packerを入手してください。
