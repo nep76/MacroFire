@@ -5,6 +5,8 @@
 #ifndef __SSTRING_H__
 #define __SSTRING_H__
 
+#include <string.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif

@@ -1,6 +1,6 @@
 /* sstring.h */
-#include <string.h>
-#include <sstring.h>
+
+#include "sstring.h"
 
 char *safe_strncpy( char *targ, const char *orig, size_t n )
 {

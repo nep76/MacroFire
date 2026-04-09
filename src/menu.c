@@ -54,8 +54,13 @@ void mfMenu( void )
 	
 	mfThreadsStatChange( false, thlist, current_number_of_threads );
 	
-	miCount = mftableMenuEntry + 2;
+	/* blitの8bitASCIIテーブルをPSPボタンシンボルへ */
+	blit8BitCharTableSwitch( B8_BUTTON_SYMBOL );
+	
+	/* "+ 2"は、先頭の"MacroFire Engine"のオプションとその次のMT_BORDERの分 */
+	miCount = mftableEntry + 2;
 	miList  = (MfMenuItem *)MemSceMallocEx( 16, PSP_MEMPART_KERNEL_1, "miList", PSP_SMEM_Low, sizeof( MfMenuItem ) * miCount, 0 );
+	if( ! miList ) goto QUIT;
 	
 	miList[0].type     = MT_OPTION;
 	miList[0].selected = &gMfEngine;
@@ -70,7 +75,7 @@ void mfMenu( void )
 	for( i = 2; i < miCount; i++ ){
 		miList[i].type     = MT_ANCHOR;
 		miList[i].selected = NULL;
-		miList[i].label    = mftableMenu[i - 2].label;
+		miList[i].label    = mftable[i - 2].menu.label;
 		miList[i].value[0] = NULL;
 	}
 	
@@ -79,10 +84,6 @@ void mfMenu( void )
 	while( gRunning ){
 		( st_f_ctrlReadLatch )( st_pad_latch );
 		( st_f_ctrlPeekBufferPositive )( st_pad_data, 1 );
-		
-		sceDisplayWaitVblankStart();
-		
-		blitString( 0, 0, MF_MENU_TOP_MESSAGE, MENU_FGCOLOR, MENU_BGCOLOR );
 		
 		if(
 			st_mfmenu_quit ||
@@ -95,24 +96,30 @@ void mfMenu( void )
 			break;
 		}
 		
+		blitString( 0, 0, MF_MENU_TOP_MESSAGE, MENU_FGCOLOR, MENU_BGCOLOR );
+		blitLine( 0, 10, 480, 10, MENU_FGCOLOR );
+		blitLine( 0, blitOffsetLine( 31 ) - 5, 480, blitOffsetLine( 31 ) - 5, MENU_FGCOLOR );
+		
 		if( ! function ){
-			switch( mfMenuVertical( 5, 32, miList, miCount, &selected ) ){
-				case MR_STAY:
-					blitString( 3, 245, "UP = MoveUp, DOWN = MoveDown, CIRCLE = Enter or Change toggle\nCROSS or START = Exit", MENU_FGCOLOR, MENU_BGCOLOR );
+			switch( mfMenuVertical( blitOffsetChar( 5 ), blitOffsetLine( 4 ), BLIT_SCR_WIDTH, miList, miCount, &selected ) ){
+				case MR_CONTINUE:
+					blitString( blitOffsetChar( 3 ), blitOffsetLine( 2 ) , "Please choose a function.", MENU_FGCOLOR, MENU_BGCOLOR );
+					blitString( blitOffsetChar( 3 ), blitOffsetLine( 31 ), "\x80 = MoveUp, \x82 = MoveDown, \x85 = Enter or Change toggle\n\x86 or START = Exit", MENU_FGCOLOR, MENU_BGCOLOR );
 				case MR_BACK:
 					break;
 				case MR_ENTER:
 					mfClearColor( MENU_BGCOLOR );
-					function = mftableMenu[selected - 2].func;
+					function = mftable[selected - 2].menu.mainFunc;
 					break;
 			}
 		} else{
-			if( ! ( function )( st_pad_latch, st_pad_data, mftableMenu[selected - 2].arg ) ){
+			if( ! ( function )( st_pad_latch, st_pad_data, mftable[selected - 2].menu.arg ) ){
 				mfClearColor( MENU_BGCOLOR );
 				function = NULL;
 			}
 		}
 		
+		sceDisplayWaitVblankStart();
 		sceKernelDcacheWritebackAll();
 		
 		if( st_wait ){
@@ -123,9 +130,14 @@ void mfMenu( void )
 			mfClearColor( MENU_BGCOLOR );
 			st_clear_vsync = false;
 		}
+		
 	}
 	
-	mfThreadsStatChange( true, thlist, current_number_of_threads );
+	MemSceFree( miList );
+	goto QUIT;
+	
+	QUIT:
+		mfThreadsStatChange( true, thlist, current_number_of_threads );
 }
 
 void mfMenuMoveFocus( MfMenuMoveFocusDir mvdir, MfMenuItem mi[], size_t items_num, int *selected )
@@ -149,12 +161,13 @@ void mfMenuMoveFocus( MfMenuMoveFocusDir mvdir, MfMenuItem mi[], size_t items_nu
 	}
 }
 
-MfMenuReturnCode mfMenuVertical( int x, int y, MfMenuItem mi[], size_t items_num, int *selected )
+MfMenuReturnCode mfMenuVertical( int x, int y, int w, MfMenuItem mi[], size_t items_num, int *selected )
 {
 	int i;
 	char line[MENUITEM_LENGTH];
 	
-	if( *selected < 0 ) return MR_STAY;
+	/* 選択項目が0未満になっている場合は0に矯正 */
+	if( *selected < 0 ) *selected = 0;
 	
 	if( st_pad_latch->uiMake & PSP_CTRL_UP ){
 		mfMenuMoveFocus( MM_PREV, mi, items_num, selected );
@@ -167,7 +180,7 @@ MfMenuReturnCode mfMenuVertical( int x, int y, MfMenuItem mi[], size_t items_num
 			} else{
 				(*mi[*selected].selected) = 0;
 			}
-			blitFillRect( 0, y + ( *selected * 8 ), 480, 8, MENU_BGCOLOR );
+			blitFillBox( x, y + ( *selected * BLIT_CHAR_HEIGHT ), w, BLIT_CHAR_HEIGHT, MENU_BGCOLOR );
 		} else{
 			return MR_ENTER;
 		}
@@ -189,9 +202,9 @@ MfMenuReturnCode mfMenuVertical( int x, int y, MfMenuItem mi[], size_t items_num
 				blitString( x, y, line, MENU_FGCOLOR, MENU_BGCOLOR );
 			}
 		}
-		y += 8;
+		y += BLIT_CHAR_HEIGHT;
 	}
-	return MR_STAY;
+	return MR_CONTINUE;
 }
 
 void mfThreadsStatChange( bool stat, SceUID thlist[], int thnum )
@@ -206,6 +219,13 @@ void mfThreadsStatChange( bool stat, SceUID thlist[], int thnum )
 	}
 	
 	for( i = 0; i < thnum; i++ ){
+		SceKernelThreadInfo thinfo;
+		
+		/* Sce関連のスレッドは止めない */
+		if( sceKernelReferThreadStatus( thlist[i], &thinfo ) == 0 ){
+			if( thinfo.name[0] == 'S' && thinfo.name[1] == 'c' && thinfo.name[2] == 'e' ) continue;
+		}
+		
 		if( thlist[i] != sceKernelGetThreadId() ){
 			( *request_stat_func )( thlist[i] );
 		}
@@ -220,4 +240,14 @@ void mfWaitScreenReload( int sec )
 void mfClearScreenWhenVsync( void )
 {
 	st_clear_vsync = true;
+}
+
+bool mfIsEnabled( void )
+{
+	return ( gMfEngine == 0 ? false : true );
+}
+
+bool mfIsDisabled( void )
+{
+	return ( gMfEngine == 0 ? true : false );
 }

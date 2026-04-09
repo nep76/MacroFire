@@ -7,22 +7,8 @@
 static int st_runLoop          = 0;
 static MacroRunMode st_runMode = MRM_NONE;
 static MacroData *st_curMacro  = NULL;
-static unsigned int st_temp_buttons, st_temp_timestamp;
-
-static MfMenuItem st_macroMenu[] = {
-	{ MT_ANCHOR, 0, "Load from MS (not impremented yet)", { 0 } },
-	{ MT_ANCHOR, 0, "Save to MS (not impremented yet)",   { 0 } },
-	{ MT_BORDER, 0, 0, { 0 } },
-	{ MT_ANCHOR, 0, "Edit macro (only display)", { 0 } },
-	{ MT_ANCHOR, 0, "Clear macro",  { 0 } },
-	{ MT_BORDER, 0, 0, { 0 } },
-	{ MT_ANCHOR, 0, "Start recording", { 0 } },
-	{ MT_ANCHOR, 0, "Stop recording",  { 0 } },
-	{ MT_BORDER, 0, 0, { 0 } },
-	{ MT_ANCHOR, 0, "Run once",     { 0 } },
-	{ MT_ANCHOR, 0, "Run infinity", { 0 } },
-	{ MT_ANCHOR, 0, "Stop macro",   { 0 } }
-};
+static unsigned int st_temp_buttons;
+static u64 st_temp_tick;
 
 #define MACRO_LOAD         0
 #define MACRO_SAVE         1
@@ -33,8 +19,246 @@ static MfMenuItem st_macroMenu[] = {
 #define MACRO_RUN_ONCE     9
 #define MACRO_RUN_INFINITY 10
 #define MACRO_RUN_HALT     11
+static MfMenuItem st_macroMenu[] = {
+	{ MT_ANCHOR, 0, "Load from MS (not impremented yet)", { 0 } },
+	{ MT_ANCHOR, 0, "Save to MS (not impremented yet)",   { 0 } },
+	{ MT_BORDER, 0, 0, { 0 } },
+	{ MT_ANCHOR, 0, "Edit macro", { 0 } },
+	{ MT_ANCHOR, 0, "Clear macro",  { 0 } },
+	{ MT_BORDER, 0, 0, { 0 } },
+	{ MT_ANCHOR, 0, "Start recording", { 0 } },
+	{ MT_ANCHOR, 0, "Stop recording",  { 0 } },
+	{ MT_BORDER, 0, 0, { 0 } },
+	{ MT_ANCHOR, 0, "Run once",     { 0 } },
+	{ MT_ANCHOR, 0, "Run infinity", { 0 } },
+	{ MT_ANCHOR, 0, "Stop macro",   { 0 } }
+};
 
+static MacroData *macro_add_data( MacroData **macro );
+static void macro_record( HookCaller caller, SceCtrlData *pad_data, void *argp );
+static void macro_trace( HookCaller caller, SceCtrlData *pad_data, void *argp );
+static bool macro_is_busy( void );
+static bool macro_is_avail( void );
+static bool macro_is_enabled_mf_engine( void );
 
+void macroInit( void )
+{
+	return;
+}
+
+void macroTerm( void )
+{
+	macroClear( NULL, NULL );
+}
+
+MfMenuReturnCode macroRunInterrupt( SceCtrlLatch *pad_latch, SceCtrlData *pad_data )
+{
+	if( st_runMode != MRM_TRACE ){
+		blitString( blitOffsetChar( 3 ), blitOffsetLine( 2 ), "Not ran yet.", MENU_FGCOLOR, MENU_BGCOLOR );
+	} else{
+		st_runMode = MRM_NONE;
+		blitString( blitOffsetChar( 3 ), blitOffsetLine( 2 ), "Macro halted.", MENU_FGCOLOR, MENU_BGCOLOR );
+		macro_trace( CALL_PEEK_BUFFER_POSITIVE, NULL, NULL );
+	}
+	mfWaitScreenReload( MACRO_NOTICE_DISPLAY_SEC );
+	return MR_BACK;
+}
+
+MfMenuReturnCode macroRunOnce( SceCtrlLatch *pad_latch, SceCtrlData *pad_data )
+{
+	if( macro_is_busy() || ! macro_is_avail() || ! macro_is_enabled_mf_engine() ) return MR_BACK;
+	
+	st_runLoop = 1;
+	st_runMode = MRM_TRACE;
+	
+	blitString( blitOffsetChar( 3 ), blitOffsetLine( 2 ), "Run Once...", MENU_FGCOLOR, MENU_BGCOLOR );
+	mfWaitScreenReload( 1 );
+	mfMenuQuit();
+	
+	return MR_BACK;
+}
+
+MfMenuReturnCode macroRunInfinity( SceCtrlLatch *pad_latch, SceCtrlData *pad_data )
+{
+	if( macro_is_busy() || ! macro_is_avail() || ! macro_is_enabled_mf_engine() ) return MR_BACK;
+	
+	st_runLoop = 0;
+	st_runMode = MRM_TRACE;
+	
+	blitString( blitOffsetChar( 3 ), blitOffsetLine( 2 ), "Run Infinity...", MENU_FGCOLOR, MENU_BGCOLOR );
+	mfWaitScreenReload( 1 );
+	mfMenuQuit();
+	
+	return MR_BACK;
+
+}
+
+void macroMain( HookCaller caller, SceCtrlData *pad_data, void *argp )
+{
+	switch( st_runMode ){
+		case MRM_NONE: break;
+		case MRM_TRACE:  macro_trace( caller, pad_data, argp );  break;
+		case MRM_RECORD: macro_record( caller, pad_data, argp ); break;
+	}
+}
+
+MfMenuReturnCode macroLoad( SceCtrlLatch *pad_latch, SceCtrlData *pad_data )
+{
+	if( macro_is_busy() ) return MR_BACK;
+	
+	blitString( blitOffsetChar( 3 ), blitOffsetLine( 2 ), "Not impremented yet.", MENU_FGCOLOR, MENU_BGCOLOR );
+	mfWaitScreenReload( MACRO_NOTICE_DISPLAY_SEC );
+	return MR_BACK;
+}
+
+MfMenuReturnCode macroSave( SceCtrlLatch *pad_latch, SceCtrlData *pad_data )
+{
+	if( macro_is_busy() || ! macro_is_avail() ) return MR_BACK;
+	
+	blitString( blitOffsetChar( 3 ), blitOffsetLine( 2 ), "Not impremented yet.", MENU_FGCOLOR, MENU_BGCOLOR );
+	mfWaitScreenReload( MACRO_NOTICE_DISPLAY_SEC );
+	return MR_BACK;
+}
+
+MfMenuReturnCode macroEdit( SceCtrlLatch *pad_latch, SceCtrlData *pad_data )
+{
+	if( macro_is_busy() || ! macro_is_avail() ) return MR_BACK;
+	
+	return macroeditorMain( pad_latch, pad_data, st_curMacro );
+}
+
+MfMenuReturnCode macroClear( SceCtrlLatch *pad_latch, SceCtrlData *pad_data )
+{
+	MacroData *macro_data;
+	
+	if( macro_is_busy() || ! macro_is_avail() ) return MR_BACK;
+	
+	if( ! st_curMacro->next ){
+		MemSceFree( st_curMacro );
+	} else{
+		for( macro_data = st_curMacro->next; macro_data->next; macro_data = macro_data->next ){
+			MemSceFree( macro_data->prev );
+		}
+		MemSceFree( macro_data->prev );
+		MemSceFree( macro_data );
+	}
+	
+	st_curMacro = NULL;
+	
+	blitString( blitOffsetChar( 3 ), blitOffsetLine( 2 ), "Clearing current macro...", MENU_FGCOLOR, MENU_BGCOLOR );
+	mfWaitScreenReload( MACRO_NOTICE_DISPLAY_SEC );
+	
+	return MR_BACK;
+}
+
+MfMenuReturnCode macroRecordStop( SceCtrlLatch *pad_latch, SceCtrlData *pad_data )
+{
+	if( st_runMode == MRM_RECORD ){
+		st_runMode = MRM_NONE;
+		blitString( blitOffsetChar( 3 ), blitOffsetLine( 2 ), "Stopping macro recording...", MENU_FGCOLOR, MENU_BGCOLOR );
+	} else{
+		blitString( blitOffsetChar( 3 ), blitOffsetLine( 2 ), "Not recorded yet.", MENU_FGCOLOR, MENU_BGCOLOR );
+	}
+	
+	mfWaitScreenReload( MACRO_NOTICE_DISPLAY_SEC );
+	return MR_BACK;
+}
+
+MfMenuReturnCode macroRecordStart( SceCtrlLatch *pad_latch, SceCtrlData *pad_data )
+{
+	static int sec = 3;
+	
+	if( macro_is_busy() || ! macro_is_enabled_mf_engine() ) return MR_BACK;
+	
+	if( st_runMode == MRM_RECORD ){
+		blitString( blitOffsetChar( 3 ), blitOffsetLine( 2 ), "Already started recording", MENU_FGCOLOR, MENU_BGCOLOR );
+		mfWaitScreenReload( MACRO_NOTICE_DISPLAY_SEC );
+		return MR_BACK;
+	}
+	
+	/* 既にマクロがあればクリア */
+	if( st_curMacro ) macroClear( NULL, NULL );
+	
+	while( sec-- ){
+		char cntdown[16];
+		
+		blitFillBox( 3, 50, 480, 8, MENU_BGCOLOR );
+		
+		sprintf( cntdown, "%d seconds...", sec + 1 );
+		blitString( blitOffsetChar( 3 ), blitOffsetLine( 2 ), "Please RELEASING ALL BUTTONS until returning to the game...", MENU_FGCOLOR, MENU_BGCOLOR );
+		blitString( blitOffsetChar( 3 ), blitOffsetLine( 5 ), cntdown, MENU_FGCOLOR, MENU_BGCOLOR );
+		mfWaitScreenReload( 1 );
+		
+		return MR_CONTINUE;
+	}
+	
+	sec = 3;
+	st_runMode = MRM_RECORD;
+	
+	mfMenuQuit();
+	
+	return MR_BACK;
+}
+
+MfMenuReturnCode macroMenu( SceCtrlLatch *pad_latch, SceCtrlData *pad_data, void *argp )
+{
+	static int  selected = 0;
+	static int  old_selected = 0;
+	static MacroFunction function;
+	
+	if( ! function ){
+		switch( mfMenuVertical( blitOffsetChar( 5 ), blitOffsetLine( 4 ), BLIT_SCR_WIDTH, st_macroMenu, ARRAY_NUM( st_macroMenu ), &selected ) ){
+			case MR_CONTINUE:
+				blitString( blitOffsetChar( 3 ), blitOffsetLine( 2 ), "Please choose a operation.", MENU_FGCOLOR, MENU_BGCOLOR );
+				if( selected != old_selected ) blitFillBox( 5, blitOffsetLine( 25 ), 480, BLIT_CHAR_HEIGHT, MENU_BGCOLOR );
+				switch( selected ){
+					case MACRO_LOAD        : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), "Loading a macro from MemoryStick.", MENU_FGCOLOR, MENU_BGCOLOR ); break;
+					case MACRO_SAVE        : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), "Saving a macro to MemoryStick.", MENU_FGCOLOR, MENU_BGCOLOR ); break;
+					case MACRO_EDIT        : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), "Edit current macro.", MENU_FGCOLOR, MENU_BGCOLOR ); break;
+					case MACRO_CLEAR       : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), "Clear current macro.", MENU_FGCOLOR, MENU_BGCOLOR ); break;
+					case MACRO_RECORD_START: blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), "Starting recording macro.", MENU_FGCOLOR, MENU_BGCOLOR ); break;
+					case MACRO_RECORD_STOP : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), "Stopping recording macro.", MENU_FGCOLOR, MENU_BGCOLOR ); break;
+					case MACRO_RUN_ONCE    : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), "Run current macro for once.", MENU_FGCOLOR, MENU_BGCOLOR ); break;
+					case MACRO_RUN_INFINITY: blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), "Run current macro for endless.", MENU_FGCOLOR, MENU_BGCOLOR ); break;
+					case MACRO_RUN_HALT    : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), "Stop current running macro.", MENU_FGCOLOR, MENU_BGCOLOR ); break;
+				}
+				blitString( blitOffsetChar( 3 ), blitOffsetLine( 31 ), "\x80 = MoveUp, \x82 = MoveDown, \x85 = Enter, \x86 = Back, START = Exit", MENU_FGCOLOR, MENU_BGCOLOR );
+				old_selected = selected;
+				break;
+			case MR_ENTER:
+				switch( selected ){
+					case MACRO_LOAD        : function = macroLoad;        break;
+					case MACRO_SAVE        : function = macroSave;        break;
+					case MACRO_EDIT        : function = macroEdit;        break;
+					case MACRO_CLEAR       : function = macroClear;       break;
+					case MACRO_RECORD_START: function = macroRecordStart; break;
+					case MACRO_RECORD_STOP : function = macroRecordStop;  break;
+					case MACRO_RUN_ONCE    : function = macroRunOnce;     break;
+					case MACRO_RUN_INFINITY: function = macroRunInfinity; break;
+					case MACRO_RUN_HALT    : function = macroRunInterrupt;break;
+				}
+				/* 最後のボタン情報をリセット */
+				st_temp_buttons = 0;
+				st_temp_tick    = 0;
+				
+				mfClearColor( MENU_BGCOLOR );
+				break;
+			case MR_BACK:
+				selected = 0;
+				return MR_BACK;
+		}
+	} else{
+		if( ( function )( pad_latch, pad_data ) == MR_BACK ){
+			function = NULL;
+			mfClearScreenWhenVsync();
+		}
+	}
+	return MR_CONTINUE;
+}
+
+/*-----------------------------------------------
+	Static関数
+------------------------------------------------*/
 static MacroData *macro_add_data( MacroData **macro )
 {
 	if( ! macro ) return NULL;
@@ -83,7 +307,12 @@ static void macro_record( HookCaller caller, SceCtrlData *pad_data, void *argp )
 	cur_buttons &= 0x0000FFFF;
 	
 	if( st_temp_buttons == cur_buttons ){
+		u64 tick;
+		sceRtcGetCurrentTick( &tick );
+		
 		if( cur_macro && cur_macro->action == MA_DELAY ){
+			cur_macro->data = tick - st_temp_tick;
+			if( cur_macro->data > MACRO_MAX_DELAY ) cur_macro->data = MACRO_MAX_DELAY;
 			return;
 		} else{
 			macro_add_data( &cur_macro );
@@ -91,16 +320,16 @@ static void macro_record( HookCaller caller, SceCtrlData *pad_data, void *argp )
 			
 			cur_macro->action = MA_DELAY;
 			cur_macro->data   = 0;
-			st_temp_timestamp = pad_data->TimeStamp;
+			st_temp_tick      = tick;
 		}
 	} else{
 		unsigned int press_buttons   = ( st_temp_buttons ^ cur_buttons ) & cur_buttons;
 		unsigned int release_buttons = ( st_temp_buttons ^ cur_buttons ) & st_temp_buttons;
 		
-		macro_add_data( &cur_macro );
-		if( ! cur_macro ) return;
-		
-		if( cur_macro->prev && cur_macro->prev->action == MA_DELAY ) cur_macro->prev->data = pad_data->TimeStamp - st_temp_timestamp;
+		if( cur_macro && cur_macro->action == MA_DELAY && cur_macro->data != 0 ){
+			macro_add_data( &cur_macro );
+			if( ! cur_macro ) return;
+		}
 		
 		if( press_buttons && release_buttons ){
 			cur_macro->action = MA_BUTTONS_CHANGE;
@@ -129,17 +358,27 @@ static void macro_trace( HookCaller caller, SceCtrlData *pad_data, void *argp )
 	
 	if( ! cur_macro ) cur_macro = st_curMacro;
 	
+	if( caller == CALL_PEEK_LATCH || caller == CALL_READ_LATCH ){
+		pad_data->Buttons |= st_temp_buttons;
+		return;
+	}
+	
 	switch( cur_macro->action ){
 		case MA_DELAY:
-			if( ! cur_macro->data ){
-				break;
-			} else if( ! st_temp_timestamp ){
-				st_temp_timestamp = pad_data->TimeStamp;
-				forward = false;
-			} else if( ( pad_data->TimeStamp - st_temp_timestamp ) > cur_macro->data ){
-				if( caller != CALL_PEEK_LATCH && caller != CALL_READ_LATCH ) st_temp_timestamp = 0;
-			} else{
-				forward = false;
+			{
+				u64 tick;
+				sceRtcGetCurrentTick( &tick );
+				
+				if( ! cur_macro->data ){
+					break;
+				} else if( ! st_temp_tick ){
+					st_temp_tick = tick;
+					forward = false;
+				} else if( ( tick - st_temp_tick ) > cur_macro->data ){
+					st_temp_tick = 0;
+				} else{
+					forward = false;
+				}
 			}
 			break;
 		case MA_BUTTONS_PRESS:
@@ -158,13 +397,13 @@ static void macro_trace( HookCaller caller, SceCtrlData *pad_data, void *argp )
 		case CALL_READ_BUFFER_NEGATIVE:
 			pad_data->Buttons = ~( ~(pad_data->Buttons) | st_temp_buttons );
 			break;
-		case CALL_PEEK_LATCH:
-		case CALL_READ_LATCH:
-			forward = false;
 		case CALL_PEEK_BUFFER_POSITIVE:
 		case CALL_READ_BUFFER_POSITIVE:
 			pad_data->Buttons |= st_temp_buttons;
 			break;
+		case CALL_PEEK_LATCH:
+		case CALL_READ_LATCH:
+			break; /* 警告抑止 */
 	}
 	
 	if( ! forward ) return;
@@ -182,7 +421,7 @@ static void macro_trace( HookCaller caller, SceCtrlData *pad_data, void *argp )
 static bool macro_is_busy( void )
 {
 	if( st_runMode != MRM_NONE ){
-		blitString( 3, 16, "Macro function is busy.", MENU_FGCOLOR, MENU_BGCOLOR );
+		blitString( blitOffsetChar( 3 ), blitOffsetLine( 2 ), "Macro function is busy.", MENU_FGCOLOR, MENU_BGCOLOR );
 		mfWaitScreenReload( 1 );
 		return true;
 	}
@@ -193,236 +432,19 @@ static bool macro_is_busy( void )
 static bool macro_is_avail( void )
 {
 	if( ! st_curMacro ){
-		blitString( 3, 16, "No current macro.", MENU_FGCOLOR, MENU_BGCOLOR );
-		mfWaitScreenReload( NOTICE_DISPLAY_SEC );
+		blitString( blitOffsetChar( 3 ), blitOffsetLine( 2 ), "No current macro.", MENU_FGCOLOR, MENU_BGCOLOR );
+		mfWaitScreenReload( MACRO_NOTICE_DISPLAY_SEC );
 		return false;
 	}
 	return true;
 }
 
-void macroInit( void )
+static bool macro_is_enabled_mf_engine( void )
 {
-	
-}
-
-void macroTerm( void )
-{
-	macroClear( NULL );
-}
-
-bool macroRunInterrupt( SceCtrlData *pad_data )
-{
-	if( st_runMode != MRM_TRACE ){
-		blitString( 3, 16, "Not ran yet.", MENU_FGCOLOR, MENU_BGCOLOR );
-	} else{
-		st_runMode = MRM_NONE;
-		blitString( 3, 16, "Macro halted.", MENU_FGCOLOR, MENU_BGCOLOR );
-		macro_trace( CALL_PEEK_BUFFER_POSITIVE, NULL, NULL );
-	}
-	mfWaitScreenReload( NOTICE_DISPLAY_SEC );
-	return false;
-}
-
-bool macroRunOnce( SceCtrlData *pad_data )
-{
-	if( macro_is_busy() || ! macro_is_avail() ) return false;
-	
-	st_runLoop = 1;
-	st_runMode = MRM_TRACE;
-	
-	blitString( 3, 16, "Run Once...", MENU_FGCOLOR, MENU_BGCOLOR );
-	mfWaitScreenReload( 1 );
-	mfMenuQuit();
-	
-	return false;
-}
-
-bool macroRunInfinity( SceCtrlData *pad_data )
-{
-	if( macro_is_busy() || ! macro_is_avail() ) return false;
-	
-	st_runLoop = 0;
-	st_runMode = MRM_TRACE;
-	
-	blitString( 3, 16, "Run Infinity...", MENU_FGCOLOR, MENU_BGCOLOR );
-	mfWaitScreenReload( 1 );
-	mfMenuQuit();
-	
-	return false;
-
-}
-
-bool macroMain( HookCaller caller, SceCtrlData *pad_data, void *argp )
-{
-	switch( st_runMode ){
-		case MRM_NONE: break;
-		case MRM_TRACE:  macro_trace( caller, pad_data, argp );  break;
-		case MRM_RECORD: macro_record( caller, pad_data, argp ); break;
-	}
-	
-	return true;
-}
-
-bool macroLoad( SceCtrlData *pad_data )
-{
-	if( macro_is_busy() ) return false;
-	
-	blitString( 3, 16, "Not impremented yet.", MENU_FGCOLOR, MENU_BGCOLOR );
-	mfWaitScreenReload( NOTICE_DISPLAY_SEC );
-	return false;
-}
-
-bool macroSave( SceCtrlData *pad_data )
-{
-	if( macro_is_busy() || ! macro_is_avail() ) return false;
-	
-	blitString( 3, 16, "Not impremented yet.", MENU_FGCOLOR, MENU_BGCOLOR );
-	mfWaitScreenReload( NOTICE_DISPLAY_SEC );
-	return false;
-}
-
-bool macroEdit( SceCtrlData *pad_data )
-{
-	MacroData *macro_data;
-	char line[64];
-	int y = 16;
-	
-	if( macro_is_busy() || ! macro_is_avail() ) return false;
-	
-	for( macro_data = st_curMacro; macro_data; macro_data = macro_data->next ){
-		sprintf( line, "%d, %x", macro_data->action, macro_data->data );
-		blitString( 3, y, line, MENU_FGCOLOR, MENU_BGCOLOR );
-		y += 8;
-		if( y > 272 ) break;
-	}
-	
-	mfWaitScreenReload( NOTICE_DISPLAY_SEC );
-	return false;
-}
-
-bool macroClear( SceCtrlData *pad_data )
-{
-	MacroData *macro_data;
-	
-	if( macro_is_busy() || ! macro_is_avail() ) return false;
-	
-	if( ! st_curMacro->next ){
-		MemSceFree( st_curMacro );
-	} else{
-		for( macro_data = st_curMacro->next; macro_data->next; macro_data = macro_data->next ){
-			MemSceFree( macro_data->prev );
-		}
-		MemSceFree( macro_data->prev );
-		MemSceFree( macro_data );
-	}
-	
-	st_curMacro = NULL;
-	
-	blitString( 3, 16, "Clearing current macro...", MENU_FGCOLOR, MENU_BGCOLOR );
-	mfWaitScreenReload( NOTICE_DISPLAY_SEC );
-	
-	return false;
-}
-
-bool macroRecordStop( SceCtrlData *pad_data )
-{
-	if( st_runMode == MRM_RECORD ){
-		st_runMode = MRM_NONE;
-		blitString( 3, 16, "Stopping macro recording...", MENU_FGCOLOR, MENU_BGCOLOR );
-	} else{
-		blitString( 3, 16, "Not recorded yet.", MENU_FGCOLOR, MENU_BGCOLOR );
-	}
-	
-	mfWaitScreenReload( NOTICE_DISPLAY_SEC );
-	return false;
-}
-
-bool macroRecordStart( SceCtrlData *pad_data )
-{
-	static int sec = 3;
-	
-	if( st_runMode == MRM_RECORD ){
-		blitString( 3, 16, "Already started recording", MENU_FGCOLOR, MENU_BGCOLOR );
-		mfWaitScreenReload( NOTICE_DISPLAY_SEC );
+	if( mfIsDisabled() ){
+		blitString( blitOffsetChar( 3 ), blitOffsetLine( 2 ), "MacroFire Engine is currently off.", MENU_FGCOLOR, MENU_BGCOLOR );
+		mfWaitScreenReload( MACRO_NOTICE_DISPLAY_SEC );
 		return false;
-	}
-	
-	/* 既にマクロがあればクリア */
-	if( st_curMacro ) macroClear( NULL );
-	
-	while( sec-- ){
-		char cntdown[16];
-		
-		blitFillRect( 3, 50, 480, 8, MENU_BGCOLOR );
-		
-		sprintf( cntdown, "%d seconds...", sec + 1 );
-		blitString( 3, 16, "Please RELEASING ALL BUTTONS until returning to the game...", MENU_FGCOLOR, MENU_BGCOLOR );
-		blitString( 3, 50, cntdown, MENU_FGCOLOR, MENU_BGCOLOR );
-		mfWaitScreenReload( 1 );
-		
-		return true;
-	}
-	
-	sec = 3;
-	st_runMode = MRM_RECORD;
-	
-	mfMenuQuit();
-	
-	return false;
-}
-
-bool macroMenu( SceCtrlLatch *pad_latch, SceCtrlData *pad_data, void *argp )
-{
-	static int  selected = 0;
-	static int  old_selected = 0;
-	static MACRO_FUNCTION function;
-	
-	if( ! function ){
-		switch( mfMenuVertical( 5, 32, st_macroMenu, ARRAY_NUM( st_macroMenu ), &selected ) ){
-			case MR_STAY:
-				blitString( 3, 16, "Please choose a operation.", MENU_FGCOLOR, MENU_BGCOLOR );
-				if( selected != old_selected ) blitFillRect( 5, 200, 480, 8, MENU_BGCOLOR );
-				switch( selected ){
-					case MACRO_LOAD:  blitString( 5, 200, "Loading a macro from MemoryStick.", MENU_FGCOLOR, MENU_BGCOLOR ); break;
-					case MACRO_SAVE:  blitString( 5, 200, "Saving a macro to MemoryStick.", MENU_FGCOLOR, MENU_BGCOLOR ); break;
-					case MACRO_EDIT:  blitString( 5, 200, "Edit current macro.", MENU_FGCOLOR, MENU_BGCOLOR ); break;
-					case MACRO_CLEAR: blitString( 5, 200, "Clear current macro.", MENU_FGCOLOR, MENU_BGCOLOR ); break;
-					case MACRO_RECORD_START: blitString( 5, 200, "Starting recording macro.", MENU_FGCOLOR, MENU_BGCOLOR ); break;
-					case MACRO_RECORD_STOP : blitString( 5, 200, "Stopping recording macro.", MENU_FGCOLOR, MENU_BGCOLOR ); break;
-					case MACRO_RUN_ONCE    : blitString( 5, 200, "Run current macro for once.", MENU_FGCOLOR, MENU_BGCOLOR ); break;
-					case MACRO_RUN_INFINITY: blitString( 5, 200, "Run current macro for endless.", MENU_FGCOLOR, MENU_BGCOLOR ); break;
-					case MACRO_RUN_HALT    : blitString( 5, 200, "Stop current running macro.", MENU_FGCOLOR, MENU_BGCOLOR ); break;
-				}
-				blitString( 3, 245, "UP = MoveUp, DOWN = MoveDown, CIRCLE = Enter\nCROSS = Back, START = Exit", MENU_FGCOLOR, MENU_BGCOLOR );
-				old_selected = selected;
-				break;
-			case MR_ENTER:
-				switch( selected ){
-					case MACRO_LOAD:         function = macroLoad;        break;
-					case MACRO_SAVE:         function = macroSave;        break;
-					case MACRO_EDIT:         function = macroEdit;        break;
-					case MACRO_CLEAR:        function = macroClear;       break;
-					case MACRO_RECORD_START: function = macroRecordStart; break;
-					case MACRO_RECORD_STOP : function = macroRecordStop;  break;
-					case MACRO_RUN_ONCE    : function = macroRunOnce;     break;
-					case MACRO_RUN_INFINITY: function = macroRunInfinity; break;
-					case MACRO_RUN_HALT    : function = macroRunInterrupt;break;
-				}
-				/* 最後のボタン情報をリセット */
-				st_temp_buttons   = 0;
-				st_temp_timestamp = 0;
-				
-				mfClearColor( MENU_BGCOLOR );
-				break;
-			case MR_BACK:
-				selected = 0;
-				return false;
-		}
-	} else{
-		if( ! ( function )( pad_data ) ){
-			function = NULL;
-			mfClearScreenWhenVsync();
-		}
 	}
 	return true;
 }

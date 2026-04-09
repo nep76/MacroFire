@@ -6,6 +6,7 @@
 #define __MACROFIRE__
 
 #include <pspkernel.h>
+#include <pspdisplay_kernel.h>
 #include <pspdisplay.h>
 #include <pspctrl.h>
 #include <stdio.h>
@@ -23,8 +24,6 @@
 #include "menu.h"
 #include "psp/blit.h"
 
-int mfDisplayWaitVblankStart( void );
-
 int mfCtrlPeekBufferPositive( SceCtrlData *pad, int count );
 int mfCtrlPeekBufferNegative( SceCtrlData *pad, int count );
 int mfCtrlReadBufferPositive( SceCtrlData *pad, int count );
@@ -32,9 +31,8 @@ int mfCtrlReadBufferNegative( SceCtrlData *pad, int count );
 int mfCtrlPeekLatch( SceCtrlLatch *latch );
 int mfCtrlReadLatch( SceCtrlLatch *latch );
 
+int main_thread( SceSize arglen, void *argp );
 int module_start( SceSize arglen, void *argp );
 int module_stop( void );
-
-#include "hooktable.h"
 
 #endif

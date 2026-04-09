@@ -18,11 +18,16 @@
 #ifndef __MEMSCE_H__
 #define __MEMSCE_H__
 
+#include <pspkernel.h>
+#include <pspkerneltypes.h>
+#include <string.h>
+
+#define MEMSCE_POWER_OF_TWO( x ) ( ! ( x & ( x - 1 ) ) )
+#define MEMSCE_ALIGNOFFSET(x, align) (((x)+((align)-1))&~((align)-1))
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#include <pspkerneltypes.h>
 
 enum MallocScePartitionType {
 	PSP_MEMPART_KERNEL_1 = 1,
@@ -31,6 +36,12 @@ enum MallocScePartitionType {
 	PSP_MEMPART_KERNEL_3,
 	PSP_MEMPART_KERNEL_4,
 	PSP_MEMPART_USER_2
+};
+
+struct heap_header {
+	char is_free;
+	SceUID	block_id;
+	unsigned int size;
 };
 
 /* MemSceMalloc
@@ -105,10 +116,6 @@ void *MemSceMemalign( SceSize boundary, SceSize size );
  *
  *	@param: void *first_mem_ptr
  *		解放するメモリのアドレス。
- *
- *	@returns:
- *       ? : 成功
- *		< 0: 失敗
  */
 int MemSceFree( void *heap_start );
 

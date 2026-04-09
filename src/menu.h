@@ -38,9 +38,9 @@ typedef struct _mf_menu_chain {
 } MfMenuChain;
 
 typedef enum {
-	MR_ENTER,
 	MR_BACK,
-	MR_STAY
+	MR_ENTER,
+	MR_CONTINUE
 } MfMenuReturnCode;
 
 typedef enum {
@@ -96,8 +96,10 @@ void mfMenuQuit( void );
 	
 	メニューがアンカーの場合は、第5引数のselected変数に項目位置の番号と
 	返り値としてMR_ENTERが返る。
+	
+	×ボタンが押されるとMR_BACKが返る。
 */
-MfMenuReturnCode mfMenuVertical( int x, int y, MfMenuItem mi[], size_t items_num, int *selected );
+MfMenuReturnCode mfMenuVertical( int x, int y, int w, MfMenuItem mi[], size_t items_num, int *selected );
 
 /* スクリーンをクリア */
 void mfClearColor( u32 color );
@@ -105,5 +107,9 @@ void mfClearColor( u32 color );
 void mfWaitScreenReload( int sec );
 
 void mfClearScreenWhenVsync( void );
+
+bool mfIsEnabled( void );
+
+bool mfIsDisabled( void );
 
 #endif

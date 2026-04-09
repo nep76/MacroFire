@@ -6,7 +6,7 @@ BUILD_PRX = 1
 USE_KERNEL_LIBC = 1
 USE_KERNEL_LIBS = 1
 
-CLASSG_LIBS = ./libs
+CLASSG_LIBS = libs
 
 INCDIR = $(CLASSG_LIBS)
 CFLAGS = -Os -G0 -Wall -fno-strict-aliasing -fno-builtin-printf
@@ -15,13 +15,14 @@ ASFLAGS = $(CFLAGS)
 
 LIBDIR =
 LDFLAGS = -mno-crt0 -nostartfiles
-LIBS =
+LIBS = -lpsprtc
 
 OBJS = main.o \
        menu.o \
        hook.o \
        function/rapidfire.o \
        function/macro.o \
+       function/macroeditor.o \
        $(CLASSG_LIBS)/sstring.o \
        $(CLASSG_LIBS)/psp/blit.o \
        $(CLASSG_LIBS)/psp/memsce.o \

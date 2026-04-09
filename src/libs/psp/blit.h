@@ -1,10 +1,11 @@
 /*
-	PSPのVRAM上に文字を描画する。
+	PSPのVRAM上に図形を転送する。
 */
 
 #ifndef __BLIT_H__
 #define __BLIT_H__
 
+#include <pspkernel.h>
 #include <pspdisplay.h>
 #include <stdio.h>
 #include <string.h>
@@ -14,9 +15,39 @@
 #define MASK_5BIT 0x1F
 #define MASK_6BIT 0x3F
 
+/* 字間の幅 */
+#define BLIT_LETTER_SPACE 2
+
+/* この値を変えても文字が大きくなったり小さくなったりはしません */
+#define BLIT_CHAR_WIDTH  ( 5 + BLIT_LETTER_SPACE )
+#define BLIT_CHAR_HEIGHT 8
+
+#define BLIT_SCR_WIDTH  480
+#define BLIT_SCR_HEIGHT 272
+
+/* 関数にみえるマクロ */
+#define blitOffsetChar( x ) ( x * BLIT_CHAR_WIDTH  )
+#define blitOffsetLine( x ) ( x * BLIT_CHAR_HEIGHT )
+#define blitFillBox( x, y, w, h, c ) blitFillRect( x, y, x + w, y + h, c )
+#define blitLineBox( x, y, w, h, c ) blitLineRect( x, y, x + w, y + h, c )
+
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+typedef enum {
+	B8_PSPSDK,
+	B8_BUTTON_SYMBOL,
+} Blit8BitCharTable;
+
+typedef struct {
+	int mode;
+	int width;
+	int height;
+	int bufferWidth;
+	enum PspDisplayPixelFormats pixelFormat;
+	void *frameBuffer;
+} BlitDisplayStatus;
 
 /* blitColorConvert565
 	PSP_DISPLAY_PIXEL_FORAMT_8888形式の色を
@@ -77,22 +108,32 @@ u32 blitConvertColorFrom8888( enum PspDisplayPixelFormats pxfmt, u32 color );
 */
 int blitGetPixelLength( enum PspDisplayPixelFormats pxfmt );
 
-/* blitFillRect
-	指定した範囲を塗りつぶす。
+/* blitChar
+	任意の位置に文字を描画する。
 	
-	@param unsigned int x
-		塗りつぶしを開始するX座標。
+	@param unsigned int sx
+		描画する位置。
+		座標ではなく文字数なのに注意。
+		実際の座標では、x = ( sx * BLIT_CHAR_WIDTH ) となる。
 	
-	@param unsigned int y
-		塗りつぶしを開始するY座標。
+	@param unsigned int sy
+		描画する行。
+		座標ではなく行なのに注意。
+		実際の座標では、y = ( sy * BLIT_CHAR_HEIGHT ) となる。
 	
-	@param unsigned int w
-		塗りつぶす長さ。
+	@param const char chr
+		描画する文字。
 	
-	@param unsigned int h
-		塗りつぶす高さ。
+	@param u32 fgcolor
+		文字の色。
+	
+	@param u32 bgcolor
+		文字の背景の色。
+	
+	@return int
+		描画した文字数。
 */
-void blitFillRect( unsigned int x, unsigned int y, unsigned int w, unsigned int h, u32 color );
+int blitChar( unsigned int sx, unsigned int sy, const char chr, u32 fgcolor, u32 bgcolor );
 
 /* blitString
 	任意の位置に文字列を描画する。
@@ -116,6 +157,74 @@ void blitFillRect( unsigned int x, unsigned int y, unsigned int w, unsigned int 
 		描画した文字数。
 */
 int blitString( unsigned int sx, unsigned int sy, const char *msg, u32 fgcolor, u32 bgcolor );
+
+/* blitFillRect
+	指定した範囲を塗りつぶす。
+	
+	@param unsigned int sx
+		塗りつぶしを開始するX座標。
+	
+	@param unsigned int sy
+		塗りつぶしを開始するY座標。
+	
+	@param unsigned int ex
+		塗りつぶしを終了するX座標。
+	
+	@param unsigned int ey
+		塗りつぶしを終了するY座標。
+	
+	@param u32 color
+		塗りつぶす色。
+*/
+void blitFillRect( unsigned int sx, unsigned int sy, unsigned int ex, unsigned int ey, u32 color );
+
+/* blitLine
+	指定した座標へ線を描画する。
+	
+	@param unsigned int sx
+		線の開始X座標。
+	
+	@param unsigned int sy
+		線の開始Y座標。
+	
+	@param unsigned int ex
+		線の終了X座標。
+	
+	@param unsigned int ey
+		線の終了Y座標。
+	
+	@param u32 color
+		線の色。
+*/
+void blitLine( unsigned int sx, unsigned int sy, unsigned int ex, unsigned int ey, u32 color );
+
+/* blitLineRect
+	指定した座標へ矩形を描画する。
+	
+	@param unsigned int sx
+		矩形の開始X座標。
+	
+	@param unsigned int sy
+		矩形の開始Y座標。
+	
+	@param unsigned int ex
+		矩形の終了X座標。
+	
+	@param unsigned int ey
+		矩形の終了Y座標。
+	
+	@param u32 color
+		矩形の色。
+*/
+void blitLineRect( unsigned int sx, unsigned int sy, unsigned int ex, unsigned int ey, u32 color );
+
+/* blit8BitCharTableSwitch
+	8bit asciiコードに割り当てる図形テーブル。
+	
+	B8_PSPSDK: PSPSDK標準の8ビットコードテーブル。
+	B8_BUTTON_SUMBOL: \x80-\x88までしかない、ボタンを表す図形。
+*/
+void blit8BitCharTableSwitch( Blit8BitCharTable table );
 
 #ifdef __cplusplus
 }

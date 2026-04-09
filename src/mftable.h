@@ -7,12 +7,22 @@
 #ifndef __FUNCTIONTABLE_H__
 #define __FUNCTIONTABLE_H__
 
+#ifdef MFTABLE_DEFINE
+#define EXPORT
+#define ENTRY( x ) = x
+#else
+#define EXPORT extern
+#define ENTRY( x )
+#endif
+
+/* 機能を実装したソース */
 #include "function/rapidfire.h"
 #include "function/macro.h"
 
 typedef void ( *MfFuncInitTerm )( void );
-typedef bool ( *MfFuncMenu )( SceCtrlLatch*, SceCtrlData*, void* );
-typedef bool ( *MfFuncHook )( HookCaller, SceCtrlData*, void* );
+typedef void ( *MfFuncHook )( HookCaller, SceCtrlData*, void* );
+typedef MfMenuReturnCode ( *MfFuncMenu )( SceCtrlLatch*, SceCtrlData*, void* );
+typedef void ( *MfFuncIntr )( void );
 
 typedef struct {
 	MfFuncHook func;
@@ -21,42 +31,33 @@ typedef struct {
 
 typedef struct {
 	char *label;
-	MfFuncMenu func;
+	MfFuncMenu mainFunc;
+	MfFuncIntr intrFunc;
 	void *arg;
 } MenuEntry;
 
+typedef struct {
+	MfFuncInitTerm initFunc;
+	MfFuncInitTerm termFunc;
+	HookEntry hook;
+	MenuEntry menu;
+} MfEntry;
+
+EXPORT int mftableEntry ENTRY( 2 );
+EXPORT MfEntry mftable[]
 #ifdef MFTABLE_DEFINE
-int mftableInitEntry = 1;
-MfFuncInitTerm mftableInit[] = {
-	macroInit,
-};
-
-int mftableTermEntry = 1;
-MfFuncInitTerm mftableTerm[] = {
-	macroTerm,
-};
-
-int mftableHookEntry = 2;
-HookEntry mftableHook[] = {
-	{ rapidfireMain, 0 },
-	{ macroMain,     0 },
-};
-
-int mftableMenuEntry = 2;
-MenuEntry mftableMenu[] = {
-	{ "Rapidfire settings", rapidfireMenu, 0 },
-	{ "Macro settings", macroMenu, 0 },
-};
-#else
-extern int mftableInitEntry;
-extern MfFuncInitTerm mftableInit[];
-extern int mftableTermEntry;
-extern MfFuncInitTerm mftableTerm[];
-extern int mftableHookEntry;
-extern HookEntry mftableHook[];
-extern int mftableMenuEntry;
-extern MenuEntry mftableMenu[];
+= {
+	/*
+		機能を定義するテーブル
+		{ 初期化関数, 終了関数, { フック関数, 引数 }, { メニュー文字列, メニュー関数, メニュー中断関数, 引数 } }
+	*/
+	{ NULL,      NULL,      { rapidfireMain, NULL }, { "Rapidfire settings", rapidfireMenu, NULL, NULL } },
+	{ macroInit, macroTerm, { macroMain,     NULL }, { "Macro settings",     macroMenu,     NULL, NULL } },
+}
 #endif
+;
 
+#undef EXPORT
+#undef ENTRY
 
 #endif
