@@ -8,7 +8,7 @@
 #include <pspdebug.h>
 #include <stdbool.h>
 
-#define MF_MENU_TOP_MESSAGE "MacroFire v1.1.1 In-game menu [ClassG: http://classg.sytes.net]"
+#define MF_MENU_TOP_MESSAGE "MacroFire v1.1.2 In-game menu [ClassG: http://classg.sytes.net]"
 
 #ifdef GLOBAL_VARIABLES_DEFINE
 #define GLOBAL

@@ -23,9 +23,8 @@
 #include "menu.h"
 #include "psp/blit.h"
 
-typedef int ( *MfSceCtrlDataFunc     )( SceCtrlData*, int );
-typedef int ( *MfSceCtrlLatchFunc    )( SceCtrlLatch* );
-typedef int ( *MfSceCtrlSamplingConf )( int );
+typedef int ( *MfSceCtrlDataFunc  )( SceCtrlData*, int );
+typedef int ( *MfSceCtrlLatchFunc )( SceCtrlLatch* );
 
 int mfCtrlPeekBufferPositive( SceCtrlData *pad, int count );
 int mfCtrlPeekBufferNegative( SceCtrlData *pad, int count );
@@ -33,7 +32,6 @@ int mfCtrlReadBufferPositive( SceCtrlData *pad, int count );
 int mfCtrlReadBufferNegative( SceCtrlData *pad, int count );
 int mfCtrlPeekLatch( SceCtrlLatch *latch );
 int mfCtrlReadLatch( SceCtrlLatch *latch );
-int mfCtrlSetSamplingMode( int mode );
 
 int main_thread( SceSize arglen, void *argp );
 int module_start( SceSize arglen, void *argp );

@@ -1,6 +1,5 @@
 /*
-	APIフック
-	(内容をほとんど把握していないので、大部分をPSPLinkのソースから流用)
+	hook.c
 */
 
 #include "hook.h"
@@ -13,16 +12,15 @@ struct SyscallHeader
 	unsigned int size;
 };
 
-static void *hookFindSyscallAddr(unsigned int addr);
-static SceUID hookFindModuleUidByName( const char *modname );
-static SceLibraryEntryTable *hookFindLibrary( SceUID uid, const char *library );
-static void *hookFindExportAddrByNid( SceUID uid, const char *library, unsigned int nid );
-static unsigned int hookFindExportByNid( SceUID uid, const char *library, unsigned int nid );
-static void *hookApiAddr( SysApi *syscall, unsigned int *addr, void *func );
-
-static void *hookFindSyscallAddr(unsigned int addr)
+void *hookFindSyscallAddr( void *addr )
 {
-	/* SYSCALL例外発生時に呼ばれる例外ハンドラの位置を特定する？ */
+	/*
+		この関数のコードはPSPLinkのソースから丸ごとコピーしました。
+		
+		SYSCALL例外発生時に呼ばれる例外ハンドラの位置を特定している?
+		アセンブリコードが全然わからないのでコード内容は不明。
+		CFC0命令がまずなんだかわからないし、$12レジスタに一体何が書き込まれているのか？
+	*/
 	
 	struct SyscallHeader *head;
 	unsigned int *syscalls;
@@ -43,7 +41,7 @@ static void *hookFindSyscallAddr(unsigned int addr)
 	
 	for(i = 0; i < size; i++)
 	{
-		if(syscalls[i] == addr)
+		if(syscalls[i] == (unsigned int)addr)
 		{
 			return &syscalls[i];
 		}
@@ -52,152 +50,84 @@ static void *hookFindSyscallAddr(unsigned int addr)
 	return NULL;
 }
 
-/* モジュール名からUIDを取得 */
-static SceUID hookFindModuleUidByName( const char *modname )
+SceLibraryEntryTable *hookGetLibraryEntry( SceModule *modinfo, const char *libname )
 {
-	SceModule *modinfo;
+	int libent_count = 0;
+	SceLibraryEntryTable *libent;
 	
-	if( ! modname ) return 0;
+	if( ! modinfo ) return NULL;
 	
-	modinfo = sceKernelFindModuleByName( modname );
-	if( ! modinfo ) return 0;
+	libent = (SceLibraryEntryTable *)modinfo->ent_top;
 	
-	return modinfo->modid;
-}
-
-/* モジュールがエクスポートしているライブラリエントリを返す */
-static SceLibraryEntryTable *hookFindLibrary( SceUID uid, const char *library )
-{
-	SceModule *modinfo;
-	SceLibraryEntryTable *entry;
-	
-	/* モジュール情報を取得 */
-	modinfo = sceKernelFindModuleByUID( uid );
-	
-	if( modinfo ){
-		int i = 0;
-		
-		/* ent_topメンバがライブラリエントリの先頭を示す */
-		entry = (SceLibraryEntryTable *)modinfo->ent_top;
-		
-		/* 順番にライブラリエントリの名前がlibraryに一致するか調べる */
-		while( i < modinfo->ent_size ){
-			if(
-				( entry->libname && ( strcmp( entry->libname, library ) == 0 ) ) ||
-				( ! entry->libname && ! library )
-			){
-				return entry;
-			}
-			entry++;
+	while( libent_count < modinfo->ent_size ){
+		if( strcmp( libent->libname, libname ) == 0 ){
+			return libent;
 		}
+		libent++;
+		libent_count++;
 	}
 	
 	return NULL;
 }
 
-static void *hookFindExportAddrByNid( SceUID uid, const char *library, unsigned int nid )
+void *hookGetExportedAddrPointer( SceLibraryEntryTable *libent, unsigned int nid )
 {
-	SceLibraryEntryTable *entry;
-	unsigned int *addr = 0;
+	unsigned int *nid_table;
+	int entry_count = 0;
 	
-	/* 目的のライブラリエントリを取得 */
-	entry = hookFindLibrary( uid, library );
-	if( entry ){
-		/* エクスポートしている関数があれば調べる */
-		if( entry->stubcount > 0 ){
-			
-			/* NIDテーブルを取得し、NIDと一致する要素を探す */
-			unsigned int *nidtable = entry->entrytable;
-			
-			int i;
-			for( i = 0; i < entry->stubcount; i++ ){
-				/*
-					一致する要素が見つかったらポインタを返すが、全NIDリスト分ずらして返す。
-					どうやらentrytableには、先頭からまずNIDが並べられ、
-					その後ろに実際のAPIとして呼ばれる関数ポインタ(を導く何かのアドレス？)が保存されているっぽい。
-				*/
-				if( nidtable[i] == nid ) return &nidtable[i + entry->stubcount + entry->vstubcount];
-			}
+	/* エクスポートしている関数がなければ戻る */
+	if( libent->stubcount <= 0 ) return NULL;
+	
+	nid_table = libent->entrytable;
+	
+	while( entry_count < libent->stubcount ){
+		if( nid_table[entry_count] == nid ){
+			return (void *)nid_table[libent->stubcount + libent->vstubcount + entry_count];
 		}
+		entry_count++;
 	}
+	
+	return NULL;
+}
+
+void *hookFindExportedAddr( const char *modname, const char *libname, unsigned int nid )
+{
+	SceModule *modinfo;
+	SceLibraryEntryTable *libent;
+	void *addr;
+	
+	/* モジュール情報を取得 */
+	modinfo = sceKernelFindModuleByName( modname );
+	if( ! modinfo ) return NULL;
+	
+	/* ライブラリ情報を取得 */
+	libent = hookGetLibraryEntry( modinfo, libname );
+	if( ! libent ) return NULL;
+	
+	/* NIDからAPIのエントリポイントが保存されているアドレスを検出 */
+	addr = hookGetExportedAddrPointer( libent, nid );
 	
 	return addr;
 }
 
-static unsigned int hookFindExportByNid( SceUID uid, const char *library, unsigned int nid )
+void *hookUpdateExportedAddr( void **addr, void *entrypoint )
 {
-	unsigned int *addr;
+	void *prev_entrypoint;
 	
-	addr = hookFindExportAddrByNid( uid, library, nid );
-	if( ! addr ) return 0;
+	if( ! addr || ! entrypoint ) return NULL;
 	
-	return *addr;
-}
-
-static void *hookApiAddr( SysApi *syscall, unsigned int *addr, void *func )
-{
-	int intr;
+	/* すでにセットされているAPIのエントリポイントをコピー */
+	prev_entrypoint = *addr;
 	
-	if( ! addr ) return NULL;
-	
-	/* Interruptってなんじゃらほい */
-	intr = pspSdkDisableInterrupts();
-	
-	/* 既存のAPI情報を保存 */
-	if( syscall ){
-		syscall->addr = (void *)addr;
-		syscall->func = (void *)(*addr);
-	}
-	
-	/* APIとして呼ばれる関数ポインタを変更! */
-	*addr = (unsigned int)func;
-	
-	/* 以下2行はAPIとして呼ばれる関数ポインタを確実に書き換えるためのキャッシュ処理だと思われる。*/
+	/* フック関数となる新しいエントリポイントをセット */
+	*addr = entrypoint;
 	
 	/* CPU内のデータキャッシュ(Dcache)から、指定した範囲のキャッシュをメモリに書き戻して無効にする? */
 	sceKernelDcacheWritebackInvalidateRange( addr, sizeof( addr ) );
+	
 	/* CPU内のインストラクションキャッシュ(Icache)から、指定した範囲を無効にする? */
 	sceKernelIcacheInvalidateRange( addr, sizeof( addr ) );
 	
-	pspSdkEnableInterrupts( intr );
-	
-	return addr;
-}
-
-unsigned int hookApiByNid( SysApi *syscall, const char *modname, const char *library, unsigned int nid, void *func )
-{
-	unsigned int addr;
-	SceUID uid;
-	
-	/* モジュール名からモジュールUIDを取得 */
-	uid = hookFindModuleUidByName( modname );
-	
-	/* NIDテーブルを参照して目的のAPIを検索 */
-	addr = hookFindExportByNid( uid, library, nid );
-	
-	if( addr ){
-		/*
-			MIPSのSYSCALL例外発生時に呼ばれる例外ハンドラの位置を特定する？
-		*/
-		if( ! hookApiAddr( syscall, hookFindSyscallAddr( addr ), func ) ){
-			addr = 0;
-		}
-	}
-	
-	return addr;
-}
-
-void *hookRestoreAddr( SysApi *syscall )
-{
-	void *addr = 0;
-	
-	if( syscall->addr )
-		addr = hookApiAddr( NULL, (void *)syscall->addr, (void *)syscall->func );
-	
-	if( addr ){
-		syscall->addr = 0;
-		syscall->func = 0;
-	}
-	
-	return addr;
+	/* 今までセットされていた古いAPIのエントリポイントを返す */
+	return prev_entrypoint;
 }

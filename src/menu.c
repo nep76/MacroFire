@@ -160,8 +160,8 @@ void mfMenu( void )
 						cmndlgGetButtons( blitOffsetChar( 40 ), blitOffsetLine( 2 ), cgb, 1 );
 						mfClearColor( MENU_BGCOLOR );
 					} else{
-						mfClearColor( MENU_BGCOLOR );
 						function = mftable[selected - MACRO_MENU_OFFSET].menu.mainFunc;
+						mfClearColor( MENU_BGCOLOR );
 					}
 					break;
 			}

@@ -9,10 +9,22 @@ PSP_MODULE_INFO( "MacroFire", PSP_MODULE_KERNEL, 0, 0 );
 
 static SceCtrlData  st_pad_data;
 
-static int  st_sampling_mode = 100;
 static bool st_apihooked = false;
-static bool st_wait_toggle_button_release = false;
 static unsigned int st_prev_pad_buttons;
+
+static void mf_find_hookaddr( void )
+{
+	int i;
+	
+	for( i = 0; i < ARRAY_NUM( Hooktable ); i++ ){
+		Hooktable[i].exported.entrypoint = hookFindExportedAddr(
+			Hooktable[i].modname,
+			Hooktable[i].library,
+			Hooktable[i].nid
+		);
+		Hooktable[i].exported.addr = hookFindSyscallAddr( Hooktable[i].exported.entrypoint );
+	}
+}
 
 static void mf_call_intr( const int mfengine )
 {
@@ -46,18 +58,22 @@ static int mf_read_pad_buffer( MfSceCtrlDataFunc func, SceCtrlData *pad, int cou
 			if( mftable[i].hook.func ) ( mftable[i].hook.func )( mode, pad, mftable[i].hook.arg );
 		}
 	}
-	
 	return ret;
+}
+
+int mfDisplayWaitVblankBreak( void )
+{
+	return 0;
 }
 
 int mfCtrlPeekBufferPositive( SceCtrlData *pad, int count )
 {
-	return mf_read_pad_buffer( Hooktable[0].syscall.func, pad, count, MF_CALL_READ );
+	return mf_read_pad_buffer( Hooktable[0].exported.entrypoint, pad, count, MF_CALL_READ );
 }
 
 int mfCtrlPeekBufferNegative( SceCtrlData *pad, int count )
 {
-	int ret = mf_read_pad_buffer( Hooktable[0].syscall.func, pad, count, MF_CALL_READ );
+	int ret = mf_read_pad_buffer( Hooktable[0].exported.entrypoint, pad, count, MF_CALL_READ );
 	
 	pad->Buttons = ~pad->Buttons;
 	
@@ -66,12 +82,12 @@ int mfCtrlPeekBufferNegative( SceCtrlData *pad, int count )
 
 int mfCtrlReadBufferPositive( SceCtrlData *pad, int count )
 {
-	return mf_read_pad_buffer( Hooktable[2].syscall.func, pad, count, MF_CALL_READ );
+	return mf_read_pad_buffer( Hooktable[2].exported.entrypoint, pad, count, MF_CALL_READ );
 }
 
 int mfCtrlReadBufferNegative( SceCtrlData *pad, int count )
 {
-	int ret = mf_read_pad_buffer( Hooktable[2].syscall.func, pad, count, MF_CALL_READ );
+	int ret = mf_read_pad_buffer( Hooktable[2].exported.entrypoint, pad, count, MF_CALL_READ );
 	
 	pad->Buttons = ~pad->Buttons;
 	
@@ -85,7 +101,7 @@ int mfCtrlPeekLatch( SceCtrlLatch *latch )
 	unsigned int k1 = pspSdkGetK1();
 	pspSdkSetK1( 0 );
 	
-	ret = mf_read_pad_buffer( Hooktable[0].syscall.func, &pad, 1, MF_CALL_LATCH );
+	ret = mf_read_pad_buffer( Hooktable[0].exported.entrypoint, &pad, 1, MF_CALL_LATCH );
 	
 	pspSdkSetK1( k1 );
 	
@@ -106,7 +122,7 @@ int mfCtrlReadLatch( SceCtrlLatch *latch )
 	unsigned int k1 = pspSdkGetK1();
 	pspSdkSetK1( 0 );
 	
-	ret = mf_read_pad_buffer( Hooktable[0].syscall.func, &pad, 1, MF_CALL_LATCH );
+	ret = mf_read_pad_buffer( Hooktable[0].exported.entrypoint, &pad, 1, MF_CALL_LATCH );
 	
 	pspSdkSetK1( k1 );
 	
@@ -127,13 +143,8 @@ void mfHookApi( void )
 	if( st_apihooked ) return;
 	
 	for( i = 0; i < ARRAY_NUM( Hooktable ); i++ ){
-		hookApiByNid(
-			&(Hooktable[i].syscall),
-			Hooktable[i].modname,
-			Hooktable[i].library,
-			Hooktable[i].nid,
-			Hooktable[i].hookfunc
-		);
+		if( ! Hooktable[i].exported.addr || ! Hooktable[i].hookfunc ) continue;
+		hookUpdateExportedAddr( Hooktable[i].exported.addr, Hooktable[i].hookfunc );
 	}
 	
 	st_apihooked = true;
@@ -146,7 +157,8 @@ void mfRestoreApi( void )
 	if( ! st_apihooked ) return;
 	
 	for( i = 0; i < ARRAY_NUM( Hooktable ); i++ ){
-		hookRestoreAddr( &(Hooktable[i].syscall) );
+		if( ! Hooktable[i].exported.addr || ! Hooktable[i].exported.entrypoint ) continue;
+		hookUpdateExportedAddr( Hooktable[i].exported.addr, Hooktable[i].exported.entrypoint );
 	}
 	
 	st_apihooked = false;
@@ -154,6 +166,11 @@ void mfRestoreApi( void )
 
 int main_thread( SceSize arglen, void *argp )
 {
+	bool wait_toggle_button_release = false;
+	
+	/* フックアドレスを取得 */
+	mf_find_hookaddr();
+	
 	/* メニューを初期化 */
 	mfMenuInit();
 	
@@ -174,23 +191,23 @@ int main_thread( SceSize arglen, void *argp )
 		if( st_apihooked ){
 			unsigned int k1 = pspSdkGetK1();
 			pspSdkSetK1( 0 );
-			mf_read_pad_buffer( Hooktable[0].syscall.func, &st_pad_data, 1, MF_CALL_INTERNAL );
+			mf_read_pad_buffer( Hooktable[0].exported.entrypoint, &st_pad_data, 1, MF_CALL_INTERNAL );
 			pspSdkSetK1( k1 );
 		} else{
 			sceCtrlPeekBufferPositive( &st_pad_data, 1 );
 		}
 		
 		if( gMfToggle ){
-			/* 検出する必要のないボタンフラグを消す */
-			st_pad_data.Buttons ^= ( st_pad_data.Buttons & ( PSP_CTRL_WLAN_UP | PSP_CTRL_REMOTE | PSP_CTRL_DISC | PSP_CTRL_MS ) );
+			/* 指定されたボタンフラグのみ取り出す */
+			st_pad_data.Buttons &= (~( ~0 ^ gMfToggle ));
 			
-			if( st_pad_data.Buttons & gMfToggle ){
-				if( ! st_wait_toggle_button_release ){
+			if( st_pad_data.Buttons == gMfToggle ){
+				if( ! wait_toggle_button_release ){
 					gMfEngine = ( gMfEngine == MFENGINE_ON ? MFENGINE_OFF : MFENGINE_ON );
-					st_wait_toggle_button_release = true;
+					wait_toggle_button_release = true;
 				}
-			} else if( st_wait_toggle_button_release ){
-				st_wait_toggle_button_release = false;
+			} else if( wait_toggle_button_release ){
+				wait_toggle_button_release = false;
 			}
 		}
 		
@@ -260,14 +277,11 @@ int module_stop( SceSize arglen, void *argp )
 {
 	/* 呼び出されていない。どうすればいいのか？ */
 	
-	int i;
 	gRunning = false;
 	
 	if( ! mfIsApiHooked() ) return 0;
 	
-	for( i = 0; i < ARRAY_NUM( Hooktable ); i++ ){
-		hookRestoreAddr( &(Hooktable[i].syscall) );
-	}
+	mfRestoreApi();
 	
 	return 0;
 }

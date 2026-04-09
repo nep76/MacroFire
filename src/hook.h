@@ -18,13 +18,18 @@
 extern "C" {
 #endif
 
-typedef struct {
-	void *addr;
-	void *func;
-} SysApi;
+enum hook_find_module_method {
+	HOOK_FIND_MODULE_METHOD_ADDR,
+	HOOK_FIND_MODULE_METHOD_UID,
+	HOOK_FIND_MODULE_METHOD_NAME
+};
 
-unsigned int hookApiByNid( SysApi *sysapi, const char *modname, const char *library, unsigned int nid, void *func );
-void *hookRestoreAddr( SysApi *syscall );
+void *hookFindSyscallAddr( void *addr );
+
+void *hookUpdateExportedAddr( void **addr, void *entrypoint );
+void *hookFindExportedAddr( const char *modname, const char *libname, unsigned int nid );
+void *hookGetExportedAddrPointer( SceLibraryEntryTable *libent, unsigned int nid );
+SceLibraryEntryTable *hookGetLibraryEntry( SceModule *modinfo, const char *libname );
 
 #ifdef __cplusplus
 }
