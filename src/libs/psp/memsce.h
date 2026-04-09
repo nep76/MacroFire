@@ -22,12 +22,12 @@
 #define MEMSCE_POWER_OF_TWO( x ) ( ! ( x & ( x - 1 ) ) )
 #define MEMSCE_ALIGNOFFSET(x, align) (((x)+((align)-1))&~((align)-1))
 
-#define PSP_MEMPART_KERNEL_1 1
-#define PSP_MEMPART_USER_1   2
-#define PSP_MEMPART_KERNEL_2 3
-#define PSP_MEMPART_KERNEL_3 4
-#define PSP_MEMPART_KERNEL_4 5
-#define PSP_MEMPART_USER_2   6
+#define MEMSCE_PART_KERNEL_HIGH        1
+#define MEMSCE_PART_USER               2
+#define MEMSCE_PART_KERNEL_HIGH_MIRROR 3
+#define MEMSCE_PART_KERNEL_LOW         4
+#define MEMSCE_PART_VOLATILE           5
+#define MEMSCE_PART_USER_MIRROR        6
 
 #ifdef __cplusplus
 extern "C" {
@@ -100,7 +100,7 @@ void *memsceRealloc( void *src_heap_start, SceSize resize );
  *	@returns:
  *		割り当てたメモリの先頭アドレス。
  */
-void *memsceMemalign( SceSize boundary, SceSize size );
+void *memsceMemalign( SceSize align, SceSize size );
 
 /* MemSceFree
  *
@@ -121,13 +121,11 @@ int memsceFree( void *heap_start );
  *	このとき、すこし余分に確保して、先頭にメモリの解放や、再割り当てに必要な少量のデータを書き込む。
  *	このため、実際に割り当てられるメモリは指定したメモリサイズより数バイト多くなる。
  *
- *  ただし、sceKernelAllocPartitionMemory()は256バイト未満のメモリ領域を確保できない。
+ *  sceKernelAllocPartitionMemory()は256バイト未満のメモリ領域を確保できない。
  *  どんなに小さなサイズを確保するように指示しても、256バイトは必ず確保する。
- *  従って、256バイト未満の領域を複数使用するような場合は、256バイト確保した後に、
- *  それをプログラム側で切り分けて使う方が効率がよい。
  *
  *	また、MemSceMalloc()/MemSceCalloc()/MemSceRealloc()/MemSceMemalignは確保するメモリパーティションとして、
- *	常にPSP_MEMPART_USER_1を、確保するブロックタイプとして常にPSP_SMEM_Lowを指定する。
+ *	常にMEMSCE_PART_USERを、確保するブロックタイプとして常にPSP_SMEM_Lowを指定する。
  *	それ以外のパラメータでメモリを確保する場合もこの関数を使う。
  *	(正しく動作するかは別として。)
  *
@@ -139,12 +137,12 @@ int memsceFree( void *heap_start );
  *	@param: SceUID partitionid
  *		確保するメモリパーティション。
  *		(詳細 http://wiki.ps2dev.org/psp:memory_mapより)
- *			PSP_MEMPART_KERNEL_1 = 1
- *			PSP_MEMPART_USER1    = 2
- *			PSP_MEMPART_KERNEL_2 = 3
- *			PSP_MEMPART_KERNEL_3 = 4
- *			PSP_MEMPART_KERNEL_4 = 5
- *			PSP_MEMPART_USER_2   = 6
+ *			MEMSCE_PART_KERNEL_HIGH        1
+ *			MEMSCE_PART_USER               2
+ *			MEMSCE_PART_KERNEL_HIGH_MIRROR 3
+ *			MEMSCE_PART_KERNEL_LOW         4
+ *			MEMSCE_PART_VOLATILE           5
+ *			MEMSCE_PART_USER_MIRROR        6
  *
  *	@param: const char *name
  *		新しいメモリブロックの名前。
@@ -168,7 +166,7 @@ int memsceFree( void *heap_start );
  *	@returns:
  *		割り当てたメモリのアドレス。
  */
-void *memsceMallocEx( SceSize boundary, SceUID partitionid, const char *name, int type, SceSize size, void *addr );
+void *memsceMallocEx( SceSize align, SceUID partitionid, const char *name, int type, SceSize size, void *addr );
 
 #ifdef __cplusplus
 }

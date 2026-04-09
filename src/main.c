@@ -2,8 +2,9 @@
 	MacroFire
 */
 
+/* フックはM33SDKのsctrlHENFindFunction(),sctrlHENPatchSyscall()を使ったほうがいいのだろうか？ */
+
 #include "main.h"
-#include "hooktable.h"
 
 PSP_MODULE_INFO( "MacroFire", PSP_MODULE_KERNEL, 0, 0 );
 
@@ -41,7 +42,7 @@ static void mf_call_intr( const int mfengine )
 {
 	int i;
 	for( i = 0; i < mftableEntry; i++ ){
-		if( mftable[i].intrFunc ) ( mftable[i].intrFunc )( mfengine );
+		if( mftable[i].hook.intr ) ( mftable[i].hook.intr )( mfengine );
 	}
 }
 
@@ -60,9 +61,15 @@ static int mf_read_pad_buffer( MfSceCtrlDataFunc func, SceCtrlData *pad, int cou
 		pspSdkSetK1( 0 )を実行すると特権モードに移行させられるようだ。
 		つまり、これを行ったあとならばファームウェア内のコードを直接実行できる。
 		
-		やることやったら元の値に戻せるように、実行前にpspSdkGetK1()で値を保存しておく。
+		やることやったら元の値に戻せるように、最初のpspSdkSetK1()の返り値を保存しておく。
 	*/
 	int ret = ( func )( pad, count );
+	
+	analogtuneTune( pad, NULL );
+	pad->Buttons |= ctrlpadUtilGetAnalogDirection( pad->Lx, pad->Ly );
+	
+	mfRapidfire( 0, mode, pad );
+	
 	if( mode != MF_CALL_INTERNAL ){
 		int i;
 		for( i = 0; i < mftableEntry; i++ ){
@@ -104,8 +111,7 @@ int mfCtrlPeekLatch( SceCtrlLatch *latch )
 {
 	SceCtrlData pad;
 	int ret;
-	unsigned int k1 = pspSdkGetK1();
-	pspSdkSetK1( 0 );
+	unsigned int k1 = pspSdkSetK1( 0 );
 	
 	ret = mf_read_pad_buffer( Hooktable[0].exported.entrypoint, &pad, 1, MF_CALL_LATCH );
 	
@@ -125,8 +131,7 @@ int mfCtrlReadLatch( SceCtrlLatch *latch )
 {
 	SceCtrlData pad;
 	int ret;
-	unsigned int k1 = pspSdkGetK1();
-	pspSdkSetK1( 0 );
+	unsigned int k1 = pspSdkSetK1( 0 );
 	
 	ret = mf_read_pad_buffer( Hooktable[0].exported.entrypoint, &pad, 1, MF_CALL_LATCH );
 	
@@ -173,7 +178,6 @@ void mfRestoreApi( void )
 int main_thread( SceSize arglen, void *argp )
 {
 	/* 必ず0で初期化 */
-	unsigned int mf_menu_buttons;
 	bool wait_toggle_button_release = false;
 	
 	/* メニューを初期化 */
@@ -199,6 +203,8 @@ int main_thread( SceSize arglen, void *argp )
 				inimgrSetString( ini, "Main", "MenuButtons", "VOLUP + VOLDOWN" );
 				inimgrSetString( ini, "Main", "ToggleButtons", "" );
 				
+				analogtuneCreateIni( ini );
+				
 				for( i = 0; i < mftableEntry; i++ ){
 					if( mftable[i].ciFunc ) ( mftable[i].ciFunc )( ini );
 				}
@@ -209,10 +215,12 @@ int main_thread( SceSize arglen, void *argp )
 			gMfEngine = inimgrGetBool( ini, "Main", "Startup", false );
 			
 			inimgrGetString( ini, "Main", "MenuButtons", "VOLUP + VOLDOWN", buttons, sizeof( buttons ) );
-			mf_menu_buttons = ctrlpadUtilStringToButtons( buttons );
+			gMfMenu = ctrlpadUtilStringToButtons( buttons );
 			
 			inimgrGetString( ini, "Main", "ToggleButtons", "", buttons, sizeof( buttons ) );
 			gMfToggle = ctrlpadUtilStringToButtons( buttons );
+			
+			analogtuneLoadIni( ini );
 			
 			for( i = 0; i < mftableEntry; i++ ){
 				if( mftable[i].liFunc ) ( mftable[i].liFunc )( ini );
@@ -220,7 +228,7 @@ int main_thread( SceSize arglen, void *argp )
 			inimgrDestroy( ini );
 		} else{
 			/* INIハンドルすら得られなかった場合 */
-			mf_menu_buttons = PSP_CTRL_VOLDOWN | PSP_CTRL_VOLUP;
+			gMfMenu = PSP_CTRL_VOLDOWN | PSP_CTRL_VOLUP;
 		}
 	}
 	
@@ -232,12 +240,13 @@ int main_thread( SceSize arglen, void *argp )
 		sceKernelDelayThread( 50000 );
 		
 		if( st_apihooked ){
-			unsigned int k1 = pspSdkGetK1();
-			pspSdkSetK1( 0 );
+			unsigned int k1 = pspSdkSetK1( 0 );
 			mf_read_pad_buffer( Hooktable[0].exported.entrypoint, &st_pad_data, 1, MF_CALL_INTERNAL );
 			pspSdkSetK1( k1 );
 		} else{
 			sceCtrlPeekBufferPositive( &st_pad_data, 1 );
+			analogtuneTune( &st_pad_data, NULL );
+			st_pad_data.Buttons |= ctrlpadUtilGetAnalogDirection( st_pad_data.Lx, st_pad_data.Ly );
 		}
 		
 		if( gMfToggle ){
@@ -261,13 +270,15 @@ int main_thread( SceSize arglen, void *argp )
 			mf_call_intr( gMfEngine );
 		}
 		
-		if( ( st_pad_data.Buttons & (~( ~0 ^ mf_menu_buttons )) ) == mf_menu_buttons ) mfMenu();
+		if( ( st_pad_data.Buttons & (~( ~0 ^ gMfMenu )) ) == gMfMenu ) mfMenu();
 	}
 	
 	/* module_stop()が呼ばれないので、以下は実行されていない */
 	
 	/* メニュー終了処理 */
 	//mfMenuTerm();
+	
+	if( st_apihooked ) mfRestoreApi();
 	
 	{
 		/* 終了関数呼び出し */
@@ -310,10 +321,12 @@ int module_start( SceSize arglen, void *argp )
 	SceUID thid;
 	
 	thid = sceKernelCreateThread( "MacroFire", main_thread, 32, 0x1200, 0, 0 );
-	if( thid ) sceKernelStartThread( thid, arglen, argp );
 	
 	/* MacroFireへカレントディレクトリ設定 */
-	sceIoChangeThreadCwd( thid, MFM_WORKING_DIRECTORY );
+	if( thid ){
+		sceIoChangeThreadCwd( thid, MFM_WORKING_DIRECTORY );
+		sceKernelStartThread( thid, arglen, argp );
+	}
 	
 	return 0;
 }
@@ -323,10 +336,5 @@ int module_stop( SceSize arglen, void *argp )
 	/* 呼び出されていない。どうすればいいのか？ */
 	
 	gRunning = false;
-	
-	if( ! mfIsApiHooked() ) return 0;
-	
-	mfRestoreApi();
-	
 	return 0;
 }

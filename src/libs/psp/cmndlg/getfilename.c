@@ -228,9 +228,8 @@ int cmndlgGetFilenameShutdownStart( void )
 	}
 	
 	memsceFree( st_params->base.tempBuffer );
-	
+	st_params->base.tempBuffer = NULL;
 	st_params = NULL;
-	ctrlpadReset( &st_cp_params );
 	
 	return 0;
 }

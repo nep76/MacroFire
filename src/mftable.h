@@ -18,7 +18,7 @@
 /*-----------------------------------------------
 	機能を実装したソースのヘッダ
 -----------------------------------------------*/
-#include "function/analogtune.h"
+//#include "function/analogtune.h"
 #include "function/rapidfire.h"
 #include "function/macro.h"
 
@@ -34,11 +34,13 @@ typedef void     ( *MfFuncIntr )( const bool mfengine );
 
 typedef struct {
 	MfFuncHook func;
+	MfFuncIntr intr;
 	void *arg;
 } MfHookEntry;
 
 typedef struct {
 	MfFuncMenu func;
+	MfFuncTerm quit;
 	void *arg;
 } MfMenuEntry;
 
@@ -46,7 +48,6 @@ typedef struct {
 	char         *name;
 	MfFuncInit   initFunc;
 	MfFuncTerm   termFunc;
-	MfFuncIntr   intrFunc;
 	MfFuncIni    ciFunc, liFunc;
 	MfHookEntry  hook;
 	MfMenuEntry  menu;
@@ -58,32 +59,29 @@ typedef struct {
 EXPORT MfEntry mftable[]
 #ifdef MFTABLE_DEFINE
 = {
+	/* 機能を定義するテーブル */
 	/*
-		機能を定義するテーブル
-		
-		割込関数は、MacroFire Engineが切り替えられた次のループで呼ばれる
-	*/
 	{
 		"Analog stick sensitivity settings",
-		NULL, NULL, NULL,
+		NULL, NULL,
 		analogtuneCreateIni, analogtuneLoadIni,
 		{ analogtuneMain, NULL },
 		{ analogtuneMenu, NULL }
 	},
-	
+	*/
 	{
 		"Rapidfire settings",
-		rapidfireInit, NULL, NULL,
+		NULL, NULL,
  		NULL, NULL,
-		{ rapidfireMain, NULL },
-		{ rapidfireMenu, NULL }
+		{ NULL, NULL },
+		{ rapidfireMenu, rapidfireApply }
 	},
 	
 	{
 		"Macro settings",
-		macroInit, NULL, macroIntr,
+		macroInit, NULL,
 		NULL, NULL,
-		{ macroMain, NULL },
+		{ macroMain, macroIntr },
 		{ macroMenu, NULL }
 	},
 }

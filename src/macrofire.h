@@ -2,13 +2,14 @@
 	グローバルヘッダー
 */
 
-#ifndef MFGLOBAL_H
-#define MFGLOBAL_H
+#ifndef MACROFIRE_H
+#define MACROFIRE_H
 
 #include <pspdebug.h>
 #include <stdbool.h>
+#include "utils/inimgr.h"
 
-#define MFM_TOP_MESSAGE       "MacroFire v2.0.0 In-game menu [ClassG: http://classg.sytes.net]"
+#define MFM_TOP_MESSAGE       "MacroFire v2.1.0 In-game menu [ClassG: http://classg.sytes.net]"
 #define MFM_WORKING_DIRECTORY "ms0:/seplugins"
 
 #ifdef GLOBAL_VARIABLES_DEFINE
@@ -47,9 +48,17 @@ bool mfIsDisabled ( void );
 -----------------------------------------------*/
 GLOBAL bool         gRunning  INIT_VALUE( true );
 GLOBAL bool         gMfEngine INIT_VALUE( false );
+GLOBAL unsigned int gMfMenu   INIT_VALUE( 0 );
 GLOBAL unsigned int gMfToggle INIT_VALUE( 0 );
 
 #undef GLOBAL
 #undef VALUE
+
+/*-----------------------------------------------
+	MFAPI
+-----------------------------------------------*/
+#include "menu.h"
+#include "analogtune.h"
+#include "rapidfire.h"
 
 #endif

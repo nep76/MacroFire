@@ -1,4 +1,4 @@
-MacroFire 2.0.1
+MacroFire 2.1.0
 
 
 Macro settings
@@ -75,6 +75,13 @@ Edit macro
 
     Analog move: アナログスティックを傾ける。
                  左上が(x,y)=(0,0)として、アナログスティックを任意の位置へ移動させる。
+
+    Rapidfire start: 連射を開始する。
+                     Buttons pressと同じように連射を行うボタンを設定する。
+                     PD/RDはPress delay/Release delayのことで、詳細はmanual_rapidfire.txtを参照。
+
+    Rapidfire stop: 連射を停止する。
+
 
   エディットではこれらコマンドの値の変更と、
   これらコマンドそのものを挿入/削除を行うことができます。

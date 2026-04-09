@@ -2,19 +2,17 @@
 	Analog stick sensitivity tuner
 */
 
-#ifndef ANALOG_THRESHOLDS_H
-#define ANALOG_THRESHOLDS_H
+#ifndef MFANALOGSENS_H
+#define MFANALOGSENS_H
 
 #include <pspctrl.h>
 #include <stdlib.h>
 #include <math.h>
-#include "../menu.h"
+#include "macrofire.h"
 
 /*-----------------------------------------------
 	íËêî/É}ÉNÉç
 -----------------------------------------------*/
-#define ANALOGTUNE_CONF_NUM     4
-
 #define ANALOGTUNE_INIT_X     128
 #define ANALOGTUNE_INIT_Y     128
 #define ANALOGTUNE_INIT_R      40
@@ -38,7 +36,7 @@ typedef struct {
 -----------------------------------------------*/
 void analogtuneLoadIni( IniUID ini );
 void analogtuneCreateIni( IniUID ini );
-void analogtuneMain( MfCallMode mode, SceCtrlData *pad_data, void *argp );
+void analogtuneTune( SceCtrlData *pad_data, void *argp );
 MfMenuRc analogtuneMenu( SceCtrlData *pad_data, void *argp );
 
 #endif

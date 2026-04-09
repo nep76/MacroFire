@@ -38,7 +38,11 @@ static struct cmndlg_get_buttons_buttonstat st_btnstat[] = {
 	{ "VolumeDown   ", PSP_CTRL_VOLDOWN,  false },
 	{ "Hold         ", PSP_CTRL_HOLD,     false },
 	{ "WLAN-SwitchUp", PSP_CTRL_WLAN_UP,  false },
-	{ "HOME         ", PSP_CTRL_HOME,     false }
+	{ "HOME         ", PSP_CTRL_HOME,     false },
+	{ "AnalogUp     ", CTRLPAD_CTRL_ANALOG_UP,    false },
+	{ "AnalogRight  ", CTRLPAD_CTRL_ANALOG_RIGHT, false },
+	{ "AnalogDown   ", CTRLPAD_CTRL_ANALOG_DOWN,  false },
+	{ "AnalogLeft   ", CTRLPAD_CTRL_ANALOG_LEFT,  false }
 };
 
 /*=============================================*/
@@ -82,6 +86,7 @@ int cmndlgGetButtonsStart( CmndlgGetButtonsParams *params )
 		}
 	}
 	
+	st_reload = true;
 	ctrlpadInit( &st_cp_params );
 	ctrlpadSetRepeatButtons( &st_cp_params, PSP_CTRL_UP | PSP_CTRL_RIGHT | PSP_CTRL_DOWN | PSP_CTRL_LEFT );
 	
@@ -193,16 +198,14 @@ int cmndlgGetButtonsShutdownStart( void )
 	
 	memsceFree( st_params->base.tempBuffer );
 	st_params->base.tempBuffer = NULL;
-	
 	st_params = NULL;
-	ctrlpadReset( &st_cp_params );
 	
 	return 0;
 }
 
 static void cmndlg_get_buttons_draw_ui( CmndlgGetButtonsParams *params )
 {
-	int i;
+	int i, l;
 	
 	if( params->numberOfData > 1 ){
 		int switch_info_pos_y = 9;
@@ -252,17 +255,18 @@ static void cmndlg_get_buttons_draw_ui( CmndlgGetButtonsParams *params )
 		"SELECT: Usage"
 	);
 	
-	for( i = 0; i < sizeof( st_btnstat ) / sizeof( st_btnstat[0] ); i++ ){
+	for( i = 0, l = 0; i < sizeof( st_btnstat ) / sizeof( st_btnstat[0] ); i++ ){
 		if( st_btnstat[i].available ){
 			blitStringf(
 				params->ui.x + blitOffsetChar( 3 ),
-				params->ui.y + blitOffsetLine( 3 + i ),
+				params->ui.y + blitOffsetLine( 3 + l ),
 				i == ((struct cmndlg_get_buttons_tempdata *)(params->base.tempBuffer))[params->selectDataNumber].selected ? params->ui.fcTextColor : params->ui.fgTextColor,
 				params->ui.bgTextColor,
 				"%s: %s",
 				st_btnstat[i].name,
 				((struct cmndlg_get_buttons_tempdata *)(params->base.tempBuffer))[params->selectDataNumber].buttons & st_btnstat[i].button ? "ON" : "OFF"
 			);
+			l++;
 		}
 	}
 }

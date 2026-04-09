@@ -10,14 +10,12 @@
 #include <pspsysmem_kernel.h>
 #include <pspsuspend.h>
 
-#include "global.h"
-#include "utils/strutil.h"
 #include "psp/blit.h"
 #include "psp/memsce.h"
 #include "psp/graphics/fbmgr.h"
 #include "psp/cmndlg.h"
-#include "utils/inimgr.h"
 #include "psp/ctrlpad.h"
+#include "utils/strutil.h"
 
 #define MFM_VRAM_TOP         0x44000000
 
@@ -32,10 +30,14 @@
 #define MFM_TEXT_FCCOLOR     0xff0000ff
 
 #define MFM_OUT_OF_MEM_WARN_SEC 6
-#define MFM_MAIN_MENU_COUNT 4
+#define MFM_MAIN_MENU_COUNT 6
 
 #define MFM_MAX_NUMBER_OF_THREADS 64
 #define MFM_ITEM_LENGTH 64
+
+#define MFM_GET_CB_ARG_BY_PTR( p, n ) ( ((MfMenuItemValue *)( p ))[( n )].pointer )
+#define MFM_GET_CB_ARG_BY_INT( p, n ) ( ((MfMenuItemValue *)( p ))[( n )].integer )
+#define MFM_GET_CB_ARG_BY_STR( p, n ) ( ((MfMenuItemValue *)( p ))[( n )].string )
 
 /*-----------------------------------------------
 	プロトタイプのないAPI
@@ -107,7 +109,7 @@ typedef struct {
 
 typedef struct {
 	void *func;
-	void *arg;
+	MfMenuItemValue *arg;
 } MfMenuCallback;
 
 /*-----------------------------------------------
@@ -177,16 +179,15 @@ MfMenuRc mfMenuUniDraw( int x, int y, MfMenuItem menu[], size_t num, int *select
 
 bool mfMenuGetNumberIsReady( void );
 MfMenuRc mfMenuGetNumberInit( const char *title, const char *unit, long *number, int digits );
-MfMenuRc mfMenuGetNumber( long *number );
+MfMenuRc mfMenuGetNumber( void );
 
 bool mfMenuGetButtonsIsReady( void );
 MfMenuRc mfMenuGetButtonsInit( const char *title, unsigned int *buttons, unsigned int avail );
-MfMenuRc mfMenuGetButtons( unsigned int *buttons );
+MfMenuRc mfMenuGetButtons( void );
 
 bool mfMenuGetFilenameIsReady( void );
 MfMenuRc mfMenuGetFilenameInit( const char *title, unsigned int flags, const char *initpath );
 MfMenuRc mfMenuGetFilename( char **path, char **name );
 void mfMenuGetFilenameFree( void );
-
 
 #endif

@@ -4,14 +4,12 @@
 #ifndef MACRO_H
 #define MACRO_H
 
-#include <pspkernel.h>
 #include <pspctrl.h>
-#include <psprtc.h>
 #include "utils/strutil.h"
 #include "psp/memsce.h"
 #include "psp/cmndlg.h"
 #include "psp/fileh.h"
-#include "../menu.h"
+#include "../macrofire.h"
 #include "macromgr.h"
 #include "macroeditor.h"
 
@@ -33,13 +31,15 @@
 #define MACRO_ERROR_DISPLAY_MICROSEC 3000000
 
 #define MACRO_DATA_SIGNATURE        "MACROFIRE-MACRO"
-#define MACRO_DATA_VERSION          2
+#define MACRO_DATA_VERSION          3
 
 #define MACRO_ACTION_DELAY          "Delay"
 #define MACRO_ACTION_BTNPRESS       "ButtonsPress"
 #define MACRO_ACTION_BTNRELEASE     "ButtonsRelease"
 #define MACRO_ACTION_BTNCHANGE      "ButtonsChange"
 #define MACRO_ACTION_ALMOVE         "AnalogMove"
+#define MACRO_ACTION_BTNRAPIDSTART  "RapidfireStart"
+#define MACRO_ACTION_BTNRAPIDSTOP   "RapidfireStop"
 
 /*-----------------------------------------------
 	å^êÈåæ

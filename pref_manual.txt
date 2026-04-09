@@ -1,4 +1,4 @@
-MacroFire 2.0.1
+MacroFire 2.1.0
 
 
 設定ファイルの書き方
@@ -26,22 +26,26 @@ MacroFire 2.0.1
       ------------------------
       ボタン名| ボタン
       ------------------------
-      SELECT  | セレクトボタン
-      START   | スタートボタン
-      UP      | 十字キー上
-      RIGHT   | 十字キー右
-      DOWN    | 十字キー下
-      LEFT    | 十字キー左
-      LTRIGGER| Lボタン
-      RTRIGGER| Rボタン
-      TRIANGLE| △ボタン
-      CIRCLE  | ○ボタン
-      CROSS   | ×ボタン
-      SQUARE  | □ボタン
-      NOTE    | ♪ボタン
-      SCREEN  | 輝度変更ボタン
-      VOLUP   | 音量+ボタン
-      VOLDOWN | 音量-ボタン
+      SELECT     | セレクトボタン
+      START      | スタートボタン
+      UP         | 十字キー上
+      RIGHT      | 十字キー右
+      DOWN       | 十字キー下
+      LEFT       | 十字キー左
+      LTRIGGER   | Lボタン
+      RTRIGGER   | Rボタン
+      TRIANGLE   | △ボタン
+      CIRCLE     | ○ボタン
+      CROSS      | ×ボタン
+      SQUARE     | □ボタン
+      NOTE       | ♪ボタン
+      SCREEN     | 輝度変更ボタン
+      VOLUP      | 音量+ボタン
+      VOLDOWN    | 音量-ボタン
+      ANALOGUP   | アナログスティック上方向
+      ANALOGRIGHT| アナログスティック右方向
+      ANALOGDOWN | アナログスティック下方向
+      ANALOGLEFT | アナログスティック左方向
       ------------------------
 
   たとえば、スタートボタンとセレクトボタンの同時押しにする場合は

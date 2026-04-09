@@ -1,3 +1,33 @@
+2008/00/00 - 2.1.0
+  - マクロコマンドにRapidfire Start/Rapidfire stopを追加した。
+
+  - 連射設定のPress delay/Release delayは、ms(ミリ秒)で指定するように変更。
+    しかし、本質的には何も変わっていないので、manual_rapidfire.txt参照のこと。
+
+  - AUTO-RAPIDとAUTO-HOLDは、PSPの実際のボタンが押されている場合は、一時的にその動作を停止するようにした。
+    AUTO-RAPIDに設定されているボタンが押されていれば連射が止まり、
+    AUTO-HOLDに設定されているボタンが押されていれば押しっぱなしが解除される。
+
+  - ホームメニューの項目の名前を二つ変更した。
+    "MacroFire toggle buttons"          -> "Buttons to toggle the engine state"
+    "Analog stick sensitivity settings" -> "Tuning the analog stick sensitivity"
+
+  - ホームメニューに"Buttons to launch the menu"を追加。
+    メニュー起動ボタンをメニューから変更できるようになった。
+    ただし保存はされないので、デフォルト値を変更したい場合は、今まで通りmacrofire.iniを変更する。
+
+  - メニュー起動ボタン、エンジン状態切り替えボタンにアナログスティックを設定可能にした。
+    任意の座標は指定できないが、アナログスティックの上下左右を設定可能。
+
+  - INIファイルの"ボタン定義(pref_manual.txt参照)"に
+        ANALOGUP ANALOGRIGHT ANALOGDOWN ANALOGLEFT
+    を追加。
+
+  - "(旧)MacroFire toggle buttons"を一度でも実行したあと、
+    マクロエディタのButtonsPress/ButtonsRelease/ButtonsChangeを実行すると、
+    ボリュームボタンなど、本来設定できないはずのボタンまで出現していた問題を修正。
+
+
 2008/08/20 - 2.0.1
   - 背景の転送にsceDmacMemcpy()にてDMAコントローラを使うことでやや高速化。
 

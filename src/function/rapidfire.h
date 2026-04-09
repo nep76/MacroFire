@@ -1,21 +1,21 @@
 /*
-	Rapidfire function
+	Rapidfire機能はベース機能に取り込まれたので、
+	メインの関数はなくなった。
 */
 #ifndef RAPIDFIRE_H
 #define RAPIDFIRE_H
 
 #include <pspctrl.h>
 #include "utils/strutil.h"
-#include "psp/blit.h"
 #include "psp/cmndlg.h"
 #include "psp/fileh.h"
-#include "../menu.h"
+#include "../macrofire.h"
 
 /*-----------------------------------------------
 	定数
 -----------------------------------------------*/
-#define RAPIDFIRE_DEFAULT_RELEASE_DELAY 2
-#define RAPIDFIRE_DEFAULT_PRESS_DELAY   2
+#define RAPIDFIRE_DEFAULT_RELEASE_DELAY 18
+#define RAPIDFIRE_DEFAULT_PRESS_DELAY   18
 
 #define RAPIDFIRE_INFO_DISPLAY_MICROSEC  1000000
 #define RAPIDFIRE_ERROR_DISPLAY_MICROSEC 3000000
@@ -75,8 +75,7 @@ typedef struct {
 /*-----------------------------------------------
 	関数
 -----------------------------------------------*/
-void     rapidfireInit( void );
-void     rapidfireMain( MfCallMode mode, SceCtrlData *pad_data, void *argp );
 MfMenuRc rapidfireMenu( SceCtrlData *pad_data, void *argp );
+void     rapidfireApply( void );
 
 #endif

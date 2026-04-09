@@ -2,8 +2,8 @@
 	MacroFire header
 */
 
-#ifndef MACROFIRE
-#define MACROFIRE
+#ifndef MFMAIN_H
+#define MFMAIN_H
 
 #include <pspkernel.h>
 #include <pspctrl.h>
@@ -12,7 +12,7 @@
 #include <string.h>
 
 #define GLOBAL_VARIABLES_DEFINE
-#include "global.h"
+#include "macrofire.h"
 #undef GLOBAL_VARIABLE_DEFINE
 
 #include "hook.h"
@@ -20,18 +20,9 @@
 #include "mftable.h"
 #undef MFTABLE_DEFINE
 
-#include "utils/inimgr.h"
-#include "menu.h"
-#include "psp/blit.h"
-
 /*-----------------------------------------------
 	íËêî
 -----------------------------------------------*/
-#define MF_CONF_NUM             3
-#define MF_CONF_FILE_FULLPATH   "ms0:/seplugins/macrofire_conf.txt"
-#define MF_DEFAULT_MENU_BUTTONS ( PSP_CTRL_VOLDOWN | PSP_CTRL_VOLUP )
-#define MF_ENGINE_STARTUP_ON    "ON"
-#define MF_ENGINE_STARTUP_OFF   "OFF"
 
 /*-----------------------------------------------
 	å^êÈåæ
@@ -52,5 +43,7 @@ int mfCtrlReadLatch( SceCtrlLatch *latch );
 int main_thread( SceSize arglen, void *argp );
 int module_start( SceSize arglen, void *argp );
 int module_stop( SceSize arglen, void *argp );
+
+#include "hooktable.h"
 
 #endif

@@ -135,3 +135,22 @@ int macromgrGetCount( void )
 {
 	return (signed int)st_macroCount;
 }
+
+void macromgrCmdInit( MacroData *macro, MacroAction action, uint64_t data, uint64_t sub )
+{
+	macro->action = action;
+	macro->data   = data;
+	macro->sub    = sub;
+	
+	if( ! data ){
+		if( action == MA_ANALOG_MOVE ){
+			macro->data = MACROMGR_SET_ANALOG_XY( 128, 128 );
+		}
+	}
+	
+	if( ! sub ){
+		if( action == MA_RAPIDFIRE_START ){
+			macro->sub = MACROMGR_SET_RAPIDDELAY( MACROMGR_DEFAULT_PRESS_DELAY, MACROMGR_DEFAULT_RELEASE_DELAY );
+		}
+	}
+}

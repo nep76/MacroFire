@@ -73,7 +73,7 @@ bool mfMenuInit( void )
 	sceCtrlSetSamplingMode( PSP_CTRL_MODE_ANALOG );
 	return true;
 }
-
+/*
 void mfDebug( FbmgrDisplayStat *fb )
 {
 	static int fps = 0;
@@ -100,7 +100,7 @@ void mfDebug( FbmgrDisplayStat *fb )
 		sceKernelPartitionTotalFreeMemSize( 6 )
 	);
 }
-
+*/
 void mfMenu( void )
 {
 	SceUID thlist[MFM_MAX_NUMBER_OF_THREADS];
@@ -183,6 +183,7 @@ void mfMenu( void )
 		st_pad_data.Buttons = ctrlpadGetData( &st_cp_params, &st_pad_data );
 		
 		if( ( st_interrupt && st_pad_data.Buttons & ( PSP_CTRL_START | PSP_CTRL_HOME ) ) || st_menu_quit ){
+			if( rc == MR_ENTER && (MfFuncTerm)MFM_GET_CB_ARG_BY_PTR( mf_menu.arg, 0 ) ) ( (MfFuncTerm)MFM_GET_CB_ARG_BY_PTR( mf_menu.arg, 0 ) )();
 			st_menu_quit = false;
 			break;
 		}
@@ -193,15 +194,18 @@ void mfMenu( void )
 		/* インジケータを描画 */
 		mf_indicator( &indicator );
 		
-		mfDebug( &backup_fb );
+		//mfDebug( &backup_fb );
 		
 		if( rc == MR_BACK ){
 			mfMenuQuit();
 		} else if( rc == MR_CONTINUE ){
 			rc = mfMenuUniDraw( blitOffsetChar( 5 ), blitOffsetLine( 4 ), menu, menu_num, &menu_selected, 0 );
 		} else{
-			MfMenuRc func_rc = ( (MfFuncMenu)mf_menu.func )( &st_pad_data, mf_menu.arg );
-			if( func_rc == MR_BACK ) rc = MR_CONTINUE;
+			MfMenuRc func_rc = ( (MfFuncMenu)mf_menu.func )( &st_pad_data, NULL );
+			if( func_rc == MR_BACK ){
+				if( (MfFuncTerm)MFM_GET_CB_ARG_BY_PTR( mf_menu.arg, 0 ) ) ( (MfFuncTerm)MFM_GET_CB_ARG_BY_PTR( mf_menu.arg, 0 ) )();
+				rc = MR_CONTINUE;
+			}
 		}
 		
 		/* 表示バッファと描画バッファを切り替えて、blitterの描画アドレスを新しい描画バッファへ */
@@ -385,10 +389,10 @@ MfMenuRc mfMenuUniDraw( int x, int y, MfMenuItem menu[], size_t max, int *select
 		return mf_menu_control( &st_pad_data, &(menu[*select]) );
 	} else{
 		if( mfMenuGetNumberIsReady() ){
-			MfMenuRc rc = mfMenuGetNumber( NULL );
+			MfMenuRc rc = mfMenuGetNumber();
 			if( rc != MR_CONTINUE ) st_dialog = false;
 		} else if( mfMenuGetButtonsIsReady() ){
-			MfMenuRc rc = mfMenuGetButtons( NULL );
+			MfMenuRc rc = mfMenuGetButtons();
 			if( rc != MR_CONTINUE ) st_dialog = false;
 		}
 		
@@ -412,7 +416,11 @@ static MfMenuRc mf_menu_control( SceCtrlData *pad_data, MfMenuItem *item )
 				(*((int *)item->handler))--;
 			}
 		} else if( item->type == MT_GET_NUMBERS ){
-			if( *((int *)item->handler) > 0 ) (*((int *)item->handler))--;
+			if( *((int *)item->handler) > item->value[3].integer ){
+				(*((int *)item->handler)) -= item->value[3].integer;
+			} else{
+				(*((int *)item->handler)) = 0;
+			}
 		}
 	} else if( pad_data->Buttons & PSP_CTRL_RIGHT ){
 	/* 右が押された */
@@ -425,7 +433,7 @@ static MfMenuRc mf_menu_control( SceCtrlData *pad_data, MfMenuItem *item )
 				(*((int *)item->handler))++;
 			}
 		} else if( item->type == MT_GET_NUMBERS ){
-			(*((int *)item->handler))++;
+			(*((int *)item->handler)) += item->value[3].integer;
 		}
 	} else if( pad_data->Buttons & PSP_CTRL_CIRCLE ){
 	/* ○が押された */
@@ -433,7 +441,7 @@ static MfMenuRc mf_menu_control( SceCtrlData *pad_data, MfMenuItem *item )
 			return MR_ENTER;
 		} else if( item->type == MT_CALLBACK ){
 			((MfMenuCallback *)(item->handler))->func = item->value[0].pointer;
-			((MfMenuCallback *)(item->handler))->arg  = item->value[1].pointer;
+			((MfMenuCallback *)(item->handler))->arg  = &(item->value[1]);
 			return MR_ENTER;
 		} else if( item->type == MT_GET_NUMBERS ){
 			MfMenuRc rc = mfMenuGetNumberInit(
@@ -529,22 +537,38 @@ static void mf_menu_create_home_menu( MfMenuItem *menu, int menu_num, MfMenuCall
 	menu[1].value[0].pointer = NULL;
 	
 	menu[2].type             = MT_GET_BUTTONS;
-	menu[2].label            = "MacroFire toggle buttons";
+	menu[2].label            = "Buttons to launch the menu";
 	menu[2].width            = 0;
-	menu[2].handler          = &gMfToggle;
-	menu[2].value[0].string  = "Set MacroFire toggle buttons";
+	menu[2].handler          = &gMfMenu;
+	menu[2].value[0].string  = "Set launch buttons";
 	menu[2].value[1].integer = (
 		PSP_CTRL_CIRCLE   | PSP_CTRL_CROSS    | PSP_CTRL_SQUARE   | PSP_CTRL_TRIANGLE |
 		PSP_CTRL_UP       | PSP_CTRL_RIGHT    | PSP_CTRL_DOWN     | PSP_CTRL_LEFT     |
 		PSP_CTRL_LTRIGGER | PSP_CTRL_RTRIGGER | PSP_CTRL_SELECT   | PSP_CTRL_START    |
-		PSP_CTRL_NOTE     | PSP_CTRL_SCREEN   | PSP_CTRL_VOLUP    | PSP_CTRL_VOLDOWN
+		PSP_CTRL_NOTE     | PSP_CTRL_SCREEN   | PSP_CTRL_VOLUP    | PSP_CTRL_VOLDOWN  |
+		CTRLPAD_CTRL_ANALOG_UP   | CTRLPAD_CTRL_ANALOG_RIGHT |
+		CTRLPAD_CTRL_ANALOG_DOWN | CTRLPAD_CTRL_ANALOG_LEFT
 	);
 	
-	menu[3].type             = MT_NULL;
-	menu[3].label            = NULL;
+	menu[3].type             = MT_GET_BUTTONS;
+	menu[3].label            = "Buttons to toggle the engine state";
 	menu[3].width            = 0;
-	menu[3].handler          = NULL;
-	menu[3].value[0].pointer = NULL;
+	menu[3].handler          = &gMfToggle;
+	menu[3].value[0].string  = "Set toggle buttons";
+	menu[3].value[1].integer = menu[2].value[1].integer;
+	
+	menu[4].type             = MT_CALLBACK;
+	menu[4].label            = "Tuning the analog stick sensitivity";
+	menu[4].width            = 0;
+	menu[4].handler          = mf_menu;
+	menu[4].value[0].pointer = analogtuneMenu;
+	menu[4].value[1].pointer = NULL;
+	
+	menu[5].type             = MT_NULL;
+	menu[5].label            = NULL;
+	menu[5].width            = 0;
+	menu[5].handler          = NULL;
+	menu[5].value[0].pointer = NULL;
 	
 	for( mftable_index = MFM_MAIN_MENU_COUNT; mftable_index < menu_num; mftable_index++ ){
 		menu[mftable_index].type     = MT_CALLBACK;
@@ -552,7 +576,7 @@ static void mf_menu_create_home_menu( MfMenuItem *menu, int menu_num, MfMenuCall
 		menu[mftable_index].width    = 0;
 		menu[mftable_index].handler  = mf_menu;
 		menu[mftable_index].value[0].pointer = mftable[mftable_index - MFM_MAIN_MENU_COUNT].menu.func;
-		menu[mftable_index].value[1].pointer = mftable[mftable_index - MFM_MAIN_MENU_COUNT].menu.arg;
+		menu[mftable_index].value[1].pointer = mftable[mftable_index - MFM_MAIN_MENU_COUNT].menu.quit;
 	}
 }
 
@@ -591,7 +615,7 @@ MfMenuRc mfMenuGetNumberInit( const char *title, const char *unit, long *number,
 	params->selectDataNumber    = 0;
 	params->rc                  = 0;
 	params->ui.x                = blitOffsetChar( 39 );
-	params->ui.y                = blitOffsetLine( 5 );
+	params->ui.y                = blitOffsetLine( 6 );
 	params->ui.fgTextColor      = MFM_TEXT_FGCOLOR;
 	params->ui.fcTextColor      = MFM_TEXT_FCCOLOR;
 	params->ui.bgTextColor      = MFM_TRANSPARENT;
@@ -614,7 +638,7 @@ MfMenuRc mfMenuGetNumberInit( const char *title, const char *unit, long *number,
 	return MR_ENTER;
 }
 
-MfMenuRc mfMenuGetNumber( long *number )
+MfMenuRc mfMenuGetNumber( void )
 {
 	CmndlgState state;
 	if( cmndlgGetNumbersUpdate() ){
@@ -628,10 +652,6 @@ MfMenuRc mfMenuGetNumber( long *number )
 		rc = params->rc;
 		
 		cmndlgGetNumbersShutdownStart();
-		
-		if( number ){
-			*number = *(params->data->numSave);
-		}
 		
 		memsceFree( params->data );
 		memsceFree( params );
@@ -675,7 +695,7 @@ MfMenuRc mfMenuGetButtonsInit( const char *title, unsigned int *buttons, unsigne
 	params->selectDataNumber       = 0;
 	params->rc                     = 0;
 	params->ui.x                   = blitOffsetChar( 39 );
-	params->ui.y                   = blitOffsetLine( 5 );
+	params->ui.y                   = blitOffsetLine( 4 );
 	params->ui.fgTextColor         = MFM_TEXT_FGCOLOR;
 	params->ui.fcTextColor         = MFM_TEXT_FCCOLOR;
 	params->ui.bgTextColor         = MFM_TRANSPARENT;
@@ -696,7 +716,7 @@ MfMenuRc mfMenuGetButtonsInit( const char *title, unsigned int *buttons, unsigne
 	return MR_ENTER;
 }
 
-MfMenuRc mfMenuGetButtons( unsigned int *buttons )
+MfMenuRc mfMenuGetButtons( void )
 {
 	CmndlgState state;
 	if( cmndlgGetButtonsUpdate() ){
@@ -710,10 +730,6 @@ MfMenuRc mfMenuGetButtons( unsigned int *buttons )
 		rc = params->rc;
 		
 		cmndlgGetButtonsShutdownStart();
-		
-		if( buttons ){
-			*buttons = *(params->data->buttonsSave);
-		}
 		
 		memsceFree( params->data );
 		memsceFree( params );

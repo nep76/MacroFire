@@ -1,7 +1,7 @@
-MacroFire 2.0.1
+MacroFire 2.1.0
 
 
-Analog stick sensitivity settings
+Tuning the analog stick sensitivity
 -------------------------------------------------
   アナログスティックの感度を調整します。
   マクロ記録時のアナログスティックの入力にも影響します。

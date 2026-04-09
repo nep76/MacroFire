@@ -88,8 +88,29 @@ unsigned int ctrlpadUtilStringToButtons( char *str )
 
 unsigned int ctrlpadUtilGetAnalogDirection( int x, int y )
 {
-	/* ŽŸ‚Ìƒo[ƒWƒ‡ƒ“‚ÅŽÀ‘• */
-	return 0;
+	unsigned int direction = 0;
+	x -= 128;
+	y -= 128;
+	
+	if( x == 0 && y == 0 ) return 0;
+	
+	if( abs( y ) > (int)(sin( CTRLPAD_DEGREE_TO_RADIAN( CTRLPAD_INVALID_RIGHT_TRIANGLE_DEGREE ) ) * abs( x )) ){
+		if( y > 0 ){
+			direction |= CTRLPAD_CTRL_ANALOG_DOWN;
+		} else if( y < 0 ){
+			direction |= CTRLPAD_CTRL_ANALOG_UP;
+		}
+	}
+	
+	if( abs( x ) > (int)(sin( CTRLPAD_DEGREE_TO_RADIAN( CTRLPAD_INVALID_RIGHT_TRIANGLE_DEGREE ) ) * abs( y )) ){
+		if( x > 0 ){
+			direction |= CTRLPAD_CTRL_ANALOG_RIGHT;
+		} else if( x < 0 ){
+			direction |= CTRLPAD_CTRL_ANALOG_LEFT;
+		}
+	}
+	
+	return direction;
 }
 
 void ctrlpadDataClear( SceCtrlData *pad_data )

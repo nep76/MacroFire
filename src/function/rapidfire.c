@@ -31,10 +31,8 @@ static RapidfireConf st_rfconf[] = {
 };
 static MfMenuCallback st_callback;
 
-static short st_rapid        = 0;
 static int st_release_delay  = RAPIDFIRE_DEFAULT_RELEASE_DELAY;
 static int st_press_delay    = RAPIDFIRE_DEFAULT_PRESS_DELAY;
-static int st_wait_cnt       = 0;
 
 static MfMenuItem st_menu_table[] = {
 	{ MT_OPTION, "Circle  ", 0, &(st_rfconf[0].mode),  { { .string = "NORMAL" }, { .string = "RAPID" }, { .string = "AUTO-RAPID"}, { .string = "AUTO-HOLD" }, { .string = NULL } } },
@@ -54,8 +52,8 @@ static MfMenuItem st_menu_table[] = {
 	{ MT_OPTION, "SELECT  ", 0, &(st_rfconf[11].mode), { { .string = "NORMAL" }, { .string = "RAPID" }, { .string = "AUTO-RAPID"}, { .string = "AUTO-HOLD" }, { .string = NULL } } },
 	
 	{ MT_NULL },
-	{ MT_GET_NUMBERS, "Release delay", 0, &(st_release_delay), { { .string = "Set release delay" }, { .string = "times" }, { .integer = 2 } } },
-	{ MT_GET_NUMBERS, "Press delay  ", 0, &(st_press_delay),   { { .string = "Set press delay"   }, { .string = "times" }, { .integer = 2 } } },
+	{ MT_GET_NUMBERS, "Release delay", 0, &(st_release_delay), { { .string = "Set release delay" }, { .string = "ms" }, { .integer = 4 }, { .integer = 18 } } },
+	{ MT_GET_NUMBERS, "Press delay  ", 0, &(st_press_delay),   { { .string = "Set press delay"   }, { .string = "ms" }, { .integer = 4 }, { .integer = 18 } } },
 	
 	{ MT_NULL },
 	{ MT_CALLBACK, "Load from MemoryStick", 0, &(st_callback), { { .pointer = rapidfire_load }, { .pointer = NULL } } },
@@ -225,46 +223,12 @@ static MfMenuRc rapidfire_save( void )
 	}
 }
 
-void rapidfireInit( void )
-{
-	st_wait_cnt = 0;
-}
-
-void rapidfireMain( MfCallMode mode, SceCtrlData *pad_data, void *argp )
-{
-	int i;
-	
-	if( st_wait_cnt && mode == MF_CALL_READ ) st_wait_cnt--;
-	
-	for( i = 0; i < MF_ARRAY_NUM( st_rfconf ); i++ ){
-		if(
-			(pad_data->Buttons & st_rfconf[i].button && st_rfconf[i].mode == RAPIDFIRE_MODE_SEMI_RAPID ) ||
-			st_rfconf[i].mode == RAPIDFIRE_MODE_AUTO_RAPID
-		 ){
-			pad_data->Buttons ^= st_rapid ? st_rfconf[i].button : 0;
-		} else if( st_rfconf[i].mode == RAPIDFIRE_MODE_AUTO_HOLD ){
-			pad_data->Buttons |= st_rfconf[i].button;
-		}
-	}
-	
-	if( ! st_wait_cnt && mode == MF_CALL_READ ){
-		st_rapid = ( ! st_rapid );
-		if( st_rapid ){
-			st_wait_cnt = st_press_delay;
-		} else{
-			st_wait_cnt = st_release_delay;
-		}
-	}
-	
-	return;
-}
-
 MfMenuRc rapidfireMenu( SceCtrlData *pad_data, void *argp )
 {
 	static int selected    = 0;
 	
 	if( ! st_callback.func ){
-		blitString( blitOffsetChar(  3 ), blitOffsetLine(  4 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Please choose a rapidfire mode per buttons." );
+		blitString( blitOffsetChar(  3 ), blitOffsetLine(  4 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Please choose a rapidfire mode per buttons. %d" );
 		blitString( blitOffsetChar( 33 ), blitOffsetLine( 22 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "NORMAL    : standard control mode." );
 		blitString( blitOffsetChar( 33 ), blitOffsetLine( 23 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "RAPID     : hold the button to rapidfire." );
 		blitString( blitOffsetChar( 33 ), blitOffsetLine( 24 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "AUTO-RAPID: always to rapidfire." );
@@ -292,4 +256,35 @@ MfMenuRc rapidfireMenu( SceCtrlData *pad_data, void *argp )
 	}
 	
 	return MR_CONTINUE;
+}
+
+void rapidfireApply( void )
+{
+	int i;
+	unsigned int buttons_normal    = 0;
+	unsigned int buttons_rapid     = 0;
+	unsigned int buttons_autorapid = 0;
+	unsigned int buttons_autohold  = 0;
+	
+	for( i = 0; i < MF_ARRAY_NUM( st_rfconf ); i++ ){
+		switch( st_rfconf[i].mode ){
+			case RAPIDFIRE_MODE_NORMAL:
+				buttons_normal |= st_rfconf[i].button;
+				break;
+			case RAPIDFIRE_MODE_SEMI_RAPID:
+				buttons_rapid |= st_rfconf[i].button;
+				break;
+			case RAPIDFIRE_MODE_AUTO_RAPID:
+				buttons_autorapid |= st_rfconf[i].button;
+				break;
+			case RAPIDFIRE_MODE_AUTO_HOLD:
+				buttons_autohold |= st_rfconf[i].button;
+				break;
+		}
+	}
+	
+	mfSetRapidfire( 0, buttons_normal,    MF_RAPIDFIRE_MODE_NORMAL,    0, 0 );
+	mfSetRapidfire( 0, buttons_rapid,     MF_RAPIDFIRE_MODE_RAPID,     st_press_delay, st_release_delay );
+	mfSetRapidfire( 0, buttons_autorapid, MF_RAPIDFIRE_MODE_AUTORAPID, st_press_delay, st_release_delay );
+	mfSetRapidfire( 0, buttons_autohold,  MF_RAPIDFIRE_MODE_AUTOHOLD,  0, 0 );
 }

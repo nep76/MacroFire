@@ -9,7 +9,15 @@
 #include <pspctrl.h>
 #include <psprtc.h>
 #include <stdbool.h>
+#include <stdlib.h>
+#include <math.h>
 #include "utils/strutil.h"
+
+/*-----------------------------------------------
+	É}ÉNÉç
+-----------------------------------------------*/
+#define CTRLPAD_INVALID_RIGHT_TRIANGLE_DEGREE   45
+#define CTRLPAD_DEGREE_TO_RADIAN( d )           ( ( d ) *  (3.14 / 180 ) )
 
 #ifdef __cplusplus
 extern "C" {
@@ -26,8 +34,8 @@ extern "C" {
 enum ctrlpad_analog_direction {
 	CTRLPAD_CTRL_ANALOG_UP    = 0x00000002,
 	CTRLPAD_CTRL_ANALOG_RIGHT = 0x00000004,
-	CTRLPAD_CTRL_ANALOG_DOWN  = 0x00000200,
-	CTRLPAD_CTRL_ANALOG_LEFT  = 0x00000400
+	CTRLPAD_CTRL_ANALOG_DOWN  = 0x00000400,
+	CTRLPAD_CTRL_ANALOG_LEFT  = 0x00000800
 };
 
 struct ctrlpad_button {
@@ -61,6 +69,7 @@ unsigned int ctrlpadGetData( CtrlpadParams *params, SceCtrlData *pad_data );
 -----------------------------------------------*/
 char *ctrlpadUtilButtonsToString( unsigned int buttons, char *str, size_t max );
 unsigned int ctrlpadUtilStringToButtons( char *str );
+unsigned int ctrlpadUtilGetAnalogDirection( int x, int y );
 
 #ifdef __cplusplus
 }
