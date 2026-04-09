@@ -129,6 +129,7 @@ void mfMenu( void )
 	
 	/* Blitterを初期化 */
 	blitInit();
+	blitSetOptions( BO_AUTOFLUSH | BO_ALPHABLEND );
 	blit8BitCharTableSwitch( B8_BUTTON_SYMBOL );
 	
 	/* 現在のフレームバッファ情報を保存 */
@@ -180,7 +181,7 @@ void mfMenu( void )
 	mfMenuEnableInterrupt();
 	
 	while( gRunning ){
-		st_pad_data.Buttons = ctrlpadGetData( &st_cp_params, &st_pad_data );
+		st_pad_data.Buttons = ctrlpadGetData( &st_cp_params, &st_pad_data, CTRLPAD_IGNORE_ANALOG_DIRECTION );
 		
 		if( ( st_interrupt && st_pad_data.Buttons & ( PSP_CTRL_START | PSP_CTRL_HOME ) ) || st_menu_quit ){
 			if( rc == MR_ENTER && (MfFuncTerm)MFM_GET_CB_ARG_BY_PTR( mf_menu.arg, 0 ) ) ( (MfFuncTerm)MFM_GET_CB_ARG_BY_PTR( mf_menu.arg, 0 ) )();
@@ -489,16 +490,15 @@ static void mf_menu_create_item_name( char line[], size_t max, MfMenuItem *item 
 
 static void mf_not_enough_mem_error( void )
 {
-	blitString( blitOffsetChar( 5 ), blitOffsetLine(  4 ), MFM_TEXT_FCCOLOR, MFM_TEXT_BGCOLOR, "Failed to allocate the extra 4MB of RAM." );
-	blitString( blitOffsetChar( 5 ), blitOffsetLine(  6 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Maybe you are running Sony's Save/Load dialog in the game side." );
-	blitString( blitOffsetChar( 5 ), blitOffsetLine(  7 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Please exit there." );
-	blitString( blitOffsetChar( 5 ), blitOffsetLine(  8 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Otherwise, there is not enough available memory." );
+	blitString( blitOffsetChar( 5 ), blitOffsetLine(  4 ), MFM_TEXT_FCCOLOR, MFM_TEXT_BGCOLOR, "Failed to allocate memory for operation." );
+	blitString( blitOffsetChar( 5 ), blitOffsetLine(  6 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "There is not enough available memory." );
+	blitString( blitOffsetChar( 5 ), blitOffsetLine(  7 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "So, MacroFire is launching the emergency dialog." );
 	
-	blitString( blitOffsetChar( 5 ), blitOffsetLine( 10 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Waiting for button press..." );
-	blitString( blitOffsetChar( 9 ), blitOffsetLine( 11 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "START/HOME = Quit." );
-	blitString( blitOffsetChar( 9 ), blitOffsetLine( 12 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "SELECT     = Toggling MacroFire Engine and quit." );
+	blitString( blitOffsetChar( 5 ), blitOffsetLine( 9 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Waiting for button press..." );
+	blitString( blitOffsetChar( 9 ), blitOffsetLine( 10 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "START/HOME = Quit." );
+	blitString( blitOffsetChar( 9 ), blitOffsetLine( 11 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "SELECT     = Toggling MacroFire Engine state and quit." );
 	
-	blitStringf( blitOffsetChar( 5 ), blitOffsetLine( 14 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Currently MacroFire Engine: %s", gMfEngine ? "ON" : "OFF" );
+	blitStringf( blitOffsetChar( 5 ), blitOffsetLine( 13 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Currently MacroFire Engine: %s", gMfEngine ? "ON" : "OFF" );
 	
 	do{
 		sceCtrlPeekBufferPositive( &st_pad_data, 1 );
@@ -542,10 +542,10 @@ static void mf_menu_create_home_menu( MfMenuItem *menu, int menu_num, MfMenuCall
 	menu[2].handler          = &gMfMenu;
 	menu[2].value[0].string  = "Set launch buttons";
 	menu[2].value[1].integer = (
-		PSP_CTRL_CIRCLE   | PSP_CTRL_CROSS    | PSP_CTRL_SQUARE   | PSP_CTRL_TRIANGLE |
-		PSP_CTRL_UP       | PSP_CTRL_RIGHT    | PSP_CTRL_DOWN     | PSP_CTRL_LEFT     |
-		PSP_CTRL_LTRIGGER | PSP_CTRL_RTRIGGER | PSP_CTRL_SELECT   | PSP_CTRL_START    |
-		PSP_CTRL_NOTE     | PSP_CTRL_SCREEN   | PSP_CTRL_VOLUP    | PSP_CTRL_VOLDOWN  |
+		PSP_CTRL_CIRCLE   | PSP_CTRL_CROSS    | PSP_CTRL_SQUARE | PSP_CTRL_TRIANGLE |
+		PSP_CTRL_UP       | PSP_CTRL_RIGHT    | PSP_CTRL_DOWN   | PSP_CTRL_LEFT     |
+		PSP_CTRL_LTRIGGER | PSP_CTRL_RTRIGGER | PSP_CTRL_SELECT | PSP_CTRL_START    |
+		PSP_CTRL_NOTE     | PSP_CTRL_SCREEN   | PSP_CTRL_VOLUP  | PSP_CTRL_VOLDOWN  |
 		CTRLPAD_CTRL_ANALOG_UP   | CTRLPAD_CTRL_ANALOG_RIGHT |
 		CTRLPAD_CTRL_ANALOG_DOWN | CTRLPAD_CTRL_ANALOG_LEFT
 	);

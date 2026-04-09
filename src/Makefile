@@ -1,5 +1,5 @@
 TARGET = macrofire
-PSP_FW_VERSION = 371
+PSP_FW_VERSION = 380
 
 # PRX‚ðì¬‚·‚é
 BUILD_PRX = 1

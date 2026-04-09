@@ -103,7 +103,7 @@ int cmndlgSoskUpdate( void )
 {
 	struct cmndlg_sosk_tempdata *tempdata = st_params->base.tempBuffer;
 	SceCtrlData pad_data;
-	pad_data.Buttons = ctrlpadGetData( &st_cp_params, &pad_data );
+	pad_data.Buttons = ctrlpadGetData( &st_cp_params, &pad_data, CTRLPAD_IGNORE_ANALOG_DIRECTION );
 	
 	cmndlg_sosk_draw_ui( st_params );
 	

@@ -79,12 +79,12 @@ void fbmgrBlitBuffers( void )
 
 int fbmgrGetDisplayStat( FbmgrDisplayStat *stat )
 {
-	int rval;
+	int rval = 0;
 	
 	rval = sceDisplayGetMode( &(stat->mode), &(stat->width), &(stat->height) );
 	if( rval ) return rval;
 	
-	rval = sceDisplayGetFrameBuf( (void *)&(stat->frameBuffer), &(stat->bufferWidth), (int *)&(stat->pixelFormat), PSP_DISPLAY_SETBUF_NEXTFRAME );
+	rval = sceDisplayGetFrameBuf( (void *)&(stat->frameBuffer), &(stat->bufferWidth), (int *)&(stat->pixelFormat), PSP_DISPLAY_SETBUF_IMMEDIATE );
 	if( rval ) return rval;
 	
 	return 0;

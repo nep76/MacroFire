@@ -1,4 +1,4 @@
-MacroFire 2.1.0
+MacroFire 2.2.0
 
 
 Macro settings
@@ -96,7 +96,7 @@ Edit macro
   Run once/Run inifinityによって実行中に、MacroFire EngineをOFFにしてゲームに戻ると、
   マクロはコマンド実行位置を先頭にリセットして、再実行を待ちます。
   つまり、MacroFir eEngineをOFFにしてゲームに戻ったあと、再びONにするとマクロは先頭から再実行されます。
-  MacroFire Toggle Buttonsと組み合わせると、ゲーム上で擬似的にマクロをボタンで実行/停止できます。
+  Buttons to toggle the engine stateと組み合わせると、ゲーム上で擬似的にマクロをボタンで実行/停止できます。
 
   POPS(PS1エミュレータ)では、高速すぎる入力は無視されることがあります。
   Delayなしで次々にコマンドを実行するようなマクロをつくってもうまく動かないかもしれません。

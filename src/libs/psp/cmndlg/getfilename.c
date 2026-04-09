@@ -71,7 +71,7 @@ int cmndlgGetFilenameUpdate( void )
 	CmndlgGetFilenameData *selected_data = &(st_params->data[st_params->selectDataNumber]);
 	struct cmndlg_get_filename_tempdata *tempdata = &(((struct cmndlg_get_filename_tempdata *)(st_params->base.tempBuffer))[st_params->selectDataNumber]);
 	SceCtrlData pad_data;
-	pad_data.Buttons = ctrlpadGetData( &st_cp_params, &pad_data );
+	pad_data.Buttons = ctrlpadGetData( &st_cp_params, &pad_data, CTRLPAD_IGNORE_ANALOG_DIRECTION );
 	
 	/* ディレクトリリスト取得 */
 	if( st_chdir ){

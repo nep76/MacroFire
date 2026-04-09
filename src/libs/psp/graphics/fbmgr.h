@@ -92,19 +92,11 @@ void fbmgrBlitBuffers( void );
 
 /*
 	現在の表示バッファのアドレスを返す。
-	
-	もし、fbmgrInit()に引数を渡してフレームバッファを指定していても、
-	それらアドレスには必ず0x40000000が加算されている。
-	これはデータキャッシュを無効化するフラグ。
 */
 void *fbmgrGetCurrentDispBuf( void );
 
 /*
 	現在の描画バッファのアドレスを返す。
-	
-	もし、fbmgrInit()に引数を渡してフレームバッファを指定していても、
-	それらアドレスには必ず0x40000000が加算されている。
-	これはデータキャッシュを無効化するフラグ。
 */
 void *fbmgrGetCurrentDrawBuf( void );
 

@@ -16,8 +16,13 @@
 /*-----------------------------------------------
 	マクロ
 -----------------------------------------------*/
-#define CTRLPAD_INVALID_RIGHT_TRIANGLE_DEGREE   45
-#define CTRLPAD_DEGREE_TO_RADIAN( d )           ( ( d ) *  (3.14 / 180 ) )
+#define CTRLPAD_INVALID_RIGHT_TRIANGLE_DEGREE 45
+#define CTRLPAD_DEGREE_TO_RADIAN( d )         ( ( d ) *  (3.14 / 180 ) )
+
+#define CTRLPAD_SQUARE( x )                ( ( x ) * ( x ) )
+#define CTRLPAD_IN_DEADZONE( x, y, r )     ( CTRLPAD_SQUARE( x ) + CTRLPAD_SQUARE( y ) <= ( CTRLPAD_SQUARE( r ) << 1 ) )
+
+#define CTRLPAD_IGNORE_ANALOG_DIRECTION    -1
 
 #ifdef __cplusplus
 extern "C" {
@@ -44,7 +49,7 @@ struct ctrlpad_button {
 };
 
 typedef struct {
-	SceCtrlData  lastPadData;
+	unsigned int lastButtons;
 	uint64_t     tickLast;
 	uint64_t     tickRepeatDelayLow;
 	uint64_t     tickRepeatDelayHigh;
@@ -60,16 +65,15 @@ void ctrlpadInit( CtrlpadParams *params );
 void ctrlpadPref( CtrlpadParams *params, uint64_t low, uint64_t high, int count );
 void ctrlpadSetRepeatButtons( CtrlpadParams *params, unsigned int mask );
 void ctrlpadReset( CtrlpadParams *params );
-void ctrlpadDataClear( SceCtrlData *pad_data );
 void ctrlpadUpdateData( CtrlpadParams *params );
-unsigned int ctrlpadGetData( CtrlpadParams *params, SceCtrlData *pad_data );
+unsigned int ctrlpadGetData( CtrlpadParams *params, SceCtrlData *pad_data, int analog_deadzone );
 
 /*-----------------------------------------------
 	ユーティリティ関数
 -----------------------------------------------*/
 char *ctrlpadUtilButtonsToString( unsigned int buttons, char *str, size_t max );
 unsigned int ctrlpadUtilStringToButtons( char *str );
-unsigned int ctrlpadUtilGetAnalogDirection( int x, int y );
+unsigned int ctrlpadUtilGetAnalogDirection( int x, int y, int deadzone );
 
 #ifdef __cplusplus
 }

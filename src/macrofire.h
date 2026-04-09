@@ -9,9 +9,6 @@
 #include <stdbool.h>
 #include "utils/inimgr.h"
 
-#define MFM_TOP_MESSAGE       "MacroFire v2.1.0 In-game menu [ClassG: http://classg.sytes.net]"
-#define MFM_WORKING_DIRECTORY "ms0:/seplugins"
-
 #ifdef GLOBAL_VARIABLES_DEFINE
 #define GLOBAL
 #define INIT_VALUE( x ) = ( x ) /* define */
@@ -20,6 +17,21 @@
 #define INIT_VALUE( x ) /* extern */
 #endif
 #define MF_ARRAY_NUM( x )  sizeof( x ) / sizeof( x[0] )
+
+/*-----------------------------------------------
+	íËêî
+-----------------------------------------------*/
+#define MFM_TOP_MESSAGE       "MacroFire v2.2.0 In-game menu [ClassG: http://classg.sytes.net]"
+#define MFM_WORKING_DIRECTORY "ms0:/seplugins"
+
+#define MF_INIDEF_MAIN_STARTUP           false
+#define MF_INIDEF_MAIN_MENUBUTTONSNAME   "VOLUP + VOLDOWN"
+#define MF_INIDEF_MAIN_MENUBUTTONS       ( PSP_CTRL_VOLUP | PSP_CTRL_VOLDOWN )
+#define MF_INIDEF_MAIN_TOGGLEBUTTONSNAME ""
+#define MF_INIDEF_MAIN_TOGGLEBUTTONS     ( 0 )
+#define MF_INIDEF_ANALOGTUNE_ORIGINX     128
+#define MF_INIDEF_ANALOGTUNE_ORIGINY     128
+#define MF_INIDEF_ANALOGTUNE_DEADZONE    40
 
 /*-----------------------------------------------
 	å^êÈåæ
@@ -48,8 +60,8 @@ bool mfIsDisabled ( void );
 -----------------------------------------------*/
 GLOBAL bool         gRunning  INIT_VALUE( true );
 GLOBAL bool         gMfEngine INIT_VALUE( false );
-GLOBAL unsigned int gMfMenu   INIT_VALUE( 0 );
-GLOBAL unsigned int gMfToggle INIT_VALUE( 0 );
+GLOBAL unsigned int gMfMenu   INIT_VALUE( MF_INIDEF_MAIN_MENUBUTTONS );
+GLOBAL unsigned int gMfToggle INIT_VALUE( MF_INIDEF_MAIN_TOGGLEBUTTONS );
 
 #undef GLOBAL
 #undef VALUE

@@ -86,13 +86,18 @@ unsigned int ctrlpadUtilStringToButtons( char *str )
 	return buttons;
 }
 
-unsigned int ctrlpadUtilGetAnalogDirection( int x, int y )
+unsigned int ctrlpadUtilGetAnalogDirection( int x, int y, int deadzone )
 {
 	unsigned int direction = 0;
+	
 	x -= 128;
 	y -= 128;
 	
-	if( x == 0 && y == 0 ) return 0;
+	if( deadzone ){
+		if( CTRLPAD_IN_DEADZONE( abs( x ), abs( y ), deadzone ) ) return 0;
+	} else{
+		if( x == 0 && y == 0 ) return 0;
+	}
 	
 	if( abs( y ) > (int)(sin( CTRLPAD_DEGREE_TO_RADIAN( CTRLPAD_INVALID_RIGHT_TRIANGLE_DEGREE ) ) * abs( x )) ){
 		if( y > 0 ){
@@ -113,13 +118,6 @@ unsigned int ctrlpadUtilGetAnalogDirection( int x, int y )
 	return direction;
 }
 
-void ctrlpadDataClear( SceCtrlData *pad_data )
-{
-	pad_data->Buttons = 0;
-	pad_data->Lx      = 128;
-	pad_data->Ly      = 128;
-}
-
 void ctrlpadInit( CtrlpadParams *params )
 {
 	if( ! params ) return;
@@ -128,6 +126,8 @@ void ctrlpadInit( CtrlpadParams *params )
 	params->tickRepeatDelayHigh = 100000;
 	params->countLowToHigh      = 1;
 	params->maskRepeatButtons   = 0;
+	
+	sceCtrlSetSamplingMode( PSP_CTRL_MODE_ANALOG );
 	
 	ctrlpadUpdateData( params );
 }
@@ -145,9 +145,9 @@ void ctrlpadReset( CtrlpadParams *params )
 {
 	if( ! params ) return;
 	
-	params->tickLast = 0;
-	params->countLow = 0;
-	ctrlpadDataClear( &(params->lastPadData) );
+	params->tickLast    = 0;
+	params->countLow    = 0;
+	params->lastButtons = 0;
 }
 
 void ctrlpadSetRepeatButtons( CtrlpadParams *params, unsigned int mask )
@@ -159,15 +159,17 @@ void ctrlpadSetRepeatButtons( CtrlpadParams *params, unsigned int mask )
 
 void ctrlpadUpdateData( CtrlpadParams *params )
 {
-
+	SceCtrlData pad;
 	if( ! params ) return;
 	
 	sceRtcGetCurrentTick( &(params->tickLast) );
-	sceCtrlPeekBufferPositive( &(params->lastPadData), 1 );
-	params->countLow = 0;
+	sceCtrlPeekBufferPositive( &pad, 1 );
+	
+	params->countLow    = 0;
+	params->lastButtons = pad.Buttons;
 }
 
-unsigned int ctrlpadGetData( CtrlpadParams *params, SceCtrlData *pad_data )
+unsigned int ctrlpadGetData( CtrlpadParams *params, SceCtrlData *pad_data, int analog_deadzone )
 {
 	uint64_t current_tick;
 	uint64_t *delay_tick;
@@ -175,7 +177,12 @@ unsigned int ctrlpadGetData( CtrlpadParams *params, SceCtrlData *pad_data )
 	
 	sceRtcGetCurrentTick( &current_tick );
 	sceCtrlPeekBufferPositive( pad_data, 1 );
+	
 	buttons = pad_data->Buttons;
+	
+	if( analog_deadzone >= 0 ){
+		buttons |= ctrlpadUtilGetAnalogDirection( pad_data->Lx, pad_data->Ly, analog_deadzone );
+	}
 	
 	if( params->countLow >= params->countLowToHigh ){
 		delay_tick = &(params->tickRepeatDelayHigh);
@@ -183,21 +190,22 @@ unsigned int ctrlpadGetData( CtrlpadParams *params, SceCtrlData *pad_data )
 		delay_tick = &(params->tickRepeatDelayLow);
 	}
 	
-	if( ! buttons ){
-		ctrlpadReset( params );
-	} else if( buttons != params->lastPadData.Buttons ){
-		params->tickLast    = current_tick;
-		params->lastPadData = *pad_data;
-		params->countLow    = 0;
-	} else if( current_tick - params->tickLast > *delay_tick ){
-		buttons             &= params->maskRepeatButtons;
-		params->tickLast    = current_tick;
-		params->lastPadData = *pad_data;
-		if( params->countLow <= params->countLowToHigh ) params->countLow++;
-	} else{
-		return 0;
+	if( buttons ){
+		if( buttons == params->lastButtons ){
+			if( current_tick - params->tickLast > *delay_tick ){
+				params->tickLast    = current_tick;
+				params->lastButtons = buttons;
+				if( params->countLow <= params->countLowToHigh ) params->countLow++;
+				buttons             &= params->maskRepeatButtons;
+			} else{
+				buttons = 0;
+			}
+		} else{
+			params->tickLast    = current_tick;
+			params->lastButtons = buttons;
+			params->countLow    = 0;
+		}
 	}
 	
 	return buttons;
 }
-

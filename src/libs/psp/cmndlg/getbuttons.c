@@ -101,7 +101,7 @@ int cmndlgGetButtonsUpdate( void )
 	CmndlgGetButtonsData *selected_data          = &(st_params->data[st_params->selectDataNumber]);
 	struct cmndlg_get_buttons_tempdata *tempdata = &(((struct cmndlg_get_buttons_tempdata *)(st_params->base.tempBuffer))[st_params->selectDataNumber]);
 	SceCtrlData pad_data;
-	pad_data.Buttons = ctrlpadGetData( &st_cp_params, &pad_data );
+	pad_data.Buttons = ctrlpadGetData( &st_cp_params, &pad_data, CTRLPAD_IGNORE_ANALOG_DIRECTION );
 	
 	if( st_reload ){
 		st_avail_buttons_num = 0;

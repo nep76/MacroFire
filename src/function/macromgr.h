@@ -10,6 +10,7 @@
 
 #include <pspkernel.h>
 #include "psp/memsce.h"
+#include <limits.h>
 
 /*-----------------------------------------------
 	’è”

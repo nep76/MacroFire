@@ -74,7 +74,7 @@ int cmndlgGetNumbersUpdate( void )
 	CmndlgGetNumbersData *selected_data = &(st_params->data[st_params->selectDataNumber]);
 	char *buf_start  = &(((char *)(st_params->base.tempBuffer))[( ( CMNDLG_GET_NUMBERS_MAX_DIGITS + 1 ) * st_params->selectDataNumber ) + ( CMNDLG_GET_NUMBERS_MAX_DIGITS - selected_data->numDigits )]);
 	SceCtrlData pad_data;
-	pad_data.Buttons = ctrlpadGetData( &st_cp_params, &pad_data );
+	pad_data.Buttons = ctrlpadGetData( &st_cp_params, &pad_data, CTRLPAD_IGNORE_ANALOG_DIRECTION );
 	
 	cmndlg_get_numbers_draw_ui( buf_start, st_params );
 	if( st_show_usage ){

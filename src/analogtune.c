@@ -47,10 +47,7 @@ void analogtuneCreateIni( IniUID ini )
 
 void analogtuneTune( SceCtrlData *pad_data, void *argp )
 {
-	if(
-		( ANALOGTUNE_SQUARE( abs( pad_data->Lx - st_deadzone.x ) ) + ANALOGTUNE_SQUARE( abs( pad_data->Ly - st_deadzone.y ) ) ) <=
-		( ANALOGTUNE_SQUARE( st_deadzone.r ) * 2 )
-	){
+	if( CTRLPAD_IN_DEADZONE( abs( pad_data->Lx - st_deadzone.x ), abs( pad_data->Ly - st_deadzone.y ), st_deadzone.r ) ){
 		pad_data->Lx = ANALOGTUNE_INIT_X;
 		pad_data->Ly = ANALOGTUNE_INIT_Y;
 	} else if( st_sensitivity != 100 ){
@@ -99,7 +96,7 @@ MfMenuRc analogtuneMenu( SceCtrlData *pad_data, void *argp )
 	pad_dupe = *pad_data;
 	analogtuneTune( &pad_dupe, NULL );
 	
-	analog_dir = ctrlpadUtilGetAnalogDirection( pad_dupe.Lx, pad_dupe.Ly );
+	analog_dir = ctrlpadUtilGetAnalogDirection( pad_dupe.Lx, pad_dupe.Ly, 0 );
 	
 	blitString( blitOffsetChar( 3 ), blitOffsetLine( 24 ),  MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Test of analog stick direction:" );
 	blitString( blitOffsetChar( 32 + 5 ), blitOffsetLine( 23 ),  analog_dir & CTRLPAD_CTRL_ANALOG_UP    ? MFM_TEXT_FCCOLOR : MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "\x80" );

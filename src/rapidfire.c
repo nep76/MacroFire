@@ -62,7 +62,7 @@ void mfSetRapidfire( MfRapidfireUID uid, unsigned int buttons, MfRapidfireMode m
 			params[i].mode         = mode;
 			params[i].delayPress   = pdelay;
 			params[i].delayRelease = rdelay;
-			params[i].delayLast    = 0;
+			params[i].statLast    = 0;
 			params[i].state        = false;
 		}
 	}
@@ -98,20 +98,36 @@ void mfRapidfire( MfRapidfireUID uid, MfCallMode caller, SceCtrlData *pad_data )
 				continue;
 			}
 			
-			delayms = (unsigned int)curms - params[i].delayLast;
+			delayms = (unsigned int)curms - params[i].statLast;
 			
 			if( params[i].state ){
 				pad_data->Buttons |= params[i].button;
 				if( caller == MF_CALL_READ && delayms > params[i].delayPress ){
-					params[i].delayLast = curms;
+					params[i].statLast = curms;
 					params[i].state     = false;
 				}
 			} else{
 				if( params[i].mode == MF_RAPIDFIRE_MODE_RAPID ) pad_data->Buttons ^= params[i].button;
 				if( caller == MF_CALL_READ && delayms > params[i].delayRelease ){
-					params[i].delayLast = curms;
+					params[i].statLast = curms;
 					params[i].state     = true;
 				}
+			}
+		} else if( params[i].mode == MF_RAPIDFIRE_MODE_HOLD ){
+			if( params[i].statLast ){
+				if( ! ( pad_data->Buttons & params[i].button ) ){
+					params[i].statLast = 0;
+				}
+			} else{
+				if( pad_data->Buttons & params[i].button ){
+					params[i].state = params[i].state ? false : true;
+					params[i].statLast = 1;
+				}
+			}
+			if( params[i].state ){
+				pad_data->Buttons |= params[i].button;
+			} else if( params[i].statLast && ( pad_data->Buttons & params[i].button ) ){
+				pad_data->Buttons ^= params[i].button;
 			}
 		} else if( params[i].mode == MF_RAPIDFIRE_MODE_AUTOHOLD ){
 			if( ! ( pad_data->Buttons & params[i].button ) ){

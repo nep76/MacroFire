@@ -36,12 +36,13 @@
 #define RAPIDFIRE_MODE_NORMAL     0
 #define RAPIDFIRE_MODE_SEMI_RAPID 1
 #define RAPIDFIRE_MODE_AUTO_RAPID 2
-#define RAPIDFIRE_MODE_AUTO_HOLD  3
+#define RAPIDFIRE_MODE_HOLD       3
+#define RAPIDFIRE_MODE_AUTO_HOLD  4
 #define RAPIDFIRE_LOAD 19
 #define RAPIDFIRE_SAVE 20
 
 #define RAPIDFIRE_DATA_SIGNATURE        "MACROFIRE-RAPIDFIRE"
-#define RAPIDFIRE_DATA_VERSION          2
+#define RAPIDFIRE_DATA_VERSION          3
 #define RAPIDFIRE_DID_CIRCLE            "Circle"
 #define RAPIDFIRE_DID_CROSS             "Cross"
 #define RAPIDFIRE_DID_SQUARE            "Square"
@@ -58,8 +59,9 @@
 #define RAPIDFIRE_DID_PDELAY            "PressDelay"
 
 #define RAPIDFIRE_DID_MODENORMAL        "NORMAL"
-#define RAPIDFIRE_DID_MODESEMIRAPID     "RAPID"
+#define RAPIDFIRE_DID_MODERAPID         "RAPID"
 #define RAPIDFIRE_DID_MODEAUTORAPID     "AUTO-RAPID"
+#define RAPIDFIRE_DID_MODEHOLD          "HOLD"
 #define RAPIDFIRE_DID_MODEAUTOHOLD      "AUTO-HOLD"
 
 /*-----------------------------------------------

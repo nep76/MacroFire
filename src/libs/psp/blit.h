@@ -40,15 +40,20 @@
 #define blitOffsetLine( x ) ( ( x ) * BLIT_CHAR_HEIGHT )
 #define blitMeasureChar( x ) ( ( x ) * BLIT_CHAR_WIDTH )
 #define blitMeasureLine( x ) ( ( x ) * BLIT_CHAR_HEIGHT )
-#define blitLineRel( x, y, e, f, c ) blitLine( x, y, x + e, y + f, c )
-#define blitFillBox( x, y, w, h, c ) blitFillRect( x, y, x + w, y + h, c )
-#define blitLineBox( x, y, w, h, c ) blitLineRect( x, y, x + w, y + h, c )
+#define blitLineRel( x, y, e, f, c ) blitLine( x, y, ( x ) + ( e ), ( y ) + ( f ), c )
+#define blitFillBox( x, y, w, h, c ) blitFillRect( x, y, ( x ) + ( w ), ( y ) + ( h ), c )
+#define blitLineBox( x, y, w, h, c ) blitLineRect( x, y, ( x ) + ( w ), ( y ) + ( h ), c )
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 typedef uint32_t ( *BlitAlphaBlender )( void *, void * );
+
+typedef enum {
+	BO_AUTOFLUSH  = 0x00000001,
+	BO_ALPHABLEND = 0x00000002
+} BlitOption;
 
 typedef enum {
 	B8_PSPSDK,
@@ -60,7 +65,8 @@ typedef struct {
 	int charnum;
 } BlitFontTable;
 
-int blitInit( void );
+int  blitInit( void );
+void blitSetOptions( unsigned int opt );
 void blitGetFrameBufStat( FbmgrDisplayStat *stat );
 void blitSetFrameBufAddrTop( void *addr );
 int  blitGetFrameBufPixelLength( void );
@@ -116,20 +122,6 @@ u16 blitColorConvert4444( u32 color );
 		変換された色。
 */
 u32 blitConvertColorFrom8888( enum PspDisplayPixelFormats pxfmt, u32 color );
-
-/* blitSetBufSync
-	転送先バッファを設定する。
-	デフォルトはPSP_DISPLAY_SETBUF_IMMEDIATEであり、
-	表示バッファに直接書き込む。
-	
-	自前でblitGetDisplayStat()を使ってダブルバッファにする場合、
-	PSP_DISPLAY_SETBUF_NEXTFRAMEに設定しておくと、
-	全てのblit*()描画関数は、描画バッファに描画する。
-	
-	@param enum PspDisplaySetBufSync sync
-		転送先にしたいバッファ。
-*/
-void blitSetBufSync( enum PspDisplaySetBufSync sync );
 
 /* blitGetPixelLength
 	渡したピクセルフォーマットのデータのバイト数を返す。

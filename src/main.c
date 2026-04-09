@@ -66,7 +66,7 @@ static int mf_read_pad_buffer( MfSceCtrlDataFunc func, SceCtrlData *pad, int cou
 	int ret = ( func )( pad, count );
 	
 	analogtuneTune( pad, NULL );
-	pad->Buttons |= ctrlpadUtilGetAnalogDirection( pad->Lx, pad->Ly );
+	pad->Buttons |= ctrlpadUtilGetAnalogDirection( pad->Lx, pad->Ly, 0 );
 	
 	mfRapidfire( 0, mode, pad );
 	
@@ -177,7 +177,6 @@ void mfRestoreApi( void )
 
 int main_thread( SceSize arglen, void *argp )
 {
-	/* 必ず0で初期化 */
 	bool wait_toggle_button_release = false;
 	
 	/* メニューを初期化 */
@@ -199,9 +198,9 @@ int main_thread( SceSize arglen, void *argp )
 		if( ini > 0 ){
 			char buttons[128];
 			if( inimgrLoad( ini, "ms0:/seplugins/macrofire.ini" ) != 0 ){
-				inimgrSetBool( ini, "Main", "Startup", false );
-				inimgrSetString( ini, "Main", "MenuButtons", "VOLUP + VOLDOWN" );
-				inimgrSetString( ini, "Main", "ToggleButtons", "" );
+				inimgrSetBool( ini, "Main", "Startup", MF_INIDEF_MAIN_STARTUP );
+				inimgrSetString( ini, "Main", "MenuButtons",   MF_INIDEF_MAIN_MENUBUTTONSNAME );
+				inimgrSetString( ini, "Main", "ToggleButtons", MF_INIDEF_MAIN_TOGGLEBUTTONSNAME );
 				
 				analogtuneCreateIni( ini );
 				
@@ -214,10 +213,10 @@ int main_thread( SceSize arglen, void *argp )
 			
 			gMfEngine = inimgrGetBool( ini, "Main", "Startup", false );
 			
-			inimgrGetString( ini, "Main", "MenuButtons", "VOLUP + VOLDOWN", buttons, sizeof( buttons ) );
+			inimgrGetString( ini, "Main", "MenuButtons", MF_INIDEF_MAIN_MENUBUTTONSNAME, buttons, sizeof( buttons ) );
 			gMfMenu = ctrlpadUtilStringToButtons( buttons );
 			
-			inimgrGetString( ini, "Main", "ToggleButtons", "", buttons, sizeof( buttons ) );
+			inimgrGetString( ini, "Main", "ToggleButtons", MF_INIDEF_MAIN_TOGGLEBUTTONSNAME, buttons, sizeof( buttons ) );
 			gMfToggle = ctrlpadUtilStringToButtons( buttons );
 			
 			analogtuneLoadIni( ini );
@@ -226,9 +225,6 @@ int main_thread( SceSize arglen, void *argp )
 				if( mftable[i].liFunc ) ( mftable[i].liFunc )( ini );
 			}
 			inimgrDestroy( ini );
-		} else{
-			/* INIハンドルすら得られなかった場合 */
-			gMfMenu = PSP_CTRL_VOLDOWN | PSP_CTRL_VOLUP;
 		}
 	}
 	
@@ -246,7 +242,7 @@ int main_thread( SceSize arglen, void *argp )
 		} else{
 			sceCtrlPeekBufferPositive( &st_pad_data, 1 );
 			analogtuneTune( &st_pad_data, NULL );
-			st_pad_data.Buttons |= ctrlpadUtilGetAnalogDirection( st_pad_data.Lx, st_pad_data.Ly );
+			st_pad_data.Buttons |= ctrlpadUtilGetAnalogDirection( st_pad_data.Lx, st_pad_data.Ly, 0 );
 		}
 		
 		if( gMfToggle ){

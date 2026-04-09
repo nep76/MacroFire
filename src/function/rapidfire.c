@@ -35,21 +35,21 @@ static int st_release_delay  = RAPIDFIRE_DEFAULT_RELEASE_DELAY;
 static int st_press_delay    = RAPIDFIRE_DEFAULT_PRESS_DELAY;
 
 static MfMenuItem st_menu_table[] = {
-	{ MT_OPTION, "Circle  ", 0, &(st_rfconf[0].mode),  { { .string = "NORMAL" }, { .string = "RAPID" }, { .string = "AUTO-RAPID"}, { .string = "AUTO-HOLD" }, { .string = NULL } } },
-	{ MT_OPTION, "Cross   ", 0, &(st_rfconf[1].mode),  { { .string = "NORMAL" }, { .string = "RAPID" }, { .string = "AUTO-RAPID"}, { .string = "AUTO-HOLD" }, { .string = NULL } } },
-	{ MT_OPTION, "Square  ", 0, &(st_rfconf[2].mode),  { { .string = "NORMAL" }, { .string = "RAPID" }, { .string = "AUTO-RAPID"}, { .string = "AUTO-HOLD" }, { .string = NULL } } },
-	{ MT_OPTION, "Triangle", 0, &(st_rfconf[3].mode),  { { .string = "NORMAL" }, { .string = "RAPID" }, { .string = "AUTO-RAPID"}, { .string = "AUTO-HOLD" }, { .string = NULL } } },
+	{ MT_OPTION, "Circle  ", 0, &(st_rfconf[0].mode),  { { .string = RAPIDFIRE_DID_MODENORMAL }, { .string = RAPIDFIRE_DID_MODERAPID }, { .string = RAPIDFIRE_DID_MODEAUTORAPID }, { .string = RAPIDFIRE_DID_MODEHOLD }, { .string = RAPIDFIRE_DID_MODEAUTOHOLD }, { .string = NULL } } },
+	{ MT_OPTION, "Cross   ", 0, &(st_rfconf[1].mode),  { { .string = RAPIDFIRE_DID_MODENORMAL }, { .string = RAPIDFIRE_DID_MODERAPID }, { .string = RAPIDFIRE_DID_MODEAUTORAPID }, { .string = RAPIDFIRE_DID_MODEHOLD }, { .string = RAPIDFIRE_DID_MODEAUTOHOLD }, { .string = NULL } } },
+	{ MT_OPTION, "Square  ", 0, &(st_rfconf[2].mode),  { { .string = RAPIDFIRE_DID_MODENORMAL }, { .string = RAPIDFIRE_DID_MODERAPID }, { .string = RAPIDFIRE_DID_MODEAUTORAPID }, { .string = RAPIDFIRE_DID_MODEHOLD }, { .string = RAPIDFIRE_DID_MODEAUTOHOLD }, { .string = NULL } } },
+	{ MT_OPTION, "Triangle", 0, &(st_rfconf[3].mode),  { { .string = RAPIDFIRE_DID_MODENORMAL }, { .string = RAPIDFIRE_DID_MODERAPID }, { .string = RAPIDFIRE_DID_MODEAUTORAPID }, { .string = RAPIDFIRE_DID_MODEHOLD }, { .string = RAPIDFIRE_DID_MODEAUTOHOLD }, { .string = NULL } } },
 	{ MT_NULL },
-	{ MT_OPTION, "Up      ", 0, &(st_rfconf[4].mode),  { { .string = "NORMAL" }, { .string = "RAPID" }, { .string = "AUTO-RAPID"}, { .string = "AUTO-HOLD" }, { .string = NULL } } },
-	{ MT_OPTION, "Right   ", 0, &(st_rfconf[5].mode),  { { .string = "NORMAL" }, { .string = "RAPID" }, { .string = "AUTO-RAPID"}, { .string = "AUTO-HOLD" }, { .string = NULL } } },
-	{ MT_OPTION, "Down    ", 0, &(st_rfconf[6].mode),  { { .string = "NORMAL" }, { .string = "RAPID" }, { .string = "AUTO-RAPID"}, { .string = "AUTO-HOLD" }, { .string = NULL } } },
-	{ MT_OPTION, "Left    ", 0, &(st_rfconf[7].mode),  { { .string = "NORMAL" }, { .string = "RAPID" }, { .string = "AUTO-RAPID"}, { .string = "AUTO-HOLD" }, { .string = NULL } } },
+	{ MT_OPTION, "Up      ", 0, &(st_rfconf[4].mode),  { { .string = RAPIDFIRE_DID_MODENORMAL }, { .string = RAPIDFIRE_DID_MODERAPID }, { .string = RAPIDFIRE_DID_MODEAUTORAPID }, { .string = RAPIDFIRE_DID_MODEHOLD }, { .string = RAPIDFIRE_DID_MODEAUTOHOLD }, { .string = NULL } } },
+	{ MT_OPTION, "Right   ", 0, &(st_rfconf[5].mode),  { { .string = RAPIDFIRE_DID_MODENORMAL }, { .string = RAPIDFIRE_DID_MODERAPID }, { .string = RAPIDFIRE_DID_MODEAUTORAPID }, { .string = RAPIDFIRE_DID_MODEHOLD }, { .string = RAPIDFIRE_DID_MODEAUTOHOLD }, { .string = NULL } } },
+	{ MT_OPTION, "Down    ", 0, &(st_rfconf[6].mode),  { { .string = RAPIDFIRE_DID_MODENORMAL }, { .string = RAPIDFIRE_DID_MODERAPID }, { .string = RAPIDFIRE_DID_MODEAUTORAPID }, { .string = RAPIDFIRE_DID_MODEHOLD }, { .string = RAPIDFIRE_DID_MODEAUTOHOLD }, { .string = NULL } } },
+	{ MT_OPTION, "Left    ", 0, &(st_rfconf[7].mode),  { { .string = RAPIDFIRE_DID_MODENORMAL }, { .string = RAPIDFIRE_DID_MODERAPID }, { .string = RAPIDFIRE_DID_MODEAUTORAPID }, { .string = RAPIDFIRE_DID_MODEHOLD }, { .string = RAPIDFIRE_DID_MODEAUTOHOLD }, { .string = NULL } } },
 	{ MT_NULL },
-	{ MT_OPTION, "L-trig  ", 0, &(st_rfconf[8].mode),  { { .string = "NORMAL" }, { .string = "RAPID" }, { .string = "AUTO-RAPID"}, { .string = "AUTO-HOLD" }, { .string = NULL } } },
-	{ MT_OPTION, "R-trig  ", 0, &(st_rfconf[9].mode),  { { .string = "NORMAL" }, { .string = "RAPID" }, { .string = "AUTO-RAPID"}, { .string = "AUTO-HOLD" }, { .string = NULL } } },
+	{ MT_OPTION, "L-trig  ", 0, &(st_rfconf[8].mode),  { { .string = RAPIDFIRE_DID_MODENORMAL }, { .string = RAPIDFIRE_DID_MODERAPID }, { .string = RAPIDFIRE_DID_MODEAUTORAPID }, { .string = RAPIDFIRE_DID_MODEHOLD }, { .string = RAPIDFIRE_DID_MODEAUTOHOLD }, { .string = NULL } } },
+	{ MT_OPTION, "R-trig  ", 0, &(st_rfconf[9].mode),  { { .string = RAPIDFIRE_DID_MODENORMAL }, { .string = RAPIDFIRE_DID_MODERAPID }, { .string = RAPIDFIRE_DID_MODEAUTORAPID }, { .string = RAPIDFIRE_DID_MODEHOLD }, { .string = RAPIDFIRE_DID_MODEAUTOHOLD }, { .string = NULL } } },
 	{ MT_NULL },
-	{ MT_OPTION, "START   ", 0, &(st_rfconf[10].mode), { { .string = "NORMAL" }, { .string = "RAPID" }, { .string = "AUTO-RAPID"}, { .string = "AUTO-HOLD" }, { .string = NULL } } },
-	{ MT_OPTION, "SELECT  ", 0, &(st_rfconf[11].mode), { { .string = "NORMAL" }, { .string = "RAPID" }, { .string = "AUTO-RAPID"}, { .string = "AUTO-HOLD" }, { .string = NULL } } },
+	{ MT_OPTION, "START   ", 0, &(st_rfconf[10].mode), { { .string = RAPIDFIRE_DID_MODENORMAL }, { .string = RAPIDFIRE_DID_MODERAPID }, { .string = RAPIDFIRE_DID_MODEAUTORAPID }, { .string = RAPIDFIRE_DID_MODEHOLD }, { .string = RAPIDFIRE_DID_MODEAUTOHOLD }, { .string = NULL } } },
+	{ MT_OPTION, "SELECT  ", 0, &(st_rfconf[11].mode), { { .string = RAPIDFIRE_DID_MODENORMAL }, { .string = RAPIDFIRE_DID_MODERAPID }, { .string = RAPIDFIRE_DID_MODEAUTORAPID }, { .string = RAPIDFIRE_DID_MODEHOLD }, { .string = RAPIDFIRE_DID_MODEAUTOHOLD }, { .string = NULL } } },
 	
 	{ MT_NULL },
 	{ MT_GET_NUMBERS, "Release delay", 0, &(st_release_delay), { { .string = "Set release delay" }, { .string = "ms" }, { .integer = 4 }, { .integer = 18 } } },
@@ -66,9 +66,11 @@ static char *rapidire_mode_to_string( int mode )
 {
 	switch( mode ){
 		case RAPIDFIRE_MODE_SEMI_RAPID:
-			return RAPIDFIRE_DID_MODESEMIRAPID;
+			return RAPIDFIRE_DID_MODERAPID;
 		case RAPIDFIRE_MODE_AUTO_RAPID:
 			return RAPIDFIRE_DID_MODEAUTORAPID;
+		case RAPIDFIRE_MODE_HOLD:
+			return RAPIDFIRE_DID_MODEHOLD;
 		case RAPIDFIRE_MODE_AUTO_HOLD:
 			return RAPIDFIRE_DID_MODEAUTOHOLD;
 		default:
@@ -78,10 +80,12 @@ static char *rapidire_mode_to_string( int mode )
 
 static int rapidfire_string_to_mode( char *mode )
 {
-	if( strcmp( mode, RAPIDFIRE_DID_MODESEMIRAPID ) == 0 ){
+	if( strcmp( mode, RAPIDFIRE_DID_MODERAPID ) == 0 ){
 		return RAPIDFIRE_MODE_SEMI_RAPID;
 	} else if( strcmp( mode, RAPIDFIRE_DID_MODEAUTORAPID ) == 0 ){
 		return RAPIDFIRE_MODE_AUTO_RAPID;
+	} else if( strcmp( mode, RAPIDFIRE_DID_MODEHOLD ) == 0 ){
+		return RAPIDFIRE_MODE_HOLD;
 	} else if( strcmp( mode, RAPIDFIRE_DID_MODEAUTOHOLD ) == 0 ){
 		return RAPIDFIRE_MODE_AUTO_HOLD;
 	} else{
@@ -228,11 +232,12 @@ MfMenuRc rapidfireMenu( SceCtrlData *pad_data, void *argp )
 	static int selected    = 0;
 	
 	if( ! st_callback.func ){
-		blitString( blitOffsetChar(  3 ), blitOffsetLine(  4 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Please choose a rapidfire mode per buttons. %d" );
-		blitString( blitOffsetChar( 33 ), blitOffsetLine( 22 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "NORMAL    : standard control mode." );
-		blitString( blitOffsetChar( 33 ), blitOffsetLine( 23 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "RAPID     : hold the button to rapidfire." );
-		blitString( blitOffsetChar( 33 ), blitOffsetLine( 24 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "AUTO-RAPID: always to rapidfire." );
-		blitString( blitOffsetChar( 33 ), blitOffsetLine( 25 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "AUTO-HOLD : always to press and hold." );
+		blitString( blitOffsetChar(  3 ), blitOffsetLine(  4 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Please choose a rapidfire mode per buttons." );
+		blitString( blitOffsetChar( 33 ), blitOffsetLine( 22 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "NORMAL    : Standard control mode." );
+		blitString( blitOffsetChar( 33 ), blitOffsetLine( 23 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "RAPID     : Rapidfire while pressing." );
+		blitString( blitOffsetChar( 33 ), blitOffsetLine( 24 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "AUTO-RAPID: Always rapidfire." );
+		blitString( blitOffsetChar( 33 ), blitOffsetLine( 25 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "HOLD      : Toggle the hold state" );
+		blitString( blitOffsetChar( 33 ), blitOffsetLine( 26 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "AUTO-HOLD : Always to hold." );
 		
 		/* 目立つように警告はSave/Loadにカーソルがのった時のみ表示 */
 		if( selected == RAPIDFIRE_LOAD || selected == RAPIDFIRE_SAVE ){
@@ -261,30 +266,37 @@ MfMenuRc rapidfireMenu( SceCtrlData *pad_data, void *argp )
 void rapidfireApply( void )
 {
 	int i;
+	unsigned int *buttons          = NULL;
 	unsigned int buttons_normal    = 0;
 	unsigned int buttons_rapid     = 0;
 	unsigned int buttons_autorapid = 0;
+	unsigned int buttons_hold      = 0;
 	unsigned int buttons_autohold  = 0;
 	
 	for( i = 0; i < MF_ARRAY_NUM( st_rfconf ); i++ ){
 		switch( st_rfconf[i].mode ){
 			case RAPIDFIRE_MODE_NORMAL:
-				buttons_normal |= st_rfconf[i].button;
+				buttons = &buttons_normal;
 				break;
 			case RAPIDFIRE_MODE_SEMI_RAPID:
-				buttons_rapid |= st_rfconf[i].button;
+				buttons = &buttons_rapid;
 				break;
 			case RAPIDFIRE_MODE_AUTO_RAPID:
-				buttons_autorapid |= st_rfconf[i].button;
+				buttons = &buttons_autorapid;
+				break;
+			case RAPIDFIRE_MODE_HOLD:
+				buttons = &buttons_hold;
 				break;
 			case RAPIDFIRE_MODE_AUTO_HOLD:
-				buttons_autohold |= st_rfconf[i].button;
+				buttons = &buttons_autohold;
 				break;
 		}
+		*buttons |= st_rfconf[i].button;
 	}
 	
 	mfSetRapidfire( 0, buttons_normal,    MF_RAPIDFIRE_MODE_NORMAL,    0, 0 );
 	mfSetRapidfire( 0, buttons_rapid,     MF_RAPIDFIRE_MODE_RAPID,     st_press_delay, st_release_delay );
 	mfSetRapidfire( 0, buttons_autorapid, MF_RAPIDFIRE_MODE_AUTORAPID, st_press_delay, st_release_delay );
+	mfSetRapidfire( 0, buttons_hold,      MF_RAPIDFIRE_MODE_HOLD,      0, 0 );
 	mfSetRapidfire( 0, buttons_autohold,  MF_RAPIDFIRE_MODE_AUTOHOLD,  0, 0 );
 }

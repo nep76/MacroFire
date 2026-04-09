@@ -1,4 +1,11 @@
-2008/00/00 - 2.1.0
+2008/09/23 - 2.2.0
+  - Rapidfire settingsに、新しいモードとして「HOLD」を追加した。
+    AUTO-HOLDと違い、ボタンを押すと押下状態とそうでない状態を切り替えることが出来る。
+
+  - マクロの記録を行った際、Buttons releaseが全く記録されていなかった問題を修正。
+
+
+2008/08/29 - 2.1.0
   - マクロコマンドにRapidfire Start/Rapidfire stopを追加した。
 
   - 連射設定のPress delay/Release delayは、ms(ミリ秒)で指定するように変更。

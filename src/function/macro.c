@@ -294,23 +294,6 @@ MfMenuRc macroRecordStart( SceCtrlData *pad_data, void *arg )
 	/* 既にマクロがあればクリア */
 	if( macromgrGetCount() ) macromgrDestroy();
 	
-	
-	/* 戻るまでにカウントダウンは必要か否か。
-	mfMenuDisableInterrupt();
-	
-	while( sec-- ){
-		blitString( blitOffsetChar( 3 ), blitOffsetLine( 4 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Returning to the game..." );
-		blitStringf( blitOffsetChar( 3 ), blitOffsetLine( 6 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "%d seconds...", sec + 1 );
-		mfMenuWait( 1000000 );
-		
-		return MR_CONTINUE;
-	}
-	
-	mfMenuEnableInterrupt();
-	
-	sec = 3;
-	*/
-	
 	/* 最後のボタン情報をリセット */
 	st_temp_buttons      = 0;
 	st_temp_analog_move  = false;
@@ -428,9 +411,9 @@ static void macro_record( MfCallMode mode, SceCtrlData *pad_data, void *argp )
 			if( press_buttons && release_buttons ){
 				macromgrCmdInit( cur_macro, MA_BUTTONS_CHANGE, cur_buttons, 0 );
 			} else if( press_buttons ){
-				macromgrCmdInit( cur_macro, MA_BUTTONS_PRESS, cur_buttons, 0 );
+				macromgrCmdInit( cur_macro, MA_BUTTONS_PRESS, press_buttons, 0 );
 			} else if( release_buttons ){
-				macromgrCmdInit( cur_macro, MA_BUTTONS_RELEASE, cur_buttons, 0 );
+				macromgrCmdInit( cur_macro, MA_BUTTONS_RELEASE, release_buttons, 0 );
 			}
 		}
 		

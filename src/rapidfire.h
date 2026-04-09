@@ -20,6 +20,7 @@ typedef enum {
 	MF_RAPIDFIRE_MODE_NORMAL = 0,
 	MF_RAPIDFIRE_MODE_RAPID,
 	MF_RAPIDFIRE_MODE_AUTORAPID,
+	MF_RAPIDFIRE_MODE_HOLD,
 	MF_RAPIDFIRE_MODE_AUTOHOLD
 } MfRapidfireMode;
 
@@ -28,7 +29,7 @@ struct mf_rapidfire_status {
 	MfRapidfireMode mode;
 	unsigned int    delayPress;
 	unsigned int    delayRelease;
-	unsigned int    delayLast;
+	unsigned int    statLast;
 	bool            state;
 };
 

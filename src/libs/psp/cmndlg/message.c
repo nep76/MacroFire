@@ -80,7 +80,7 @@ int cmndlgMessageStart( CmndlgMessageParams *params )
 int cmndlgMessageUpdate( void )
 {
 	SceCtrlData pad_data;
-	pad_data.Buttons = ctrlpadGetData( &st_cp_params, &pad_data );
+	pad_data.Buttons = ctrlpadGetData( &st_cp_params, &pad_data, CTRLPAD_IGNORE_ANALOG_DIRECTION );
 	
 	cmndlg_message_draw_ui( st_width, st_lines, st_params );
 	
