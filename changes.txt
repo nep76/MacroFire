@@ -1,3 +1,13 @@
+2008/07/12 - 1.1.1
+  - Rapidfire settingsにおいて、Release Delayが1以上の場合に、
+    AUTO-HOLDが機能を果たしていなかった問題を修正。
+
+  - Rapidfire settingsにおいて、Release Delay/Presse Delayの
+    動作がおかしくなっていた問題を修正。
+
+  - sceCtrl*Latch系関数がより正常な値を返すよう修正。
+
+
 2008/07/11 - 1.1.0
   - 連射設定のセーブとロードを実装。
 

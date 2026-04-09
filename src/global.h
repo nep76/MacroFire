@@ -8,7 +8,7 @@
 #include <pspdebug.h>
 #include <stdbool.h>
 
-#define MF_MENU_TOP_MESSAGE "MacroFire v1.1.0 In-game menu [ClassG: http://classg.sytes.net]"
+#define MF_MENU_TOP_MESSAGE "MacroFire v1.1.1 In-game menu [ClassG: http://classg.sytes.net]"
 
 #ifdef GLOBAL_VARIABLES_DEFINE
 #define GLOBAL
@@ -23,11 +23,9 @@
 
 #define ARRAY_NUM( x )  sizeof( x ) / sizeof( x[0] )
 
-typedef int ( *SCE_CTRL_DATA_FUNC )( SceCtrlData*, int );
-typedef int ( *SCE_CTRL_LATCH_FUNC )( SceCtrlLatch* );
-
 /* ファンクションの呼び出しモード */
 typedef enum {
+	MF_CALL_INTERNAL,
 	MF_CALL_READ,
 	MF_CALL_LATCH
 } MfCallMode;

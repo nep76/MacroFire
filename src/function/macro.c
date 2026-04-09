@@ -410,8 +410,8 @@ MfMenuReturnCode macroMenu( SceCtrlLatch *pad_latch, SceCtrlData *pad_data, void
 					case MACRO_EDIT         : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "Editing currently macro." ); break;
 					case MACRO_CLEAR        : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "Clearing currently macro." ); break;
 					case MACRO_CREATE       : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "Creating new macro." ); break;
-					case MACRO_LOAD         : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "Loading a macro from MemoryStick.\n\nIMPORTANT NOTICE:\n  Verify that MemoryStick access indicator is not blinking.\n  Otherwise, will CRASH the currently running game!" ); break;
-					case MACRO_SAVE         : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "Saving currently macro to MemoryStick.\n\nIMPORTANT NOTICE:\n  Verify that MemoryStick access indicator is not blinking.\n  Otherwise, will CRASH the currently running game!" ); break;
+					case MACRO_LOAD         : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "Loading a macro from MemoryStick.\n\nIMPORTANT CAUTION:\n  Verify that MemoryStick access indicator is not blinking.\n  Otherwise, will CRASH the currently running game!" ); break;
+					case MACRO_SAVE         : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "Saving currently macro to MemoryStick.\n\nIMPORTANT CAUTION:\n  Verify that MemoryStick access indicator is not blinking.\n  Otherwise, will CRASH the currently running game!" ); break;
 				}
 				blitString( blitOffsetChar( 3 ), blitOffsetLine( 31 ), MENU_FGCOLOR, MENU_BGCOLOR, "\x80\x82 = Move, \x83\x81 = Change toggle, \x85 = Enter, \x86 = Back, START = Exit" );
 				old_selected = selected;

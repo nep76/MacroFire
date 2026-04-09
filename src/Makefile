@@ -1,4 +1,5 @@
 TARGET = macrofire
+PSP_FW_VERSION = 371
 
 # PRXを作成する
 BUILD_PRX = 1
@@ -16,7 +17,7 @@ PRX_EXPORTS = exports.exp
 # 優先的にカーネルモードの方(psp***_driver)をリンクしようとするみたい。
 USE_KERNEL_LIBS = 1
 
-CLASSG_LIBS = libs
+CLASSG_LIBS = ../libs
 
 INCDIR = $(CLASSG_LIBS)
 CFLAGS = -g -Os -G0 -Wall -fno-strict-aliasing -fno-builtin-printf
@@ -29,10 +30,7 @@ LDFLAGS =
 # newlibを使う場合、libpspuserをリンクしないとsceKernelFreeMemSizeのリンクに失敗する。
 # libpspuserより先にlibpspkernelをリンクしないと、システムコントロール系のシンボルに
 # ユーザモードの方をリンクしてしまい、カーネルモードスレッドを生成できない模様？
-#
-# libpspctrlは、フックしているキー操作関数のNIDがユーザモード側であるので、
-# ユーザモードのライブラリを先にリンクする必要がある？
-LIBS = -lpsprtc -lpspkernel -lc -lpspuser -lpspctrl
+LIBS = -lpsprtc -lpspkernel -lc -lpspuser
 
 OBJS = exports.o \
        main.o \

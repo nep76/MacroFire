@@ -37,6 +37,7 @@ typedef struct {
 	int  mode;
 } RapidfireConf;
 
+void rapidfireInit( void );
 void rapidfireMain( MfCallMode mode, SceCtrlData *pad_data, void *argp );
 
 MfMenuReturnCode rapidfireMenu( SceCtrlLatch *pad_latch, SceCtrlData *pad_data, void *argp );

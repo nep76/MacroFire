@@ -9,32 +9,11 @@ PSP_MODULE_INFO( "MacroFire", PSP_MODULE_KERNEL, 0, 0 );
 
 static SceCtrlData  st_pad_data;
 
+static int  st_sampling_mode = 100;
 static bool st_apihooked = false;
 static bool st_wait_toggle_button_release = false;
 static unsigned int st_prev_pad_buttons;
-/*
-static void mf_latch_callback( int cur, int last, void *arg )
-{
-	int *mfengine = arg;
-	
-	sceKernelWaitSema( st_semaid, 1, 0 );
-	
-	if( *mfengine == MFENGINE_OFF ) return;
-	
-	st_pad_latch.uiMake    = ( last ^ cur ) & cur;
-	st_pad_latch.uiBreak   = ( last ^ cur ) & last;
-	
-	if( st_pad_latch.uiMake ){
-		st_pad_latch.uiPress |= st_pad_latch.uiMake;
-	} else if( st_pad_latch.uiBreak ){
-		st_pad_latch.uiPress ^= st_pad_latch.uiBreak;
-	}
-	
-	st_pad_latch.uiRelease = ~st_pad_latch.uiPress;
-	
-	sceKernelSignalSema( st_semaid, 1 );
-}
-*/
+
 static void mf_call_intr( const int mfengine )
 {
 	int i;
@@ -43,49 +22,42 @@ static void mf_call_intr( const int mfengine )
 	}
 }
 
-static void mf_key_hook( MfCallMode mode, SceCtrlData *pad )
+static int mf_read_pad_buffer( MfSceCtrlDataFunc func, SceCtrlData *pad, int count, MfCallMode mode )
 {
-	int i;
-	
-	for( i = 0; i < mftableEntry; i++ ){
-		if( mftable[i].hook.func ) ( mftable[i].hook.func )( mode, pad, mftable[i].hook.arg );
+	/*
+		K1レジスタのメモ
+		mf_read_pad_buffer()は内部で第1引数に指定された本来のAPIを実行する。
+		しかし本来のコードは、ファームウェア内部のOSカーネル専用領域に存在する。
+		ここにアクセスするには、特権モードに移行しなければならない。
+		
+		普通にAPIはシステムコール例外の例外ハンドラとして動いているようで、
+		APIをコールするとSYSCALL命令が発行され、例外ハンドラを実行する際に
+		特権モードへ移行するという仕掛けを使って実行できるようになっているっぽい？
+		
+		pspSdkSetK1( 0 )を実行すると特権モードに移行させられるようだ。
+		つまり、これを行ったあとならばファームウェア内のコードを直接実行できる。
+		
+		やることやったら元の値に戻せるように、実行前にpspSdkGetK1()で値を保存しておく。
+	*/
+	int ret = ( func )( pad, count );
+	if( mode != MF_CALL_INTERNAL ){
+		int i;
+		for( i = 0; i < mftableEntry; i++ ){
+			if( mftable[i].hook.func ) ( mftable[i].hook.func )( mode, pad, mftable[i].hook.arg );
+		}
 	}
-}
-
-int mfCtrlPeekBufferPositive( SceCtrlData *pad, int count )
-{
-	MfCallMode mode;
-	int ret;
-	
-	if( count ){
-		mode  = MF_CALL_READ;
-	} else{
-		mode  = MF_CALL_LATCH;
-		count = 1;
-	}
-	
-	ret   = ( (SCE_CTRL_DATA_FUNC)(Hooktable[0].syscall.func) )( pad, count );
-	
-	mf_key_hook( MF_CALL_READ, pad );
 	
 	return ret;
 }
 
+int mfCtrlPeekBufferPositive( SceCtrlData *pad, int count )
+{
+	return mf_read_pad_buffer( Hooktable[0].syscall.func, pad, count, MF_CALL_READ );
+}
+
 int mfCtrlPeekBufferNegative( SceCtrlData *pad, int count )
 {
-	MfCallMode mode;
-	int ret;
-	
-	if( count ){
-		mode  = MF_CALL_READ;
-	} else{
-		mode  = MF_CALL_LATCH;
-		count = 1;
-	}
-	
-	ret   = ( (SCE_CTRL_DATA_FUNC)(Hooktable[0].syscall.func) )( pad, count );
-	
-	mf_key_hook( MF_CALL_READ, pad );
+	int ret = mf_read_pad_buffer( Hooktable[0].syscall.func, pad, count, MF_CALL_READ );
 	
 	pad->Buttons = ~pad->Buttons;
 	
@@ -94,38 +66,12 @@ int mfCtrlPeekBufferNegative( SceCtrlData *pad, int count )
 
 int mfCtrlReadBufferPositive( SceCtrlData *pad, int count )
 {
-	MfCallMode mode;
-	int ret;
-	
-	if( count ){
-		mode  = MF_CALL_READ;
-	} else{
-		mode  = MF_CALL_LATCH;
-		count = 1;
-	}
-	
-	ret   = ( (SCE_CTRL_DATA_FUNC)(Hooktable[2].syscall.func) )( pad, count );
-	
-	mf_key_hook( MF_CALL_READ, pad );
-	
-	return ret;
+	return mf_read_pad_buffer( Hooktable[2].syscall.func, pad, count, MF_CALL_READ );
 }
 
 int mfCtrlReadBufferNegative( SceCtrlData *pad, int count )
 {
-	MfCallMode mode;
-	int ret;
-	
-	if( count ){
-		mode  = MF_CALL_READ;
-	} else{
-		mode  = MF_CALL_LATCH;
-		count = 1;
-	}
-	
-	ret   = ( (SCE_CTRL_DATA_FUNC)(Hooktable[2].syscall.func) )( pad, count );
-	
-	mf_key_hook( MF_CALL_READ, pad );
+	int ret = mf_read_pad_buffer( Hooktable[2].syscall.func, pad, count, MF_CALL_READ );
 	
 	pad->Buttons = ~pad->Buttons;
 	
@@ -135,8 +81,13 @@ int mfCtrlReadBufferNegative( SceCtrlData *pad, int count )
 int mfCtrlPeekLatch( SceCtrlLatch *latch )
 {
 	SceCtrlData pad;
-	/* int ret = ( (SCE_CTRL_DATA_FUNC)(Hooktable[0].syscall.func) )( pad, count ); // 0x80000023が返る。なぜ？ */
-	int ret = sceCtrlPeekBufferPositive( &pad, MF_INTERNAL_CALL ); 
+	int ret;
+	unsigned int k1 = pspSdkGetK1();
+	pspSdkSetK1( 0 );
+	
+	ret = mf_read_pad_buffer( Hooktable[0].syscall.func, &pad, 1, MF_CALL_LATCH );
+	
+	pspSdkSetK1( k1 );
 	
 	latch->uiMake    |= ( st_prev_pad_buttons ^ pad.Buttons ) & pad.Buttons;
 	latch->uiBreak   |= ( st_prev_pad_buttons ^ pad.Buttons ) & st_prev_pad_buttons;
@@ -151,8 +102,13 @@ int mfCtrlPeekLatch( SceCtrlLatch *latch )
 int mfCtrlReadLatch( SceCtrlLatch *latch )
 {
 	SceCtrlData pad;
-	/* int ret = ( (SCE_CTRL_DATA_FUNC)(Hooktable[0].syscall.func) )( pad, count ); // 0x80000023が返る。なぜ？ */
-	int ret = sceCtrlPeekBufferPositive( &pad, MF_INTERNAL_CALL );
+	int ret;
+	unsigned int k1 = pspSdkGetK1();
+	pspSdkSetK1( 0 );
+	
+	ret = mf_read_pad_buffer( Hooktable[0].syscall.func, &pad, 1, MF_CALL_LATCH );
+	
+	pspSdkSetK1( k1 );
 	
 	latch->uiMake    = ( st_prev_pad_buttons ^ pad.Buttons ) & pad.Buttons;
 	latch->uiBreak   = ( st_prev_pad_buttons ^ pad.Buttons ) & st_prev_pad_buttons;
@@ -213,10 +169,16 @@ int main_thread( SceSize arglen, void *argp )
 	
 	while( gRunning ){
 		/* module_stop()が呼ばれないので、一時停止をして強制終了可能な状態にする */
-		//sceDisplayWaitVblankStart();
-		sceKernelDelayThread( 10000 );
+		sceKernelDelayThread( 50000 );
 		
-		sceCtrlPeekBufferPositive( &st_pad_data, 1 );
+		if( st_apihooked ){
+			unsigned int k1 = pspSdkGetK1();
+			pspSdkSetK1( 0 );
+			mf_read_pad_buffer( Hooktable[0].syscall.func, &st_pad_data, 1, MF_CALL_INTERNAL );
+			pspSdkSetK1( k1 );
+		} else{
+			sceCtrlPeekBufferPositive( &st_pad_data, 1 );
+		}
 		
 		if( gMfToggle ){
 			/* 検出する必要のないボタンフラグを消す */

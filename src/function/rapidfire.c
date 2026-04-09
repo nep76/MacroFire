@@ -24,8 +24,7 @@ static short st_rapid = 0;
 static int st_release_delay = 2;
 static int st_press_delay   = 2;
 
-static int st_release_cnt = 0;
-static int st_press_cnt   = 0;
+static int st_wait_cnt = 0;
 
 #define RAPIDFIRE_MODE_NORMAL     0
 #define RAPIDFIRE_MODE_SEMI_RAPID 1
@@ -52,8 +51,8 @@ static MfMenuItem st_rfMenuTable[] = {
 	{ MT_OPTION, &(st_rfconf[11].mode), "SELECT  ", { "NORMAL", "RAPID", "AUTO-RAPID", "AUTO-HOLD", 0 } },
 	
 	{ MT_BORDER, 0, 0, { 0 } },
-	{ MT_GET_DIGITS, &(st_release_delay), "Released delay", { "Set released delay", "delay", "2" } },
-	{ MT_GET_DIGITS, &(st_press_delay),   "Pressed delay ", { "Set pressed delay",  "delay", "2" } },
+	{ MT_GET_DIGITS, &(st_release_delay), "Release delay", { "Set release delay", "delay", "2" } },
+	{ MT_GET_DIGITS, &(st_press_delay),   "Press delay  ", { "Set press delay",  "delay", "2" } },
 	
 	{ MT_BORDER, 0, 0, { 0 } },
 	{ MT_ANCHOR, 0, "Load from MemoryStick", { 0 } },
@@ -265,18 +264,16 @@ static void rapidfire_save( void )
 		return;
 }
 
+void rapidfireInit( void )
+{
+	st_wait_cnt = 0;
+}
+
 void rapidfireMain( MfCallMode mode, SceCtrlData *pad_data, void *argp )
 {
 	int i;
 	
-	if( ! st_rapid ){
-		if( st_release_cnt ){
-			st_release_cnt--;
-			return;
-		} else{
-			st_release_cnt = st_release_delay;
-		}
-	}
+	if( st_wait_cnt && mode == MF_CALL_READ ) st_wait_cnt--;
 	
 	for( i = 0; i < ARRAY_NUM( st_rfconf ); i++ ){
 		if(
@@ -289,11 +286,13 @@ void rapidfireMain( MfCallMode mode, SceCtrlData *pad_data, void *argp )
 		}
 	}
 	
-	if( st_rapid && st_press_cnt ){
-		st_press_cnt--;
-	} else{
-		st_press_cnt = st_press_delay;
-		st_rapid = ( mode == MF_CALL_READ ? ( ! st_rapid ) : st_rapid );
+	if( ! st_wait_cnt && mode == MF_CALL_READ ){
+		st_rapid = ( ! st_rapid );
+		if( st_rapid ){
+			st_wait_cnt = st_press_delay;
+		} else{
+			st_wait_cnt = st_release_delay;
+		}
 	}
 	
 	return;
@@ -306,16 +305,30 @@ MfMenuReturnCode rapidfireMenu( SceCtrlLatch *pad_latch, SceCtrlData *pad_data, 
 	switch( mfMenuVertical( blitOffsetChar( 5 ), blitOffsetLine( 4 ), BLIT_SCR_WIDTH, st_rfMenuTable, ARRAY_NUM( st_rfMenuTable ), &selected ) ){
 		case MR_CONTINUE:
 			blitString( blitOffsetChar( 3 ), blitOffsetLine(  2 ), MENU_FGCOLOR, MENU_BGCOLOR, "Please choose a rapidfire mode per buttons." );
-			blitString( blitOffsetChar( 33 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "NORMAL    : standard control mode." );
-			blitString( blitOffsetChar( 33 ), blitOffsetLine( 26 ), MENU_FGCOLOR, MENU_BGCOLOR, "RAPID     : hold the button to rapidfire." );
-			blitString( blitOffsetChar( 33 ), blitOffsetLine( 27 ), MENU_FGCOLOR, MENU_BGCOLOR, "AUTO-RAPID: always to rapidfire." );
-			blitString( blitOffsetChar( 33 ), blitOffsetLine( 28 ), MENU_FGCOLOR, MENU_BGCOLOR, "AUTO-HOLD : always to press and hold." );
+			blitString( blitOffsetChar( 33 ), blitOffsetLine( 22 ), MENU_FGCOLOR, MENU_BGCOLOR, "NORMAL    : standard control mode." );
+			blitString( blitOffsetChar( 33 ), blitOffsetLine( 23 ), MENU_FGCOLOR, MENU_BGCOLOR, "RAPID     : hold the button to rapidfire." );
+			blitString( blitOffsetChar( 33 ), blitOffsetLine( 24 ), MENU_FGCOLOR, MENU_BGCOLOR, "AUTO-RAPID: always to rapidfire." );
+			blitString( blitOffsetChar( 33 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "AUTO-HOLD : always to press and hold." );
+			
+			/* Œx‚ª–Ú—§‚Â‚æ‚¤‚ÉŒx‚ÍSave/Load‚ÉƒJ[ƒ\ƒ‹‚ª‚Ì‚Á‚½Žž‚Ì‚Ý•\Ž¦ */
+			if( selected == RAPIDFIRE_LOAD || selected == RAPIDFIRE_SAVE ){
+				blitString( blitOffsetChar( 5 ), blitOffsetLine( 27 ), MENU_FGCOLOR, MENU_BGCOLOR, "IMPORTANT CAUTION for Save/Load\n  Verify that MemoryStick access indicator is not blinking.\n  Otherwise, will CRASH the currently running game!" );
+			} else{
+				blitFillBox( blitOffsetChar( 5 ), blitOffsetLine( 27 ), BLIT_SCR_WIDTH, blitMeasureLine( 3 ), MENU_BGCOLOR );
+			}
+			
 			blitString( blitOffsetChar( 3 ), blitOffsetLine( 31 ), MENU_FGCOLOR, MENU_BGCOLOR, "\x80\x82 = Move, \x83\x81 = Change mode, \x85 = SetDelay, \x86 = Back, START = Exit" );
 			break;
 		case MR_ENTER:
 			switch( selected ){
-				case RAPIDFIRE_LOAD: rapidfire_load(); break;
-				case RAPIDFIRE_SAVE: rapidfire_save(); break;
+				case RAPIDFIRE_LOAD:
+					rapidfire_load();
+					st_wait_cnt = 0;
+					break;
+				case RAPIDFIRE_SAVE:
+					rapidfire_save();
+					st_wait_cnt = 0;
+					break;
 			}
 			break;
 		case MR_BACK:

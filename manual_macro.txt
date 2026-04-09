@@ -1,4 +1,4 @@
-MacroFire - 1.1.0 Version
+MacroFire - 1.1.1 Version
 
 
 Macro settings
@@ -38,9 +38,12 @@ Macro settings
 
   Load from MemoryStick
     メモリースティックからマクロファイルをロードする。
+    (特定の状態でこれを選択すると操作不能に陥ることがあるので、必ずreadme.txtの既知の問題を参照のこと)
+    
 
   Save to MemoryStick
     メモリースティックへ、現在保持しているマクロを保存する。
+    (特定の状態でこれを選択すると操作不能に陥ることがあるので、必ずreadme.txtの既知の問題を参照のこと)
 
 
 Edit macro
@@ -95,6 +98,10 @@ Edit macro
   マクロはコマンド実行位置を先頭にリセットして、再実行を待ちます。
   つまり、MacroFir eEngineをOFFにしてゲームに戻ったあと、再びONにするとマクロは先頭から再実行されます。
   MacroFire Toggle Buttonsと組み合わせると、ゲーム上で擬似的にマクロをボタンで実行/停止できます。
+
+  POPS(PS1エミュレータ)では、高速すぎる入力は無視されることがあります。
+  Delayなしで次々にコマンドを実行するようなマクロをつくってもうまく動かないかもしれません。
+  Delayの調整には注意してください。
 
 
 v1.0.0で保存したマクロファイルが読み込めない問題について

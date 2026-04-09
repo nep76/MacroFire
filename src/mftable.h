@@ -50,8 +50,8 @@ EXPORT MfEntry mftable[]
 		
 		Š„ŠÖ”‚ÍAMacroFire Engine‚ªØ‚è‘Ö‚¦‚ç‚ê‚½Ÿ‚Ìƒ‹[ƒv‚ÅŒÄ‚Î‚ê‚é
 	*/
-	{ NULL,       NULL, NULL,      { rapidfireMain, NULL }, { "Rapidfire settings", rapidfireMenu, NULL } },
-	{ macroInit,  NULL, macroIntr, { macroMain,     NULL }, { "Macro settings",     macroMenu,     NULL } },
+	{ rapidfireInit, NULL, NULL,      { rapidfireMain, NULL }, { "Rapidfire settings", rapidfireMenu, NULL } },
+	{ macroInit,     NULL, macroIntr, { macroMain,     NULL }, { "Macro settings",     macroMenu,     NULL } },
 }
 #endif
 ;
