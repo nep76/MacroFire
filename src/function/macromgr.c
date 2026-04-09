@@ -5,70 +5,88 @@
 #include "macromgr.h"
 
 /*-----------------------------------------------
-	ローカル変数
+	スタティック関数
 -----------------------------------------------*/
-static MacroData    *st_curMacro  = NULL;
-static unsigned int st_macroCount = 0;
+
+/*-----------------------------------------------
+	スタティック変数
+-----------------------------------------------*/
 
 /*=============================================*/
-
 MacroData *macromgrNew( void )
 {
-	st_curMacro = (MacroData *)memsceMalloc( sizeof( MacroData ) );
-	if( ! st_curMacro ) return NULL;
+	MacroData *macro = (MacroData *)memsceMalloc( sizeof( MacroData ) );
+	if( ! macro ) return NULL;
 	
-	st_macroCount = 1;
+	macro->action = MA_DELAY;
+	macro->data   = 0;
+	macro->sub    = 0;
+	macro->prev   = NULL;
+	macro->next   = NULL;
 	
-	memset( st_curMacro, 0, sizeof( MacroData ) );
-	return st_curMacro;
+	return macro;
 }
 
-MacroData *macromgrInsert( MacroInsertPosition pos, MacroData *macro )
+MacroData *macromgrInsertBefore( MacroData *macro )
 {
-	MacroData *addedcmd;
+	MacroData *newcmd;
 	
-	if( st_macroCount >= INT_MAX || ! macro ) return NULL;
+	if( ! macro ) return NULL;
 	
-	addedcmd = (MacroData *)memsceMalloc( sizeof( MacroData ) );
-	if( ! addedcmd ) return NULL;
+	newcmd = (MacroData *)memsceMalloc( sizeof( MacroData ) );
+	if( ! newcmd ) return NULL;
 	
-	memset( addedcmd, 0, sizeof( MacroData ) );
-	
-	if( pos == MIP_AFTER ){
-		if( macro->next ) macro->next->prev = addedcmd;
-		addedcmd->next = macro->next;
-		addedcmd->prev = macro;
-		macro->next    = addedcmd;
-	} else if( pos == MIP_BEFORE ){
-		/* 前のコマンドが無い場合は先頭なので特別扱い */
-		if( ! macro->prev ){
-			/* 新規コマンドに現在の先頭コマンドをコピー */
-			*addedcmd = *macro;
-			
-			/* 新規コマンドの"前"は先頭を指す */
-			addedcmd->prev = macro;
-			
-			/* 先頭は新規コマンドを指す */
-			macro->next = addedcmd;
-			
-			/* この時点で、先頭の次に新規コマンドがリンクしている状態で
-			先頭と新規コマンドのコマンド内容は同じ。
-			なので、先頭のコマンドを初期化。*/
-			macro->action = MA_DELAY;
-			macro->data   = 0;
-		} else{
-			macro->prev->next = addedcmd;
-			addedcmd->prev = macro->prev;
-			addedcmd->next = macro;
-			macro->prev    = addedcmd;
-		}
+	/* 前のコマンドが無い場合は、先頭なので特別扱い */
+	if( ! macro->prev ){
+		/* 新規コマンドに現在の先頭コマンドをコピー */
+		*newcmd = *macro;
+		
+		/* 新規コマンドの"前"は先頭を指す */
+		newcmd->prev = macro;
+		
+		/* 先頭は新規コマンドを指す */
+		macro->next = newcmd;
+		
+		/* この時点で、先頭の次に新規コマンドがリンクしている状態で
+		先頭と新規コマンドのコマンド内容は同じ。
+		なので、先頭のコマンドを指定されたコマンドに設定。*/
+		macro->action = MA_DELAY;
+		macro->data   = 0;
+		macro->sub    = 0;
+		
+		/* 先頭を返す */
+		return macro;
 	} else{
-		return NULL;
+		macro->prev->next = newcmd;
+		newcmd->action    = MA_DELAY;
+		newcmd->data      = 0;
+		newcmd->sub       = 0;
+		newcmd->prev      = macro->prev;
+		newcmd->next      = macro;
+		macro->prev       = newcmd;
+		
+		return newcmd;
 	}
+}
+
+MacroData *macromgrInsertAfter( MacroData *macro )
+{
+	MacroData *newcmd;
 	
-	st_macroCount++;
+	if( ! macro ) return NULL;
 	
-	return addedcmd;
+	newcmd = (MacroData *)memsceMalloc( sizeof( MacroData ) );
+	if( ! newcmd ) return NULL;
+	
+	if( macro->next ) macro->next->prev = newcmd;
+	newcmd->action = MA_DELAY;
+	newcmd->data   = 0;
+	newcmd->sub    = 0;
+	newcmd->next   = macro->next;
+	newcmd->prev   = macro;
+	macro->next    = newcmd;
+	
+	return newcmd;
 }
 
 void macromgrRemove( MacroData *macro )
@@ -79,6 +97,7 @@ void macromgrRemove( MacroData *macro )
 		if( ! macro->next ){
 			macro->action = MA_DELAY;
 			macro->data   = 0;
+			macro->sub    = 0;
 		} else{
 			/* 次のコマンドのアドレスを保持 */
 			MacroData *rm_macro = macro->next;
@@ -102,41 +121,26 @@ void macromgrRemove( MacroData *macro )
 		}
 		memsceFree( macro );
 	}
-	
-	if( st_macroCount > 1 ) st_macroCount--;
 }
 
-void macromgrDestroy( void )
+
+void macromgrDestroy( MacroData *macro )
 {
-	MacroData *macro_data;
+	if( ! macro ) return;
 	
-	if( ! st_curMacro ) return;
-	
-	if( ! st_curMacro->next ){
-		memsceFree( st_curMacro );
+	if( ! macro->next ){
+		memsceFree( macro );
 	} else{
-		for( macro_data = st_curMacro->next; macro_data->next; macro_data = macro_data->next ){
-			memsceFree( macro_data->prev );
+		MacroData *nxm;
+		for( nxm = macro->next; nxm->next; nxm = nxm->next ){
+			memsceFree( nxm->prev );
 		}
-		memsceFree( macro_data->prev );
-		memsceFree( macro_data );
+		memsceFree( nxm->prev );
+		memsceFree( nxm );
 	}
-	
-	st_curMacro   = NULL;
-	st_macroCount = 0;
 }
 
-MacroData *macromgrGetFirst( void )
-{
-	return st_curMacro;
-}
-
-int macromgrGetCount( void )
-{
-	return (signed int)st_macroCount;
-}
-
-void macromgrCmdInit( MacroData *macro, MacroAction action, uint64_t data, uint64_t sub )
+void macromgrSet( MacroData *macro, MacroAction action, uint64_t data, uint64_t sub )
 {
 	macro->action = action;
 	macro->data   = data;

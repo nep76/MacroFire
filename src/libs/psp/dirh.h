@@ -9,7 +9,7 @@
 #include <pspsdk.h>
 #include "psp/memsce.h"
 #include "psp/pathexpand.h"
-#include "psp/blit.h"
+#include "psp/gb.h"
 #include "cgerrs.h"
 
 #define DIRH_MAXPATH 256

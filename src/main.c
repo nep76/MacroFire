@@ -228,9 +228,6 @@ int main_thread( SceSize arglen, void *argp )
 		}
 	}
 	
-	/* 起動を待つ */
-	sceKernelDelayThread( 3000000 );
-	
 	while( gRunning ){
 		/* module_stop()が呼ばれないので、一時停止をして強制終了可能な状態にする */
 		sceKernelDelayThread( 50000 );

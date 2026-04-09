@@ -185,13 +185,13 @@ static void cmndlg_get_numbers_draw_ui( char *buf, CmndlgGetNumbersParams *param
 	if( params->numberOfData > 1 ){
 		int switch_info_pos_y = 9;
 		
-		blitFillBox( params->ui.x, params->ui.y, blitMeasureChar( 30 ), blitMeasureLine( 11 ), params->ui.bgColor );
-		blitLineBox( params->ui.x, params->ui.y, blitMeasureChar( 30 ), blitMeasureLine( 11 ), params->ui.borderColor );
+		gbFillRectRel( params->ui.x, params->ui.y, gbOffsetChar( 30 ), gbOffsetLine( 11 ), params->ui.bgColor );
+		gbLineRectRel( params->ui.x, params->ui.y, gbOffsetChar( 30 ), gbOffsetLine( 11 ), params->ui.borderColor );
 		
 		if( params->selectDataNumber ){
-			blitStringf(
-				params->ui.x + blitOffsetChar( 1 ),
-				params->ui.y + blitOffsetLine( switch_info_pos_y++ ),
+			gbPrintf(
+				params->ui.x + gbOffsetChar( 1 ),
+				params->ui.y + gbOffsetLine( switch_info_pos_y++ ),
 				params->ui.fgTextColor,
 				params->ui.bgTextColor,
 				"L = %s",
@@ -200,9 +200,9 @@ static void cmndlg_get_numbers_draw_ui( char *buf, CmndlgGetNumbersParams *param
 		}
 		
 		if( params->selectDataNumber < params->numberOfData - 1 ){
-			blitStringf(
-				params->ui.x + blitOffsetChar( 1 ),
-				params->ui.y + blitOffsetLine( switch_info_pos_y ),
+			gbPrintf(
+				params->ui.x + gbOffsetChar( 1 ),
+				params->ui.y + gbOffsetLine( switch_info_pos_y ),
 				params->ui.fgTextColor,
 				params->ui.bgTextColor,
 				"R = %s",
@@ -210,20 +210,20 @@ static void cmndlg_get_numbers_draw_ui( char *buf, CmndlgGetNumbersParams *param
 			);
 		}
 	} else{
-		blitFillBox( params->ui.x, params->ui.y, blitMeasureChar( 30 ), blitMeasureLine( 8 ), params->ui.bgColor );
-		blitLineBox( params->ui.x, params->ui.y, blitMeasureChar( 30 ), blitMeasureLine( 8 ), params->ui.borderColor );
+		gbFillRectRel( params->ui.x, params->ui.y, gbOffsetChar( 30 ), gbOffsetLine( 8 ), params->ui.bgColor );
+		gbLineRectRel( params->ui.x, params->ui.y, gbOffsetChar( 30 ), gbOffsetLine( 8 ), params->ui.borderColor );
 	}
 	
-	blitString(
-		params->ui.x + blitOffsetChar( 1 ),
-		params->ui.y + blitOffsetLine( 1 ),
+	gbPrint(
+		params->ui.x + gbOffsetChar( 1 ),
+		params->ui.y + gbOffsetLine( 1 ),
 		params->ui.fgTextColor,
 		params->ui.bgTextColor,
 		params->data[params->selectDataNumber].title
 	);
-	blitString(
-		params->ui.x + blitOffsetChar( 1 ),
-		params->ui.y + blitOffsetLine( 6 ),
+	gbPrint(
+		params->ui.x + gbOffsetChar( 1 ),
+		params->ui.y + gbOffsetLine( 6 ),
 		params->ui.fgTextColor,
 		params->ui.bgTextColor,
 		"SELECT: Usage"
@@ -232,17 +232,17 @@ static void cmndlg_get_numbers_draw_ui( char *buf, CmndlgGetNumbersParams *param
 	for( i = 0; buf[i] != '\0'; i++ ){
 		if( ( params->data[params->selectDataNumber].numDigits - 1) - params->data[params->selectDataNumber].selectedPlace == i ){
 			char num_reel[] = { '\x80', '\n', buf[i], '\n', '\x82', '\0' };
-			blitString(
-				params->ui.x + blitOffsetChar( i + 1 ),
-				params->ui.y + blitOffsetLine( 2 ),
+			gbPrint(
+				params->ui.x + gbOffsetChar( i + 1 ),
+				params->ui.y + gbOffsetLine( 2 ),
 				params->ui.fcTextColor,
 				params->ui.bgTextColor,
 				num_reel
 			);
 		} else{
-			blitChar(
-				params->ui.x + blitOffsetChar( i + 1 ),
-				params->ui.y + blitOffsetLine( 3 ),
+			gbPutChar(
+				params->ui.x + gbOffsetChar( i + 1 ),
+				params->ui.y + gbOffsetLine( 3 ),
 				params->ui.fgTextColor,
 				params->ui.bgTextColor,
 				buf[i]
@@ -250,9 +250,9 @@ static void cmndlg_get_numbers_draw_ui( char *buf, CmndlgGetNumbersParams *param
 		}
 	}
 	
-	blitString(
-		params->ui.x + blitOffsetChar( i + 2 ),
-		params->ui.y + blitOffsetLine( 3 ),
+	gbPrint(
+		params->ui.x + gbOffsetChar( i + 2 ),
+		params->ui.y + gbOffsetLine( 3 ),
 		params->ui.fgTextColor,
 		params->ui.bgTextColor,
 		params->data[params->selectDataNumber].unit

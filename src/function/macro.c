@@ -7,138 +7,337 @@
 /*-----------------------------------------------
 	ローカル関数
 -----------------------------------------------*/
-static MacroData *macro_append             ( MacroData *macro );
-static void      macro_record              ( MfCallMode mode, SceCtrlData *pad_data, void *argp );
-static bool      macro_trace               ( MfCallMode mode, SceCtrlData *pad_data, void *argp );
-static bool      macro_is_busy             ( void );
-static bool      macro_is_avail            ( void );
-static bool      macro_is_enabled_mf_engine( void );
-static void      macro_save                ( FilehUID fuid, char *buf, size_t max );
-static void      macro_load                ( IniUID ini, FilehUID fuid, char *buf, size_t max );
+/* プロシージャ */
+static MfMenuRc macro_slot_proc( MfMenuCtrlSignal signal, SceCtrlData *pad, void *var, MfMenuItemValue value[], const void *arg );
+
+/* メニュー処理 */
+static MfMenuRc macro_menu_halt( SceCtrlData *pad_data, void *arg );
+static MfMenuRc macro_menu_run( SceCtrlData *pad_data, void *arg );
+static MfMenuRc macro_menu_load( SceCtrlData *pad_data, void *arg );
+static MfMenuRc macro_menu_save( SceCtrlData *pad_data, void *arg );
+static MfMenuRc macro_menu_edit( SceCtrlData *pad_data, void *arg );
+static MfMenuRc macro_menu_clear( SceCtrlData *pad_data, void *arg );
+static MfMenuRc macro_menu_record_start( SceCtrlData *pad_data, void *arg );
+static MfMenuRc macro_menu_record_stop( SceCtrlData *pad_data, void *arg );
+
+/* 適当なロック */
+static bool macro_lock( void );
+static void macro_unlock( void );
+
+/* マクロ操作 */
+static bool macro_select( unsigned int slot );
+static bool macro_create( MacroEntry *entry );
+static bool macro_run( MacroEntry *entry, unsigned int loop );
+static bool macro_purge( MacroEntry *entry );
+static bool macro_stop( MacroEntry *entry );
+static void macro_init_tempdata( struct macro_tempdata *temp );
+static void macro_record( MfCallMode mode, SceCtrlData *pad_data, void *argp );
+static void macro_trace( MfCallMode mode, SceCtrlData *pad_data, void *argp );
+static void macro_read( IniUID ini, FilehUID fuid, char *buf, size_t max );
+static void macro_store( FilehUID fuid, char *buf, size_t max );
+
+/* エラーチェック */
+static bool macro_is_busy( MacroEntry *entry );
+static bool macro_is_unavail( MacroEntry *entry );
+static bool macro_is_disable_engine( void );
+static bool macro_is_locked( void );
+static bool macro_is_busy_with_message( MacroEntry *entry );
+static bool macro_is_unavail_with_message( MacroEntry *entry );
+static bool macro_is_disable_engine_with_message( void );
+static bool macro_is_locked_with_message( void );
 
 /*-----------------------------------------------
 	ローカル変数
 -----------------------------------------------*/
+static bool           st_exlock = false;
 static MfMenuCallback st_callback;
-static int            st_run_loop     = 0;
-static MacroRunMode   st_run_mode     = MRM_NONE;
-static bool           st_avail_analog = false;
-static MfRapidfireUID st_rfuid;
 
-static unsigned int   st_temp_buttons;
-static bool           st_temp_analog_move;
-static u64            st_temp_analog_coord;
-static u64            st_temp_ms;
+static unsigned int st_slot = 0;
+static MacroEntry   st_macro[MACRO_MAX_SLOT];
 
 static MfMenuItem st_menu_table[] = {
-	{ MT_CALLBACK, "Run once",     0, &st_callback, { { .pointer = macroRunOnce },      { .pointer = NULL } } },
-	{ MT_CALLBACK, "Run infinity", 0, &st_callback, { { .pointer = macroRunInfinity },  { .pointer = NULL } } },
-	{ MT_CALLBACK, "Stop macro",   0, &st_callback, { { .pointer = macroRunInterrupt }, { .pointer = NULL } } },
-	{ MT_NULL },
-	{ MT_CALLBACK, "Start recording", 0, &st_callback, { { .pointer = macroRecordStart }, { .pointer = NULL } } },
-	{ MT_CALLBACK, "Stop recording",  0, &st_callback, { { .pointer = macroRecordStop },  { .pointer = NULL } } },
-	{ MT_BOOL,     "Recording analog stick", 0, &st_avail_analog, { { .string = "OFF" }, { .string = "ON" }, { NULL } } },
-	{ MT_NULL },
-	{ MT_CALLBACK, "Edit macro",   0, &st_callback, { { .pointer = macroEdit },   { .pointer = NULL } } },
-	{ MT_CALLBACK, "Clear macro",  0, &st_callback, { { .pointer = macroClear },  { .pointer = NULL } } },
-	{ MT_NULL },
-	{ MT_CALLBACK, "Load from MemoryStick", 0, &st_callback, { { .pointer = macroLoad }, { .pointer = NULL } } },
-	{ MT_CALLBACK, "Save to MemoryStick",   0, &st_callback, { { .pointer = macroSave }, { .pointer = NULL } } }
+	{ "Macro slot: %d %s", macro_slot_proc, &st_slot, { { .string = "Select macro slot" }, { .string = "slot" }, { .integer = 1 }, { .integer = 1 }, { .integer = MACRO_MAX_SLOT - 1 } } },
+	{ NULL },
+	{ "Buttons to run the macro", mfMenuDefGetButtonsProc, NULL, { { .string = "Trigger buttons" }, { .integer = MFM_ALL_AVAILABLE_BUTTONS } } },
+	{ NULL },
+	{ "Run once",     mfMenuDefCallbackProc, &st_callback, { { .pointer = macro_menu_run  }, { .integer = 1    } } },
+	{ "Run infinity", mfMenuDefCallbackProc, &st_callback, { { .pointer = macro_menu_run  }, { .integer = -1   } } },
+	{ "Stop macro",   mfMenuDefCallbackProc, &st_callback, { { .pointer = macro_menu_halt }, { .pointer = NULL } } },
+	{ NULL },
+	{ "Start recording",            mfMenuDefCallbackProc, &st_callback, { { .pointer = macro_menu_record_start }, { .pointer = NULL } } },
+	{ "Stop recording",             mfMenuDefCallbackProc, &st_callback, { { .pointer = macro_menu_record_stop  }, { .pointer = NULL } } },
+	{ "Recording analog stick: %s", mfMenuDefBoolProc,     NULL,         { { .string = "OFF" }, { .string = "ON" } } },
+	{ NULL },
+	{ "Edit macro",  mfMenuDefCallbackProc, &st_callback, { { .pointer = macro_menu_edit  }, { .pointer = NULL } } },
+	{ "Clear macro", mfMenuDefCallbackProc, &st_callback, { { .pointer = macro_menu_clear }, { .pointer = NULL } } },
+	{ NULL },
+	{ "Load from MemoryStick", mfMenuDefCallbackProc, &st_callback, { { .pointer = macro_menu_load }, { .pointer = NULL } } },
+	{ "Save to MemoryStick",   mfMenuDefCallbackProc, &st_callback, { { .pointer = macro_menu_save }, { .pointer = NULL } } }
 };
 
 /*=============================================*/
 
 void macroInit( void )
 {
+	macro_select( 0 );
 	return;
 }
 
 void macroTerm( void )
 {
-	macromgrDestroy();
+	int i;
+	for( i = 0; i < MACRO_MAX_SLOT; i++ ){
+		macro_purge( &(st_macro[i]) );
+	}
 }
 
 void macroIntr( const bool mfengine )
 {
-	if( ! mfengine && st_run_mode == MRM_TRACE ){
-		/* マクロ実行位置を先頭に戻すのみ */
-		macro_trace( MF_CALL_READ, NULL, NULL );
-	}
-}
-
-MfMenuRc macroRunInterrupt( SceCtrlData *pad_data, void *arg )
-{
-	if( st_run_mode != MRM_TRACE ){
-		blitString( blitOffsetChar( 3 ), blitOffsetLine( 4 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Not ran yet." );
-	} else{
-		st_run_mode = MRM_NONE;
-		if( st_rfuid ){
-			mfRapidfireDestroy( st_rfuid );
-			st_rfuid = 0;
+	if( ! mfengine ){
+		int i;
+		for( i = 0; i < MACRO_MAX_SLOT; i++ ){
+			macro_stop( &(st_macro[i]) );
 		}
-		blitString( blitOffsetChar( 3 ), blitOffsetLine( 4 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Macro halted." );
-		macro_trace( MF_CALL_READ, NULL, NULL );
+	}
+}
+
+void macroMain( MfCallMode mode, SceCtrlData *pad, void *argp )
+{
+	int i;
+	SceCtrlData dupe_pad;
+	
+	if( ! pad ) return;
+	dupe_pad = *pad;
+	
+	for( i = 0; i < MACRO_MAX_SLOT; i++ ){
+		if( ! st_macro[i].current.macro ) continue;
+		
+		if( st_macro[i].runButtons ){
+			bool trigger = ( ( dupe_pad.Buttons & (~( ~0 ^ st_macro[i].runButtons )) ) == st_macro[i].runButtons ) ? true : false;
+			
+			if( trigger && st_macro[i].current.hotkeyEnable ){
+				if( st_macro[i].current.runMode == MRM_NONE ){
+					macro_run( &(st_macro[i]), 1 );
+				} else if( st_macro[i].current.runMode == MRM_TRACE ){
+					macro_stop( &(st_macro[i]) );
+				}
+				st_macro[i].current.hotkeyEnable = false;
+			} else if( ! trigger && ! st_macro[i].current.hotkeyEnable ){
+				st_macro[i].current.hotkeyEnable = true;
+			}
+		}
+		
+		switch( st_macro[i].current.runMode ){
+			case MRM_NONE:
+				break;
+			case MRM_TRACE:
+				macro_trace( mode, pad, &(st_macro[i]) );
+				break;
+			case MRM_RECORD:
+				macro_record( mode, pad, &(st_macro[i]) );
+				break;
+		}
+	}
+}
+
+MfMenuRc macroMenu( SceCtrlData *pad_data, void *arg )
+{
+	static int selected = 0;
+	
+	if( ! st_callback.func ){
+		switch( mfMenuUniDraw( gbOffsetChar( 5 ), gbOffsetLine( 6 ), st_menu_table, MF_ARRAY_NUM( st_menu_table ), &selected, 0 ) ){
+			case MR_CONTINUE:
+				gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 4 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Please choose a operation." );
+				switch( selected ){
+					case MACRO_SELECT_SLOT  : gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 25 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Macro slot number" );
+					case MACRO_SET_TRIGGER  : gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 25 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Buttons to run the macro" );
+					case MACRO_RUN_ONCE     : gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 25 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Running currently macro for once." ); break;
+					case MACRO_RUN_INFINITY : gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 25 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Running currently macro for endless." ); break;
+					case MACRO_RUN_HALT     : gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 25 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Stopping currently running macro." ); break;
+					case MACRO_RECORD_START : gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 25 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Starting to record a macro." ); break;
+					case MACRO_RECORD_STOP  : gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 25 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Stopping to record a macro." ); break;
+					case MACRO_ANALOG_OPTION: gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 25 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Recording the analog stick movement." ); break;
+					case MACRO_EDIT         : gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 25 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Editing currently macro." ); break;
+					case MACRO_CLEAR        : gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 25 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Clearing currently macro." ); break;
+					case MACRO_LOAD         : gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 25 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Loading a macro from MemoryStick.\n\nIMPORTANT CAUTION:\n  Verify that MemoryStick access indicator is not blinking.\n  Otherwise, will CRASH the currently running game!" ); break;
+					case MACRO_SAVE         : gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 25 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Saving currently macro to MemoryStick.\n\nIMPORTANT CAUTION:\n  Verify that MemoryStick access indicator is not blinking.\n  Otherwise, will CRASH the currently running game!" ); break;
+				}
+				break;
+			case MR_ENTER:
+				break;
+			case MR_BACK:
+				return MR_BACK;
+		}
+	} else{
+		if( ( (MacroFunction)(st_callback.func) )( pad_data, st_callback.arg ) == MR_BACK ){
+			st_callback.func = NULL;
+		}
+	}
+	return MR_CONTINUE;
+}
+
+static bool macro_lock( void )
+{
+	if( ! st_exlock ){
+		st_exlock = true;
+		return true;
+	}
+	return false;
+}
+
+static void macro_unlock( void )
+{
+	st_exlock = false;
+}
+
+static bool macro_select( unsigned int slot )
+{
+	if( slot < MACRO_MAX_SLOT ){
+		st_slot = slot;
+		st_menu_table[MACRO_SET_TRIGGER].var   = &(st_macro[slot].runButtons);
+		st_menu_table[MACRO_ANALOG_OPTION].var = &(st_macro[slot].analogStick);
+		return true;
+	}
+	return false;
+}
+
+static bool macro_run( MacroEntry *entry, unsigned int loop )
+{
+	if( macro_is_unavail( entry ) || macro_is_busy( entry ) || macro_is_disable_engine() || macro_is_locked() ) return false;
+	
+	/* マクロ実行準備 */
+	entry->current.runMode = MRM_TRACE;
+	entry->current.runLoop = loop;
+	entry->current.rfUid   = mfRapidfireNew();
+	entry->current.command = NULL;
+	
+	/* 最後のボタン情報をリセット */
+	macro_init_tempdata( &(entry->current.temp) );
+	
+	macro_lock();
+	
+	return true;
+}
+
+static bool macro_create( MacroEntry *entry )
+{
+	if( ! macro_is_unavail( entry ) ) return false;
+	
+	entry->current.macro = macromgrNew();
+	if( ! entry->current.macro ) return false;
+	
+	entry->current.command = NULL;
+	entry->current.runMode = MRM_NONE;
+	entry->current.runLoop = 0;
+	entry->current.rfUid   = 0;
+	
+	return true;
+}
+
+static bool macro_purge( MacroEntry *entry )
+{
+	if( macro_is_unavail( entry ) ) return false;
+	
+	macro_stop( entry );
+	
+	macromgrDestroy( entry->current.macro );
+	entry->current.macro = NULL;
+	
+	return true;
+}
+
+static bool macro_stop( MacroEntry *entry )
+{
+	if( entry->current.runMode != MRM_TRACE ) return false;
+	
+	entry->current.runMode = MRM_NONE;
+	
+	if( entry->current.rfUid ){
+		mfRapidfireDestroy( entry->current.rfUid );
+	}
+	
+	macro_unlock();
+	
+	return true;
+}
+
+static void macro_init_tempdata( struct macro_tempdata *temp )
+{
+	temp->buttons     = 0;
+	temp->analogMove  = false;
+	temp->analogCoord = MACROMGR_ANALOG_NEUTRAL;
+	temp->rtc         = 0;
+}
+
+/* スロット切り替え時に処理を追加 */
+static MfMenuRc macro_slot_proc( MfMenuCtrlSignal signal, SceCtrlData *pad, void *var, MfMenuItemValue value[], const void *arg )
+{
+	MfMenuRc rc;
+	
+	if( signal == MS_QUERY_LABEL ){
+		char *macro_stat;
+		if( ! st_macro[*((unsigned int *)var)].current.macro ){
+			macro_stat = "";
+		} else if( st_macro[*((unsigned int *)var)].current.runMode == MRM_TRACE ){
+			macro_stat = "(Running)";
+		} else if( st_macro[*((unsigned int *)var)].current.runMode == MRM_RECORD ){
+			macro_stat = "(Recording)";
+		} else{
+			macro_stat = "(Available)";
+		}
+		mfMenuLabel( (char *)arg, *((unsigned int *)var) + 1, macro_stat );
+		rc = MR_CONTINUE;
+	} else{
+		rc = mfMenuDefGetNumberProc( signal, pad, var, value, arg );
+	}
+	
+	if( pad->Buttons & ( PSP_CTRL_LEFT | PSP_CTRL_RIGHT ) ) macro_select( *((unsigned int *)var) );
+	
+	return rc;
+}
+
+static MfMenuRc macro_menu_halt( SceCtrlData *pad_data, void *arg )
+{
+	if( macro_stop( &(st_macro[st_slot]) ) ){
+		gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 4 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Macro halted." );
+	} else{
+		gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 4 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Not ran yet." );
 	}
 	mfMenuWait( 1000000 );
 	return MR_BACK;
 }
 
-MfMenuRc macroRunOnce( SceCtrlData *pad_data, void *arg )
+static MfMenuRc macro_menu_run( SceCtrlData *pad_data, void *arg )
 {
-	if( macro_is_busy() || ! macro_is_avail() || ! macro_is_enabled_mf_engine() ) return MR_BACK;
+	int loop = MACRO_GET_ARG_BY_INT( arg );
 	
-	st_run_loop = 1;
-	st_run_mode = MRM_TRACE;
+	if(
+		macro_is_busy_with_message( &(st_macro[st_slot]) )    ||
+		macro_is_unavail_with_message( &(st_macro[st_slot]) ) ||
+		macro_is_disable_engine_with_message()                ||
+		macro_is_locked_with_message()
+	) return MR_BACK;
 	
-	/* 最後のボタン情報をリセット */
-	st_temp_buttons      = 0;
-	st_temp_analog_move  = false;
-	st_temp_analog_coord = MACROMGR_ANALOG_NEUTRAL;
-	st_temp_ms           = 0;
+	macro_run( &(st_macro[st_slot]), loop );
 	
-	blitString( blitOffsetChar( 3 ), blitOffsetLine( 4 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Run once..." );
+	if( loop == 1 ){
+		gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 4 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Run once..." );
+	} else if( loop == -1 ){
+		gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 4 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Run infinity..." );
+	} else{
+		gbPrintf( gbOffsetChar( 3 ), gbOffsetLine( 4 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Run %d times...", loop );
+	}
+		
 	mfMenuWait( 1000000 );
 	mfMenuQuit();
 	
 	return MR_BACK;
 }
 
-MfMenuRc macroRunInfinity( SceCtrlData *pad_data, void *arg )
-{
-	if( macro_is_busy() || ! macro_is_avail() || ! macro_is_enabled_mf_engine() ) return MR_BACK;
-	
-	st_run_loop = -1; /* 無限 */
-	st_run_mode = MRM_TRACE;
-	
-	/* 最後のボタン情報をリセット */
-	st_temp_buttons      = 0;
-	st_temp_analog_move  = false;
-	st_temp_analog_coord = MACROMGR_ANALOG_NEUTRAL;
-	st_temp_ms           = 0;
-	
-	blitString( blitOffsetChar( 3 ), blitOffsetLine( 4 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Run infinity..." );
-	mfMenuWait( 1000000 );
-	mfMenuQuit();
-	
-	return MR_BACK;
-}
 
-void macroMain( MfCallMode mode, SceCtrlData *pad_data, void *argp )
+static MfMenuRc macro_menu_load( SceCtrlData *pad_data, void *arg )
 {
-	switch( st_run_mode ){
-		case MRM_NONE: break;
-		case MRM_TRACE:
-			while( macro_trace( mode, pad_data, argp ) );
-			break;
-		case MRM_RECORD:
-			macro_record( mode, pad_data, argp );
-			break;
-	}
-}
-
-MfMenuRc macroLoad( SceCtrlData *pad_data, void *arg )
-{
-	if( macro_is_busy() ) return MR_BACK;
+	if( macro_is_busy_with_message( &(st_macro[st_slot]) ) ) return MR_BACK;
 	
 	if( ! mfMenuGetFilenameIsReady() ){
 		MfMenuRc rc = mfMenuGetFilenameInit(
@@ -168,18 +367,18 @@ MfMenuRc macroLoad( SceCtrlData *pad_data, void *arg )
 		ini = inimgrNew();
 		if( ini > 0 ){
 			unsigned int err;
-			inimgrSetCallback( ini, "CommandSequence", macro_load, NULL );
+			inimgrSetCallback( ini, "CommandSequence", macro_read, NULL );
 			if( ( err = inimgrLoad( ini, inipath ) ) == 0 ){
 				int version = inimgrGetInt( ini, "default", MACRO_DATA_SIGNATURE, 0 );
 				if( version <= 1 ){
-					blitString( blitOffsetChar( 3 ), blitOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FCCOLOR, "Macro file is invalid or too lower version." );
+					gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FCCOLOR, "Macro file is invalid or too lower version." );
 					mfMenuWait( MFM_DISPLAY_MICROSEC_ERROR );
 				} else{
-					blitStringf( blitOffsetChar( 3 ), blitOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FGCOLOR, "Loaded from %s.", inipath );
+					gbPrintf( gbOffsetChar( 3 ), gbOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FGCOLOR, "Loaded from %s.", inipath );
 					mfMenuWait( MFM_DISPLAY_MICROSEC_INFO );
 				}
 			} else{
-				blitStringf( blitOffsetChar( 3 ), blitOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FCCOLOR, "Failed to load from %s: 0x%X", inipath, err );
+				gbPrintf( gbOffsetChar( 3 ), gbOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FCCOLOR, "Failed to load from %s: 0x%X", inipath, err );
 				mfMenuWait( MFM_DISPLAY_MICROSEC_ERROR );
 			}
 			inimgrDestroy( ini );
@@ -190,9 +389,9 @@ MfMenuRc macroLoad( SceCtrlData *pad_data, void *arg )
 	}
 }
 
-MfMenuRc macroSave( SceCtrlData *pad_data, void *arg )
+static MfMenuRc macro_menu_save( SceCtrlData *pad_data, void *arg )
 {
-	if( macro_is_busy() || ! macro_is_avail() ) return MR_BACK;
+	if( macro_is_busy_with_message( &(st_macro[st_slot]) ) || macro_is_unavail_with_message( &(st_macro[st_slot]) ) ) return MR_BACK;
 	
 	if( ! mfMenuGetFilenameIsReady() ){
 		MfMenuRc rc = mfMenuGetFilenameInit(
@@ -224,12 +423,12 @@ MfMenuRc macroSave( SceCtrlData *pad_data, void *arg )
 			unsigned int err;
 			inimgrSetInt( ini, "default", MACRO_DATA_SIGNATURE, MACRO_DATA_VERSION );
 			inimgrAddSection(  ini, "CommandSequence" );
-			inimgrSetCallback( ini, "CommandSequence", NULL, macro_save );
+			inimgrSetCallback( ini, "CommandSequence", NULL, macro_store );
 			if( ( err = inimgrSave( ini, inipath ) ) == 0 ){
-				blitStringf( blitOffsetChar( 3 ), blitOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FGCOLOR, "Saved to %s.", inipath );
+				gbPrintf( gbOffsetChar( 3 ), gbOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FGCOLOR, "Saved to %s.", inipath );
 				mfMenuWait( MFM_DISPLAY_MICROSEC_INFO );
 			} else{
-				blitStringf( blitOffsetChar( 3 ), blitOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FCCOLOR, "Failed to save to %s: 0x%X", inipath, err );
+				gbPrintf( gbOffsetChar( 3 ), gbOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FCCOLOR, "Failed to save to %s: 0x%X", inipath, err );
 				mfMenuWait( MFM_DISPLAY_MICROSEC_ERROR );
 			}
 			inimgrDestroy( ini );
@@ -240,343 +439,257 @@ MfMenuRc macroSave( SceCtrlData *pad_data, void *arg )
 	}
 }
 
-MfMenuRc macroEdit( SceCtrlData *pad_data, void *arg )
+static MfMenuRc macro_menu_edit( SceCtrlData *pad_data, void *arg )
 {
-	if( macro_is_busy() ) return MR_BACK;
+	if( macro_is_busy_with_message( &(st_macro[st_slot]) ) ) return MR_BACK;
 	
-	if( ! macromgrGetCount() ){
-			MacroData *macro = macromgrNew();
-		if( ! macro ){
-			blitString( blitOffsetChar( 3 ), blitOffsetLine( 4 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Failed to create." );
+	if( ! st_macro[st_slot].current.macro ){
+		if( ! macro_create( &(st_macro[st_slot]) ) ){
+			gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 4 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Failed to create." );
 			mfMenuWait( 1000000 );
 			return MR_BACK;
 		}
 		
-		macromgrCmdInit( macro, MA_DELAY, 0, 0 );
-		
-		blitString( blitOffsetChar( 3 ), blitOffsetLine( 4 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Creating new macro..." );
+		gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 4 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Creating new macro..." );
 		mfMenuWait( 1000000 );
 		return MR_CONTINUE;
 	}
 	
-	return macroeditorMain( pad_data, macromgrGetFirst() );
+	return macroeditorMain( pad_data, st_macro[st_slot].current.macro );
 }
 
-MfMenuRc macroClear( SceCtrlData *pad_data, void *arg )
+static MfMenuRc macro_menu_clear( SceCtrlData *pad_data, void *arg )
 {
-	if( macro_is_busy() || ! macro_is_avail() ) return MR_BACK;
+	if( macro_is_busy_with_message( &(st_macro[st_slot]) ) || macro_is_unavail_with_message( &(st_macro[st_slot]) ) ) return MR_BACK;
 	
-	macromgrDestroy();
+	macro_purge( &(st_macro[st_slot]) );
 	
-	blitString( blitOffsetChar( 3 ), blitOffsetLine( 4 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Clearing currently macro..." );
+	gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 4 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Clearing currently macro..." );
 	mfMenuWait( 1000000 );
 	
 	return MR_BACK;
 }
 
-MfMenuRc macroRecordStop( SceCtrlData *pad_data, void *arg )
+static MfMenuRc macro_menu_record_start( SceCtrlData *pad_data, void *arg )
 {
-	if( st_run_mode == MRM_RECORD ){
-		st_run_mode = MRM_NONE;
-		blitString( blitOffsetChar( 3 ), blitOffsetLine( 4 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Stopping macro recording..." );
-	} else{
-		blitString( blitOffsetChar( 3 ), blitOffsetLine( 4 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Not recorded yet." );
-	}
+	if( macro_is_busy_with_message( &(st_macro[st_slot]) ) || macro_is_disable_engine_with_message() || macro_is_locked_with_message() ) return MR_BACK;
 	
-	mfMenuWait( 1000000 );
-	return MR_BACK;
-}
-
-MfMenuRc macroRecordStart( SceCtrlData *pad_data, void *arg )
-{
-	if( macro_is_busy() || ! macro_is_enabled_mf_engine() ) return MR_BACK;
-	
-	if( st_run_mode == MRM_RECORD ){
-		blitString( blitOffsetChar( 3 ), blitOffsetLine( 4 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Already started recording" );
+	if( st_macro[st_slot].current.runMode == MRM_RECORD ){
+		gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 4 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Already started recording" );
 		mfMenuWait( 1000000 );
 		return MR_BACK;
 	}
 	
-	/* 既にマクロがあればクリア */
-	if( macromgrGetCount() ) macromgrDestroy();
+	/* 既にマクロがあれば削除 */
+	if( st_macro[st_slot].current.macro ) macro_purge( &(st_macro[st_slot]) );
+	
+	/* マクロを初期化 */
+	if( ! macro_create( &(st_macro[st_slot]) ) ) return MR_BACK;
 	
 	/* 最後のボタン情報をリセット */
-	st_temp_buttons      = 0;
-	st_temp_analog_move  = false;
-	st_temp_analog_coord = MACROMGR_ANALOG_NEUTRAL;
-	st_temp_ms           = 0;
+	macro_init_tempdata( &(st_macro[st_slot].current.temp) );
 	
-	st_run_mode = MRM_RECORD;
+	/* 記録の準備 */
+	st_macro[st_slot].current.runMode         = MRM_RECORD;
+	st_macro[st_slot].current.command         = st_macro[st_slot].current.macro;
+	st_macro[st_slot].current.command->action = MA_DELAY;
+	st_macro[st_slot].current.command->data   = 0;
+	st_macro[st_slot].current.command->sub    = 0;
+	sceRtcGetCurrentTick( &(st_macro[st_slot].current.temp.rtc) );
 	
 	mfMenuQuit();
+	
+	macro_lock();
 	
 	return MR_BACK;
 }
 
-MfMenuRc macroMenu( SceCtrlData *pad_data, void *arg )
+static MfMenuRc macro_menu_record_stop( SceCtrlData *pad_data, void *arg )
 {
-	static int  selected = 0;
-	
-	if( ! st_callback.func ){
-		switch( mfMenuUniDraw( blitOffsetChar( 5 ), blitOffsetLine( 6 ), st_menu_table, MF_ARRAY_NUM( st_menu_table ), &selected, 0 ) ){
-			case MR_CONTINUE:
-				blitString( blitOffsetChar( 3 ), blitOffsetLine( 4 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Please choose a operation." );
-				switch( selected ){
-					case MACRO_RUN_ONCE     : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Running currently macro for once." ); break;
-					case MACRO_RUN_INFINITY : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Running currently macro for endless." ); break;
-					case MACRO_RUN_HALT     : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Stopping currently running macro." ); break;
-					case MACRO_RECORD_START : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Starting to record a macro." ); break;
-					case MACRO_RECORD_STOP  : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Stopping to record a macro." ); break;
-					case MACRO_ANALOG_OPTION: blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Recording the analog stick movement." ); break;
-					case MACRO_EDIT         : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Editing currently macro." ); break;
-					case MACRO_CLEAR        : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Clearing currently macro." ); break;
-					case MACRO_LOAD         : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Loading a macro from MemoryStick.\n\nIMPORTANT CAUTION:\n  Verify that MemoryStick access indicator is not blinking.\n  Otherwise, will CRASH the currently running game!" ); break;
-					case MACRO_SAVE         : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Saving currently macro to MemoryStick.\n\nIMPORTANT CAUTION:\n  Verify that MemoryStick access indicator is not blinking.\n  Otherwise, will CRASH the currently running game!" ); break;
-				}
-				break;
-			case MR_ENTER:
-				break;
-			case MR_BACK:
-				return MR_BACK;
-		}
+	if( st_macro[st_slot].current.runMode == MRM_RECORD ){
+		macro_unlock();
+		st_macro[st_slot].current.runMode = MRM_NONE;
+		gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 4 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Stopping macro recording..." );
 	} else{
-		if( ( (MacroFunction)(st_callback.func) )( pad_data, MFM_GET_CB_ARG_BY_PTR( st_callback.arg, 0 ) ) == MR_BACK ){
-			st_callback.func = NULL;
-		}
+		gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 4 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Not recorded yet." );
 	}
-	return MR_CONTINUE;
+	
+	mfMenuWait( 1000000 );
+	return MR_BACK;
 }
 
-/*-----------------------------------------------
-	Static関数
-------------------------------------------------*/
-static MacroData *macro_append( MacroData *macro )
+static void macro_update_delayms( MacroData *macro, uint64_t origin )
 {
-	MacroData *new_macro;
+	uint64_t rtc, waitms;
+	sceRtcGetCurrentTick( &rtc );
 	
-	if( macro ){
-		new_macro = macromgrInsert( MIP_AFTER, macro );
-	} else{
-		new_macro = macromgrNew();
-	}
-	
-	return new_macro;
+	waitms = ( rtc - origin ) / 1000;
+	macro->data = waitms > MACROMGR_MAX_DELAY ? MACROMGR_MAX_DELAY : waitms;
 }
 
-static void macro_record( MfCallMode mode, SceCtrlData *pad_data, void *argp )
+static void macro_record( MfCallMode mode, SceCtrlData *pad, void *argp )
 {
-	unsigned int cur_buttons;
-	u64 cur_analog_coord = MACROMGR_ANALOG_NEUTRAL;
-	static MacroData *cur_macro;
+	MacroEntry   *entry;
+	unsigned int current_buttons;
+	uint64_t     current_analog_coord = MACROMGR_ANALOG_NEUTRAL;
 	
-	if( mode == MF_CALL_LATCH || ! pad_data ) return;
+	if( mode == MF_CALL_LATCH || ! pad || ! argp ) return;
 	
-	/* チェックするボタンをマスク */
-	cur_buttons = pad_data->Buttons & 0x0000FFFF;
-	
-	if( st_avail_analog ){
-		cur_analog_coord = MACROMGR_SET_ANALOG_XY( pad_data->Lx, pad_data->Ly );
+	entry           = (MacroEntry *)argp;
+	current_buttons = pad->Buttons & 0x0000FFFF;
+	if( entry->analogStick ){
+		current_analog_coord = MACROMGR_SET_ANALOG_XY( pad->Lx, pad->Ly );
 	}
 	
-	if( ! macromgrGetCount() ) cur_macro = NULL;
-	
-	if( st_temp_buttons == cur_buttons && cur_analog_coord == st_temp_analog_coord ){
-		u64 waitms;
-		sceRtcGetCurrentTick( &waitms );
-		waitms /= 1000;
-		
-		if( cur_macro && cur_macro->action == MA_DELAY ){
-			u64 diff = ( waitms - st_temp_ms );
-			cur_macro->data = diff > MACROMGR_MAX_DELAY ? MACROMGR_MAX_DELAY : diff;
-		} else{
-			cur_macro = macro_append( cur_macro );
-			if( ! cur_macro ) return;
-			
-			macromgrCmdInit( cur_macro, MA_DELAY, 0, st_temp_buttons );
-			st_temp_ms = waitms;
-		}
+	if( entry->current.temp.buttons == current_buttons && entry->current.temp.analogCoord ){
+		/* ボタンもアナログスティックも前回と同じ場合は、ディレイを更新して終了 */
+		macro_update_delayms( entry->current.command, entry->current.temp.rtc );
+		return;
 	} else{
-		unsigned int press_buttons   = ( st_temp_buttons ^ cur_buttons ) & cur_buttons;
-		unsigned int release_buttons = ( st_temp_buttons ^ cur_buttons ) & st_temp_buttons;
+		/* ボタンかアナログスティックが異なる場合 */
+		unsigned int press_buttons   = ( entry->current.temp.buttons ^ current_buttons ) & current_buttons;
+		unsigned int release_buttons = ( entry->current.temp.buttons ^ current_buttons ) & entry->current.temp.buttons;
 		
-		if( cur_macro ){
-			if( ! ( cur_macro->action == MA_DELAY && cur_macro->data == 0 ) ){
-				if( cur_macro->action == MA_DELAY && cur_macro->data != 0 ){
-					u64 waitms;
-					sceRtcGetCurrentTick( &waitms );
-					waitms /= 1000;
-					
-					u64 diff = ( waitms - st_temp_ms );
-					cur_macro->data = diff > MACROMGR_MAX_DELAY ? MACROMGR_MAX_DELAY : diff;
-				}
-				cur_macro = macro_append( cur_macro );
-			}
-		} else{
-			cur_macro = macro_append( cur_macro );
+		if( entry->current.command->action == MA_DELAY && entry->current.command->data != 0 ){
+			/* 現在のコマンドがディレイで時間が0より大きい場合は、ディレイを更新して次のコマンド作成 */
+			macro_update_delayms( entry->current.command, entry->current.temp.rtc );
+			entry->current.command = macromgrInsertAfter( entry->current.command );
+		} else if( entry->current.command->action != MA_DELAY ){
+			/* 現在のコマンドがディレイじゃない場合は次のコマンド作成 */
+			entry->current.command = macromgrInsertAfter( entry->current.command );
 		}
 		
-		if( ! cur_macro ) return;
+		/* コマンドの追加に失敗していれば終了 */
+		if( ! entry->current.command ) return;
 		
-		if( cur_macro->action == MA_DELAY && cur_macro->data != 0 ){
-			u64 waitms;
-			sceRtcGetCurrentTick( &waitms );
-			waitms /= 1000;
-			
-			u64 diff = ( waitms - st_temp_ms );
-			cur_macro->data = diff > MACROMGR_MAX_DELAY ? MACROMGR_MAX_DELAY : diff;
-		}
-		
+		/* ボタンが異なっていればボタン変更コマンドをセット */
 		if( press_buttons && release_buttons ){
-			macromgrCmdInit( cur_macro, MA_BUTTONS_CHANGE, cur_buttons, st_temp_buttons );
+			entry->current.command->action = MA_BUTTONS_CHANGE;
+			entry->current.command->data   = current_buttons;
+			entry->current.command->sub    = 0;
 		} else if( press_buttons ){
-			macromgrCmdInit( cur_macro, MA_BUTTONS_PRESS, press_buttons, st_temp_buttons );
+			entry->current.command->action = MA_BUTTONS_PRESS;
+			entry->current.command->data   = press_buttons;
+			entry->current.command->sub    = 0;
 		} else if( release_buttons ){
-			macromgrCmdInit( cur_macro, MA_BUTTONS_RELEASE, release_buttons, st_temp_buttons );
+			entry->current.command->action = MA_BUTTONS_RELEASE;
+			entry->current.command->data   = release_buttons;
+			entry->current.command->sub    = 0;
 		}
 		
-		if( cur_analog_coord != st_temp_analog_coord ){
-			cur_macro = macro_append( cur_macro );
-			if( ! cur_macro ) return;
-			
-			macromgrCmdInit( cur_macro, MA_ANALOG_MOVE, cur_analog_coord, 0 );
+		/* アナログスティックが動いていれば移動コマンドをセット */
+		if( current_analog_coord != entry->current.temp.analogCoord ){
+			if( press_buttons || release_buttons ){
+				entry->current.command = macromgrInsertAfter( entry->current.command );
+				/* コマンドの追加に失敗していれば終了 */
+				if( ! entry->current.command ) return;
+			}
+			entry->current.command->action = MA_ANALOG_MOVE;
+			entry->current.command->data   = current_analog_coord;
+			entry->current.command->sub    = 0;
 		}
 		
-		st_temp_buttons      = cur_buttons;
-		st_temp_analog_coord = cur_analog_coord;
+		/* 次のコマンドの準備 */
+		entry->current.command = macromgrInsertAfter( entry->current.command );
+		
+		/* コマンドの追加に失敗していれば終了 */
+		if( ! entry->current.command ) return;
+		
+		/* ディレイコマンドをセット */
+		entry->current.command->action = MA_DELAY;
+		entry->current.command->data   = 0;
+		entry->current.command->sub    = 0;
+		
+		/* 一時データを更新する */
+		entry->current.temp.buttons     = current_buttons;
+		entry->current.temp.analogCoord = current_analog_coord;
+		sceRtcGetCurrentTick( &(entry->current.temp.rtc) );
 	}
 }
 
-static bool macro_trace( MfCallMode mode, SceCtrlData *pad_data, void *argp )
+static void macro_trace( MfCallMode mode, SceCtrlData *pad, void *argp )
 {
-	static MacroData *cur_macro = NULL;
-	bool redo = false;
+	MacroEntry *entry;
 	
-	if( ! macromgrGetCount() || ! pad_data || st_run_mode != MRM_TRACE ){
-		cur_macro = NULL;
-		st_run_mode = MRM_NONE;
-		return false;
-	} else if( mode == MF_CALL_LATCH ){
-		pad_data->Buttons |= st_temp_buttons;
-		return false;
+	if( ! pad || ! argp ) return;
+	
+	entry = (MacroEntry *)argp;
+	
+	if( mode == MF_CALL_LATCH ){
+		pad->Buttons |= entry->current.temp.buttons;
+		return;
 	}
 	
-	if( ! cur_macro ){
-		if( ! st_run_loop ){
-			if( st_rfuid ){
-				mfRapidfireDestroy( st_rfuid );
-				st_rfuid = 0;
-			}
-		 	cur_macro = NULL;
-			st_run_mode = MRM_NONE;
-			return false;
-		} else if( st_run_loop < 0 || st_run_loop-- ){
-			if( ! st_rfuid ){
-				st_rfuid = mfRapidfireNew();
+	for( ; ; ){
+		/* 現在のコマンドがNULLの場合は、実行待ち */
+		if( ! entry->current.command ){
+			if( (entry->current.runLoop)-- ){
+				mfRapidfireClearAll( entry->current.rfUid );
+				entry->current.command = entry->current.macro;
 			} else{
-				mfClearRapidfireAll( st_rfuid );
+				macro_stop( entry );
+				break;
 			}
-			cur_macro = macromgrGetFirst();
 		}
-	}
-	
-	if( cur_macro->action == MA_DELAY ){
-		u64 waitms;
-		sceRtcGetCurrentTick( &waitms );
-		waitms /= 1000;
 		
-		if( ! st_temp_ms ){
-			st_temp_ms = waitms;
-		} else if( ( waitms - st_temp_ms ) > cur_macro->data ){
-			st_temp_ms = 0;
+		/* コマンドごとの処理 */
+		if( entry->current.command->action == MA_DELAY ){
+			uint64_t rtc;
+			sceRtcGetCurrentTick( &rtc );
+			
+			if( ! entry->current.temp.rtc ){
+				entry->current.temp.rtc = rtc;
+			} else if( ( rtc - entry->current.temp.rtc ) / 1000 > entry->current.command->data ){
+				entry->current.temp.rtc = 0;
+				entry->current.command = entry->current.command->next;
+				continue;
+			}
+		} else if( entry->current.command->action == MA_BUTTONS_PRESS ){
+			entry->current.temp.buttons |= entry->current.command->data;
+		} else if( entry->current.command->action == MA_BUTTONS_RELEASE ){
+			entry->current.temp.buttons ^= entry->current.command->data;
+		} else if( entry->current.command->action == MA_BUTTONS_CHANGE ){
+			entry->current.temp.buttons = entry->current.command->data;
+		} else if( entry->current.command->action == MA_ANALOG_MOVE ){
+			entry->current.temp.analogMove = true;
+			entry->current.temp.analogCoord = entry->current.command->data;
+		} else if( entry->current.command->action == MA_RAPIDFIRE_START ){
+			mfRapidfireSet(
+				entry->current.rfUid,
+				(unsigned int)(entry->current.command->data),
+				MF_RAPIDFIRE_MODE_AUTORAPID,
+				MACROMGR_GET_RAPIDPDELAY( entry->current.command->sub ),
+				MACROMGR_GET_RAPIDRDELAY( entry->current.command->sub )
+			);		
+		} else if( entry->current.command->action == MA_RAPIDFIRE_STOP ){
+			mfRapidfireClear( entry->current.rfUid, (unsigned int)(entry->current.command->data) );
 		}
-	}
-	if( st_temp_ms ){
-		redo = false;
-	} else if( cur_macro->action == MA_DELAY ){
-		cur_macro = cur_macro->next;
-		redo = true;
-	} else{
-		switch( cur_macro->action ){
-			case MA_BUTTONS_PRESS:
-				st_temp_buttons |= cur_macro->data;
-				break;
-			case MA_BUTTONS_RELEASE:
-				st_temp_buttons ^= cur_macro->data;
-				break;
-			case MA_BUTTONS_CHANGE:
-				st_temp_buttons = cur_macro->data;
-				break;
-			case MA_ANALOG_MOVE:
-				st_temp_analog_move  = true;
-				st_temp_analog_coord = cur_macro->data;
-				break;
-			case MA_RAPIDFIRE_START:
-				mfSetRapidfire(
-					st_rfuid,
-					(unsigned int)(cur_macro->data),
-					MF_RAPIDFIRE_MODE_AUTORAPID,
-					MACROMGR_GET_RAPIDPDELAY( cur_macro->sub ),
-					MACROMGR_GET_RAPIDRDELAY( cur_macro->sub )
-				);
-				break;
-			case MA_RAPIDFIRE_STOP:
-				mfClearRapidfire( st_rfuid, (unsigned int)(cur_macro->data) );
-				break;
+		
+		mfRapidfire( entry->current.rfUid, mode, pad );
+	
+		pad->Buttons |= entry->current.temp.buttons;
+		if( entry->current.temp.analogMove ){
+			pad->Lx = MACROMGR_GET_ANALOG_X( entry->current.temp.analogCoord );
+			pad->Ly = MACROMGR_GET_ANALOG_Y( entry->current.temp.analogCoord );
 		}
-		redo = false;
-		cur_macro = cur_macro->next;
+		
+		/* 次のコマンドへ */
+		if( entry->current.command->action != MA_DELAY ) entry->current.command = entry->current.command->next;
+		
+		/* コマンドを一つ実行完了により抜ける */
+		break;
 	}
-	
-	mfRapidfire( st_rfuid, mode, pad_data );
-	
-	pad_data->Buttons |= st_temp_buttons;
-	if( st_temp_analog_move ){
-		pad_data->Lx = MACROMGR_GET_ANALOG_X( st_temp_analog_coord );
-		pad_data->Ly = MACROMGR_GET_ANALOG_Y( st_temp_analog_coord );
-	}
-	
-	return redo;
 }
 
-static bool macro_is_busy( void )
+static void macro_read( IniUID ini, FilehUID fuid, char *buf, size_t max )
 {
-	if( st_run_mode != MRM_NONE ){
-		blitString( blitOffsetChar( 3 ), blitOffsetLine( 4 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Macro function is busy." );
-		mfMenuWait( 1000000 );
-		return true;
-	}
-	return false;
-
-}
-
-static bool macro_is_avail( void )
-{
-	if( ! macromgrGetCount() ){
-		blitString( blitOffsetChar( 3 ), blitOffsetLine( 4 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "No current macro." );
-		mfMenuWait( 1000000 );
-		return false;
-	}
-	return true;
-}
-
-static bool macro_is_enabled_mf_engine( void )
-{
-	if( mfIsDisabled() ){
-		blitString( blitOffsetChar( 3 ), blitOffsetLine( 4 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "MacroFire Engine is currently off." );
-		mfMenuWait( 1000000 );
-		return false;
-	}
-	return true;
-}
-
-static void macro_load( IniUID ini, FilehUID fuid, char *buf, size_t max )
-{
-	MacroData *command = NULL;
 	char *action, *data;
 	
 	if( inimgrGetInt( ini, "default", MACRO_DATA_SIGNATURE, 0 ) <= 1 ) return;
 	
-	if( macromgrGetCount() ) macromgrDestroy();
+	if( st_macro[st_slot].current.macro ) macro_purge( &(st_macro[st_slot]) );
+	macro_create( &(st_macro[st_slot]) );
+	st_macro[st_slot].current.command = st_macro[st_slot].current.macro;
 	
 	while( inimgrCBReadln( fuid, buf, max ) ){
 		strutilRemoveChar( buf, "\t\x20" );
@@ -588,17 +701,21 @@ static void macro_load( IniUID ini, FilehUID fuid, char *buf, size_t max )
 		action = buf;
 		
 		if( strcmp( action, MACRO_ACTION_DELAY ) == 0 ){
-			command = macro_append( command );
-			macromgrCmdInit( command, MA_DELAY, strtoul( data, NULL, 10 ), 0 );
+			st_macro[st_slot].current.command->action = MA_DELAY;
+			st_macro[st_slot].current.command->data   = strtoul( data, NULL, 10 );
+			st_macro[st_slot].current.command->sub    = 0;
 		} else if( strcmp( action, MACRO_ACTION_BTNPRESS ) == 0 ){
-			command = macro_append( command );
-			macromgrCmdInit( command, MA_BUTTONS_PRESS, ctrlpadUtilStringToButtons( data ), 0 );
+			st_macro[st_slot].current.command->action = MA_BUTTONS_PRESS;
+			st_macro[st_slot].current.command->data   = ctrlpadUtilStringToButtons( data );
+			st_macro[st_slot].current.command->sub    = 0;
 		} else if( strcmp( action, MACRO_ACTION_BTNRELEASE ) == 0 ){
-			command = macro_append( command );
-			macromgrCmdInit( command, MA_BUTTONS_RELEASE, ctrlpadUtilStringToButtons( data ), 0 );
+			st_macro[st_slot].current.command->action = MA_BUTTONS_RELEASE;
+			st_macro[st_slot].current.command->data   = ctrlpadUtilStringToButtons( data );
+			st_macro[st_slot].current.command->sub    = 0;
 		} else if( strcmp( action, MACRO_ACTION_BTNCHANGE ) == 0 ){
-			command = macro_append( command );
-			macromgrCmdInit( command, MA_BUTTONS_CHANGE, ctrlpadUtilStringToButtons( data ), 0 );
+			st_macro[st_slot].current.command->action = MA_BUTTONS_CHANGE;
+			st_macro[st_slot].current.command->data   = ctrlpadUtilStringToButtons( data );
+			st_macro[st_slot].current.command->sub    = 0;
 		} else if( strcmp( action, MACRO_ACTION_ALMOVE ) == 0 ){
 			int x, y;
 			char *data2 = strchr( data, ',' );
@@ -610,8 +727,9 @@ static void macro_load( IniUID ini, FilehUID fuid, char *buf, size_t max )
 			x = strtol( data, NULL, 10 );
 			y = strtol( data2, NULL, 10 );
 			
-			command = macro_append( command );
-			macromgrCmdInit( command, MA_ANALOG_MOVE, MACROMGR_SET_ANALOG_XY( x, y ), 0 );
+			st_macro[st_slot].current.command->action = MA_ANALOG_MOVE;
+			st_macro[st_slot].current.command->data   = MACROMGR_SET_ANALOG_XY( x, y );
+			st_macro[st_slot].current.command->sub    = 0;
 		} else if( strcmp( action, MACRO_ACTION_BTNRAPIDSTART ) == 0 ){
 			char *pdelay, *rdelay, *buttons;
 			pdelay = data;
@@ -627,50 +745,124 @@ static void macro_load( IniUID ini, FilehUID fuid, char *buf, size_t max )
 			*buttons = '\0';
 			buttons++;
 			
-			command = macro_append( command );
-			macromgrCmdInit( command, MA_RAPIDFIRE_START, ctrlpadUtilStringToButtons( buttons ), MACROMGR_SET_RAPIDDELAY( strtoul( pdelay, NULL, 10 ), strtoul( rdelay, NULL, 10 ) ) );
+			st_macro[st_slot].current.command->action = MA_RAPIDFIRE_START;
+			st_macro[st_slot].current.command->data   = ctrlpadUtilStringToButtons( buttons );
+			st_macro[st_slot].current.command->sub    = MACROMGR_SET_RAPIDDELAY( strtoul( pdelay, NULL, 10 ), strtoul( rdelay, NULL, 10 ) );
 		} else if( strcmp( action, MACRO_ACTION_BTNRAPIDSTOP ) == 0 ){
-			command = macro_append( command );
-			macromgrCmdInit( command, MA_RAPIDFIRE_STOP, ctrlpadUtilStringToButtons( data ), 0 );
+			st_macro[st_slot].current.command->action = MA_RAPIDFIRE_STOP;
+			st_macro[st_slot].current.command->data   = ctrlpadUtilStringToButtons( data );
+			st_macro[st_slot].current.command->sub    = 0;
 		}
+		st_macro[st_slot].current.command = macromgrInsertAfter( st_macro[st_slot].current.command );
+		if( ! st_macro[st_slot].current.command ) return;
 	}
+	macromgrRemove( st_macro[st_slot].current.command );
 }
 
-static void macro_save( FilehUID fuid, char *buf, size_t max )
+static void macro_store( FilehUID fuid, char *buf, size_t max )
 {
-	MacroData *command;
 	char buttons[128];
 	
-	for( command = macromgrGetFirst(); command; command = command->next ){
-		switch( command->action ){
+	for( st_macro[st_slot].current.command = st_macro[st_slot].current.macro; st_macro[st_slot].current.command; st_macro[st_slot].current.command = st_macro[st_slot].current.command->next ){
+		switch( st_macro[st_slot].current.command->action ){
 			case MA_DELAY:
-				snprintf( buf, max, "%s: %llu", MACRO_ACTION_DELAY, (uint64_t)command->data );
+				snprintf( buf, max, "%s: %llu", MACRO_ACTION_DELAY, (uint64_t)st_macro[st_slot].current.command->data );
 				break;
 			case MA_BUTTONS_PRESS:
-				ctrlpadUtilButtonsToString( command->data, buttons, sizeof( buttons ) );
+				ctrlpadUtilButtonsToString( st_macro[st_slot].current.command->data, buttons, sizeof( buttons ) );
 				snprintf( buf, max, "%s: %s", MACRO_ACTION_BTNPRESS, buttons );
 				break;
 			case MA_BUTTONS_RELEASE:
-				ctrlpadUtilButtonsToString( command->data, buttons, sizeof( buttons ) );
+				ctrlpadUtilButtonsToString( st_macro[st_slot].current.command->data, buttons, sizeof( buttons ) );
 				snprintf( buf, max, "%s: %s", MACRO_ACTION_BTNRELEASE, buttons );
 				break;
 			case MA_BUTTONS_CHANGE:
-				ctrlpadUtilButtonsToString( command->data, buttons, sizeof( buttons ) );
+				ctrlpadUtilButtonsToString( st_macro[st_slot].current.command->data, buttons, sizeof( buttons ) );
 				snprintf( buf, max, "%s: %s", MACRO_ACTION_BTNCHANGE, buttons );
 				break;
 			case MA_ANALOG_MOVE:
-				snprintf( buf, max, "%s: %d,%d", MACRO_ACTION_ALMOVE, (int)MACROMGR_GET_ANALOG_X( command->data ), (int)MACROMGR_GET_ANALOG_Y( command->data ) );
+				snprintf( buf, max, "%s: %d,%d", MACRO_ACTION_ALMOVE, (int)MACROMGR_GET_ANALOG_X( st_macro[st_slot].current.command->data ), (int)MACROMGR_GET_ANALOG_Y( st_macro[st_slot].current.command->data ) );
 				break;
 			case MA_RAPIDFIRE_START:
-				ctrlpadUtilButtonsToString( command->data, buttons, sizeof( buttons ) );
-				snprintf( buf, max, "%s: %lu,%lu,%s", MACRO_ACTION_BTNRAPIDSTART, MACROMGR_GET_RAPIDPDELAY( command->sub ), MACROMGR_GET_RAPIDRDELAY( command->sub ), buttons );
+				ctrlpadUtilButtonsToString( st_macro[st_slot].current.command->data, buttons, sizeof( buttons ) );
+				snprintf( buf, max, "%s: %lu,%lu,%s", MACRO_ACTION_BTNRAPIDSTART, MACROMGR_GET_RAPIDPDELAY( st_macro[st_slot].current.command->sub ), MACROMGR_GET_RAPIDRDELAY( st_macro[st_slot].current.command->sub ), buttons );
 				break;
 			case MA_RAPIDFIRE_STOP:
-				ctrlpadUtilButtonsToString( command->data, buttons, sizeof( buttons ) );
+				ctrlpadUtilButtonsToString( st_macro[st_slot].current.command->data, buttons, sizeof( buttons ) );
 				snprintf( buf, max, "%s: %s", MACRO_ACTION_BTNRAPIDSTOP, buttons );
 				break;
 		}
 		inimgrCBWriteln( fuid, buf );
 	}
+}
+
+
+
+static bool macro_is_busy( MacroEntry *entry )
+{
+	return entry->current.runMode != MRM_NONE ? true : false;
+}
+
+static bool macro_is_unavail( MacroEntry *entry )
+{
+	return ! entry->current.macro ? true : false;
+}
+
+static bool macro_is_disable_engine( void )
+{
+	return mfIsDisabled() ? true : false;
+}
+
+static bool macro_is_locked( void )
+{
+	return st_exlock;
+}
+
+static bool macro_is_busy_with_message( MacroEntry *entry )
+{
+	bool rc = macro_is_busy( entry );
+	
+	if( rc ){
+		gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 4 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Macro function is busy." );
+		mfMenuWait( 1000000 );
+	}
+	
+	return rc;
+}
+
+static bool macro_is_unavail_with_message( MacroEntry *entry )
+{
+	bool rc = macro_is_unavail( entry );
+	
+	if( rc ){
+		gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 4 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "No current macro." );
+		mfMenuWait( 1000000 );
+	}
+	
+	return rc;
+}
+
+static bool macro_is_disable_engine_with_message( void )
+{
+	bool rc = macro_is_disable_engine();
+	
+	if( rc ){
+		gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 4 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "MacroFire Engine is currently off." );
+		mfMenuWait( 1000000 );
+	}
+	
+	return rc;
+}
+
+static bool macro_is_locked_with_message( void )
+{
+	bool rc = macro_is_locked();
+	
+	if( rc ){
+		gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 4 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Already running or recording in other macro slot." );
+		mfMenuWait( 1000000 );
+	}
+	
+	return rc;
 }
 

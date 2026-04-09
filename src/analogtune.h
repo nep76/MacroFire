@@ -39,4 +39,8 @@ void analogtuneCreateIni( IniUID ini );
 void analogtuneTune( SceCtrlData *pad_data, void *argp );
 MfMenuRc analogtuneMenu( SceCtrlData *pad_data, void *argp );
 
+int analogtuneGetOriginX( void );
+int analogtuneGetOriginY( void );
+int analogtuneGetDeadzone( void );
+
 #endif

@@ -5,7 +5,7 @@
 #ifndef GETFILENAME_H
 #define GETFILENAME_H
 
-#include "psp/blit.h"
+#include "psp/gb.h"
 #include "psp/ctrlpad.h"
 #include "psp/pathexpand.h"
 #include "psp/dirh.h"
@@ -19,8 +19,8 @@
 /*-----------------------------------------------
 	íËêî
 -----------------------------------------------*/
-#define CMNDLG_GET_FILENAME_MAX_WIDTH  ( SCR_WIDTH  / BLIT_CHAR_WIDTH  )
-#define CMNDLG_GET_FILENAME_MAX_HEIGHT ( SCR_HEIGHT / BLIT_CHAR_HEIGHT )
+#define CMNDLG_GET_FILENAME_MAX_WIDTH  ( SCR_WIDTH  / GB_CHAR_WIDTH  )
+#define CMNDLG_GET_FILENAME_MAX_HEIGHT ( SCR_HEIGHT / GB_CHAR_HEIGHT )
 
 #ifdef __cplusplus
 extern "C" {

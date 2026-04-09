@@ -50,22 +50,14 @@ typedef struct _macro_data {
 	struct _macro_data *prev;
 } MacroData;
 
-typedef enum {
-	MIP_BEFORE,
-	MIP_AFTER
-} MacroInsertPosition;
-
-typedef void ( *MacromgrCmdInitializer )( MacroData*, MacroAction, uint64_t, uint64_t );
-
 /*-----------------------------------------------
 	ä÷êî
 -----------------------------------------------*/
-MacroData *macromgrNew     ( void );
-MacroData *macromgrInsert  ( MacroInsertPosition pos, MacroData *macro );
-void      macromgrRemove   ( MacroData *macro );
-void      macromgrDestroy  ( void );
-MacroData *macromgrGetFirst( void );
-int       macromgrGetCount ( void );
-void macromgrCmdInit( MacroData *macro, MacroAction action, uint64_t data, uint64_t sub );
+MacroData *macromgrNew( void );
+MacroData *macromgrInsertBefore( MacroData *macro );
+MacroData *macromgrInsertAfter( MacroData *macro );
+void macromgrRemove( MacroData *macro );
+void macromgrDestroy( MacroData *macro );
+void macromgrSet( MacroData *macro, MacroAction action, uint64_t data, uint64_t sub );
 
 #endif

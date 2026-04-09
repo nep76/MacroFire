@@ -15,11 +15,11 @@ static AnalogtuneDeadzone st_deadzone = {
 };
 	
 static MfMenuItem st_menu_table[] = {
-	{ MT_GET_NUMBERS, "Deadzone radius",     0, &(st_deadzone.r),  { { .string = "Set deadzone radius"  }, { .string = "(0-128)"  }, { .integer = 3 }, { .integer = 1 } } },
-	{ MT_GET_NUMBERS, "Sensitivity    ",     0, &(st_sensitivity), { { .string = "Set sensitivity rate" }, { .string = "% (0-200)"}, { .integer = 3 }, { .integer = 1 } } },
-	{ MT_NULL },
-	{ MT_GET_NUMBERS, "Origin X-coordinate", 0, &(st_deadzone.x),  { { .string = "Set origin X-coordinate" }, { .string = "(0-255)" }, { .integer = 3 }, { .integer = 1 } } },
-	{ MT_GET_NUMBERS, "Origin Y-coordinate", 0, &(st_deadzone.y),  { { .string = "Set origin Y-coordinate" }, { .string = "(0-255)" }, { .integer = 3 }, { .integer = 1 } } },
+	{ "Deadzone radius: %d %s",     mfMenuDefGetNumberProc, &(st_deadzone.r),  { { .string = "Set deadzone radius"  }, { .string = "(0-128)"  }, { .integer = 3 }, { .integer = 1 } } },
+	{ "Sensitivity    : %d %s",     mfMenuDefGetNumberProc, &(st_sensitivity), { { .string = "Set sensitivity rate" }, { .string = "% (0-200)"}, { .integer = 3 }, { .integer = 1 } } },
+	{ NULL },
+	{ "Origin X-coordinate: %d %s", mfMenuDefGetNumberProc, &(st_deadzone.x),  { { .string = "Set origin X-coordinate" }, { .string = "(0-255)" }, { .integer = 3 }, { .integer = 1 } } },
+	{ "Origin Y-coordinate: %d %s", mfMenuDefGetNumberProc, &(st_deadzone.y),  { { .string = "Set origin Y-coordinate" }, { .string = "(0-255)" }, { .integer = 3 }, { .integer = 1 } } },
 };
 
 /*-----------------------------------------------
@@ -92,22 +92,22 @@ MfMenuRc analogtuneMenu( SceCtrlData *pad_data, void *argp )
 	
 	analogtune_normalize();
 	
-	blitString( blitOffsetChar( 3 ), blitOffsetLine(  4 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Analog stick sensitivity tuner." );
+	gbPrint( gbOffsetChar( 3 ), gbOffsetLine(  4 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Analog stick sensitivity tuner." );
 	pad_dupe = *pad_data;
 	analogtuneTune( &pad_dupe, NULL );
 	
 	analog_dir = ctrlpadUtilGetAnalogDirection( pad_dupe.Lx, pad_dupe.Ly, 0 );
 	
-	blitString( blitOffsetChar( 3 ), blitOffsetLine( 24 ),  MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Test of analog stick direction:" );
-	blitString( blitOffsetChar( 32 + 5 ), blitOffsetLine( 23 ),  analog_dir & CTRLPAD_CTRL_ANALOG_UP    ? MFM_TEXT_FCCOLOR : MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "\x80" );
-	blitString( blitOffsetChar( 32 + 7 ), blitOffsetLine( 24 ),  analog_dir & CTRLPAD_CTRL_ANALOG_RIGHT ? MFM_TEXT_FCCOLOR : MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "\x81" );
-	blitString( blitOffsetChar( 32 + 5 ), blitOffsetLine( 25 ),  analog_dir & CTRLPAD_CTRL_ANALOG_DOWN  ? MFM_TEXT_FCCOLOR : MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "\x82" );
-	blitString( blitOffsetChar( 32 + 3 ), blitOffsetLine( 24 ),  analog_dir & CTRLPAD_CTRL_ANALOG_LEFT  ? MFM_TEXT_FCCOLOR : MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "\x83" );
-	blitString( blitOffsetChar( 3 ), blitOffsetLine( 27 ),  MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Test of analog stick movement:" );
-	blitStringf( blitOffsetChar( 5 ), blitOffsetLine( 28 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Untuned coordinate (X,Y) = ( %03d , %03d )", pad_data->Lx, pad_data->Ly );
-	blitStringf( blitOffsetChar( 5 ), blitOffsetLine( 29 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Tuned coordinate   (X,Y) = ( %03d , %03d )", pad_dupe.Lx, pad_dupe.Ly );
+	gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 24 ),  MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Test of analog stick direction:" );
+	gbPrint( gbOffsetChar( 32 + 5 ), gbOffsetLine( 23 ),  analog_dir & CTRLPAD_CTRL_ANALOG_UP    ? MFM_TEXT_FCCOLOR : MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "\x80" );
+	gbPrint( gbOffsetChar( 32 + 7 ), gbOffsetLine( 24 ),  analog_dir & CTRLPAD_CTRL_ANALOG_RIGHT ? MFM_TEXT_FCCOLOR : MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "\x81" );
+	gbPrint( gbOffsetChar( 32 + 5 ), gbOffsetLine( 25 ),  analog_dir & CTRLPAD_CTRL_ANALOG_DOWN  ? MFM_TEXT_FCCOLOR : MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "\x82" );
+	gbPrint( gbOffsetChar( 32 + 3 ), gbOffsetLine( 24 ),  analog_dir & CTRLPAD_CTRL_ANALOG_LEFT  ? MFM_TEXT_FCCOLOR : MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "\x83" );
+	gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 27 ),  MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Test of analog stick movement:" );
+	gbPrintf( gbOffsetChar( 5 ), gbOffsetLine( 28 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Untuned coordinate (X,Y) = ( %03d , %03d )", pad_data->Lx, pad_data->Ly );
+	gbPrintf( gbOffsetChar( 5 ), gbOffsetLine( 29 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Tuned coordinate   (X,Y) = ( %03d , %03d )", pad_dupe.Lx, pad_dupe.Ly );
 	
-	switch( mfMenuUniDraw( blitOffsetChar( 5 ), blitOffsetLine( 6 ), st_menu_table, MF_ARRAY_NUM( st_menu_table ), &selected, 0 ) ){
+	switch( mfMenuUniDraw( gbOffsetChar( 5 ), gbOffsetLine( 6 ), st_menu_table, MF_ARRAY_NUM( st_menu_table ), &selected, 0 ) ){
 		case MR_CONTINUE:
 		case MR_ENTER:
 			break;
@@ -117,6 +117,21 @@ MfMenuRc analogtuneMenu( SceCtrlData *pad_data, void *argp )
 	}
 	
 	return MR_CONTINUE;
+}
+
+int analogtuneGetOriginX( void )
+{
+	return st_deadzone.x;
+}
+
+int analogtuneGetOriginY( void )
+{
+	return st_deadzone.y;
+}
+
+int analogtuneGetDeadzone( void )
+{
+	return st_deadzone.r;
 }
 
 static void analogtune_normalize( void )

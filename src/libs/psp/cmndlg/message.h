@@ -5,7 +5,7 @@
 #ifndef MESSAGE_H
 #define MESSAGE_H
 
-#include "psp/blit.h"
+#include "psp/gb.h"
 #include "psp/ctrlpad.h"
 #define CMNDLG_FUNCTION_EXPORT
 #include "psp/cmndlg.h"

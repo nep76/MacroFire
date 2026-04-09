@@ -210,13 +210,13 @@ static void cmndlg_get_buttons_draw_ui( CmndlgGetButtonsParams *params )
 	if( params->numberOfData > 1 ){
 		int switch_info_pos_y = 9;
 		
-		blitFillBox( params->ui.x, params->ui.y, blitMeasureChar( 30 ), blitMeasureLine( 8 + st_avail_buttons_num ), params->ui.bgColor );
-		blitLineBox( params->ui.x, params->ui.y, blitMeasureChar( 30 ), blitMeasureLine( 8 + st_avail_buttons_num ), params->ui.borderColor );
+		gbFillRectRel( params->ui.x, params->ui.y, gbOffsetChar( 30 ), gbOffsetLine( 8 + st_avail_buttons_num ), params->ui.bgColor );
+		gbLineRectRel( params->ui.x, params->ui.y, gbOffsetChar( 30 ), gbOffsetLine( 8 + st_avail_buttons_num ), params->ui.borderColor );
 		
 		if( params->selectDataNumber ){
-			blitStringf(
-				params->ui.x + blitOffsetChar( 1 ),
-				params->ui.y + blitOffsetLine( 7 + st_avail_buttons_num + switch_info_pos_y++ ),
+			gbPrintf(
+				params->ui.x + gbOffsetChar( 1 ),
+				params->ui.y + gbOffsetLine( 7 + st_avail_buttons_num + switch_info_pos_y++ ),
 				params->ui.fgTextColor,
 				params->ui.bgTextColor,
 				"L = %s",
@@ -225,9 +225,9 @@ static void cmndlg_get_buttons_draw_ui( CmndlgGetButtonsParams *params )
 		}
 		
 		if( params->selectDataNumber < params->numberOfData - 1 ){
-			blitStringf(
-				params->ui.x + blitOffsetChar( 1 ),
-				params->ui.y + blitOffsetLine( 7 + st_avail_buttons_num + switch_info_pos_y ),
+			gbPrintf(
+				params->ui.x + gbOffsetChar( 1 ),
+				params->ui.y + gbOffsetLine( 7 + st_avail_buttons_num + switch_info_pos_y ),
 				params->ui.fgTextColor,
 				params->ui.bgTextColor,
 				"R = %s",
@@ -235,21 +235,21 @@ static void cmndlg_get_buttons_draw_ui( CmndlgGetButtonsParams *params )
 			);
 		}
 	} else{
-		blitFillBox( params->ui.x, params->ui.y, blitMeasureChar( 30 ), blitMeasureLine( 6 + st_avail_buttons_num ), params->ui.bgColor );
-		blitLineBox( params->ui.x, params->ui.y, blitMeasureChar( 30 ), blitMeasureLine( 6 + st_avail_buttons_num ), params->ui.borderColor );
+		gbFillRectRel( params->ui.x, params->ui.y, gbOffsetChar( 30 ), gbOffsetLine( 6 + st_avail_buttons_num ), params->ui.bgColor );
+		gbLineRectRel( params->ui.x, params->ui.y, gbOffsetChar( 30 ), gbOffsetLine( 6 + st_avail_buttons_num ), params->ui.borderColor );
 	}
 	
-	blitString(
-		params->ui.x + blitOffsetChar( 1 ),
-		params->ui.y + blitOffsetLine( 1 ),
+	gbPrint(
+		params->ui.x + gbOffsetChar( 1 ),
+		params->ui.y + gbOffsetLine( 1 ),
 		params->ui.fgTextColor,
 		params->ui.bgTextColor,
 		params->data[params->selectDataNumber].title
 	);
 	
-	blitString(
-		params->ui.x + blitOffsetChar( 1 ),
-		params->ui.y + blitOffsetLine( 4 + st_avail_buttons_num ),
+	gbPrint(
+		params->ui.x + gbOffsetChar( 1 ),
+		params->ui.y + gbOffsetLine( 4 + st_avail_buttons_num ),
 		params->ui.fgTextColor,
 		params->ui.bgTextColor,
 		"SELECT: Usage"
@@ -257,9 +257,9 @@ static void cmndlg_get_buttons_draw_ui( CmndlgGetButtonsParams *params )
 	
 	for( i = 0, l = 0; i < sizeof( st_btnstat ) / sizeof( st_btnstat[0] ); i++ ){
 		if( st_btnstat[i].available ){
-			blitStringf(
-				params->ui.x + blitOffsetChar( 3 ),
-				params->ui.y + blitOffsetLine( 3 + l ),
+			gbPrintf(
+				params->ui.x + gbOffsetChar( 3 ),
+				params->ui.y + gbOffsetLine( 3 + l ),
 				i == ((struct cmndlg_get_buttons_tempdata *)(params->base.tempBuffer))[params->selectDataNumber].selected ? params->ui.fcTextColor : params->ui.fgTextColor,
 				params->ui.bgTextColor,
 				"%s: %s",

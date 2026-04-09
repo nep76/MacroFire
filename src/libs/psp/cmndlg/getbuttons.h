@@ -5,8 +5,9 @@
 #ifndef CMNDLG_GET_BUTTONS_H
 #define CMNDLG_GET_BUTTONS_H
 
-#include "psp/blit.h"
+#include "psp/gb.h"
 #include "psp/ctrlpad.h"
+#include "psp/memsce.h"
 #include "utils/strutil.h"
 #define CMNDLG_FUNCTION_EXPORT
 #include "psp/cmndlg.h"

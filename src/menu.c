@@ -8,36 +8,43 @@
 /*-----------------------------------------------
 	ローカル関数
 -----------------------------------------------*/
-static void mf_indicator( int *i );
-static void mf_threads_stat_change( enum mf_thread_chstat stat, SceUID thlist[], int thnum );
-static void mf_menu_create_item_name( char line[], size_t max, MfMenuItem *item );
-static void mf_not_enough_mem_error( void );
-static MfMenuRc mf_menu_control( SceCtrlData *pad_data, MfMenuItem *item );
-static void mf_menu_create_home_menu( MfMenuItem *menu, int menu_num, MfMenuCallback *mf_menu );
+static void     mf_indicator( void );
+static void     mf_threads_stat_change( enum mf_thread_chstat stat, SceUID thlist[], int thnum );
+static void     mf_emerg_menu( void );
+static void     mf_menu_create_home_menu( MfMenuItem *menu, int menu_num, MfMenuCallback *mf_menu );
+static void     mf_backup_fbstat( struct mf_fbstat *fbstat );
+static void     mf_restore_fbstat( struct mf_fbstat *fbstat );
+static bool     mf_alloc_buffers( struct mf_buffers *buf, void *orig_buffer );
+static void     mf_free_buffers( struct mf_buffers *buf );
+static void     mf_ready_to_draw( void );
+static void     mf_draw_base( void );
 
 /*-----------------------------------------------
 	ローカル変数
 -----------------------------------------------*/
-static bool              st_interrupt = true;
-static bool              st_menu_quit = false;
-static bool              st_dialog    = false;
-static uint64_t          st_wait_micro_sec = 0;
-static SceUID            st_thids_first[MFM_MAX_NUMBER_OF_THREADS];
-static int               st_thnum_first;
-static SceCtrlData       st_pad_data;
-static CtrlpadParams     st_cp_params;
+static bool          st_interrupt = true;
+static bool          st_menu_quit = false;
+static bool          st_dialog    = false;
+static uint64_t      st_wait_micro_sec = 0;
+static SceUID        st_thids_first[MFM_MAX_NUMBER_OF_THREADS];
+static int           st_thnum_first;
+static SceCtrlData   st_pad_data;
+static CtrlpadParams st_cp_params;
+static void          *st_vrambase;
+
+static char          st_label[MFM_ITEM_LENGTH];
+static char          st_usage[MFM_ITEM_LENGTH];
 
 /*=============================================*/
 
-static void mf_indicator( int *i )
+static void mf_indicator( void )
 {
-	char work_indicator[] = { '|', '/', '-', '\\' };
+	static char st_working_indicator[] = { '|', '/', '-', '\\' };
+	static int  st_working_indicator_index = 0;
 	
-	if( *i > 3 ) *i = 0;
+	if( st_working_indicator_index > ( sizeof( st_working_indicator ) - 1 ) ) st_working_indicator_index = 0;
 	
-	blitChar( blitOffsetChar( 1 ), blitOffsetLine( 1 ), MFM_TITLE_TEXT_COLOR, MFM_TRANSPARENT, work_indicator[*i] );
-	
-	(*i)++;
+	gbPutChar( gbOffsetChar( 1 ), gbOffsetLine( 1 ), MFM_TITLE_TEXT_COLOR, MFM_TRANSPARENT, st_working_indicator[st_working_indicator_index++] );
 }
 
 static void mf_threads_stat_change( enum mf_thread_chstat stat, SceUID thids[], int thnum )
@@ -74,7 +81,7 @@ bool mfMenuInit( void )
 	return true;
 }
 /*
-void mfDebug( FbmgrDisplayStat *fb )
+void mfDebug( struct mf_buffers *buf )
 {
 	static int fps = 0;
 	static int st_fps = 0;
@@ -88,8 +95,19 @@ void mfDebug( FbmgrDisplayStat *fb )
 		fps = st_fps;
 		st_fps = 0;
 	}
+
 	
-	blitStringf( blitOffsetChar( 1 ), blitOffsetLine( 0 ), MFM_TITLE_TEXT_COLOR, MFM_TRANSPARENT,
+	gbPrintf( gbOffsetChar( 1 ), gbOffsetLine( 0 ), MFM_TITLE_TEXT_COLOR, MFM_TRANSPARENT,
+		"%p %p %p %p %d %d",
+		gbGetCurrentDisplayBuf(),
+		buf->frame.display,
+		buf->frame.draw,
+		buf->frame.clearImage,
+		buf->frame.size,
+		buf->useVolatileMem
+	);
+		
+	gbPrintf( gbOffsetChar( 1 ), gbOffsetLine( 2 ), MFM_TITLE_TEXT_COLOR, MFM_TRANSPARENT,
 		"%d 1:%d 2:%d 3:%d 4:%d 5:%d 6:%d",
 		fps,
 		sceKernelPartitionTotalFreeMemSize( 1 ),
@@ -101,10 +119,95 @@ void mfDebug( FbmgrDisplayStat *fb )
 	);
 }
 */
+static void mf_backup_fbstat( struct mf_fbstat *fbstat )
+{
+	fbstat->mode        = gbGetMode();
+	fbstat->width       = gbGetWidth();
+	fbstat->height      = gbGetHeight();
+	fbstat->frameBuffer = gbGetCurrentDisplayBuf();
+	fbstat->bufferWidth = gbGetBufferWidth();
+	fbstat->pixelFormat = gbGetPixelFormat();
+}
+
+static void mf_restore_fbstat( struct mf_fbstat *fbstat )
+{
+	sceDisplaySetMode( fbstat->mode, fbstat->width, fbstat->height );
+	sceDisplaySetFrameBuf( fbstat->frameBuffer, fbstat->bufferWidth, fbstat->pixelFormat, PSP_DISPLAY_SETBUF_IMMEDIATE );
+}
+
+static bool mf_alloc_buffers( struct mf_buffers *buf, void *orig_buffer )
+{
+	int backup_vram_size;
+	
+	memset( buf, 0, sizeof( struct mf_buffers ) );
+	
+	buf->frame.size = gbGetDataFrameSize();
+	backup_vram_size = buf->frame.size * 3;
+	
+	if( scePowerVolatileMemTryLock( 0, &(buf->backup.vram), &backup_vram_size ) == 0 ){
+		sceDmacMemcpy( buf->backup.vram, st_vrambase, backup_vram_size );
+		buf->frame.display    = st_vrambase;
+		buf->frame.draw       = (void *)( (unsigned int)(buf->frame.display) + buf->frame.size );
+		buf->frame.clearImage = (void *)( (unsigned int)(buf->frame.draw) + buf->frame.size );
+		buf->useVolatileMem   = true;
+	} else{
+		unsigned int frame_num = sceKernelMaxFreeMemSize() / buf->frame.size;
+		
+		if( frame_num >= 3 ){
+			buf->backup.vram = memsceMalloc( backup_vram_size );
+			if( ! buf->backup.vram ) return false;
+			
+			sceDmacMemcpy( buf->backup.vram, st_vrambase, backup_vram_size );
+			buf->frame.display    = st_vrambase;
+			buf->frame.draw       = (void *)( (unsigned int)(buf->frame.display) + buf->frame.size );
+			buf->frame.clearImage = (void *)( (unsigned int)(buf->frame.draw) + buf->frame.size );
+		} else if( frame_num == 2 ){
+			buf->frame.display = orig_buffer;
+			buf->frame.draw    = memsceMalloc( buf->frame.size * 2 );
+			if( ! buf->frame.draw ) return false;
+			buf->frame.clearImage = (void *)( (unsigned int)(buf->frame.draw) + buf->frame.size );
+		} else if( frame_num == 1 ){
+			buf->frame.display = orig_buffer;
+			buf->frame.draw    = memsceMalloc( buf->frame.size );
+			if( ! buf->frame.draw ) return false;
+		} else{
+			return false;
+		}
+	}
+	return true;
+};
+
+static void mf_free_buffers( struct mf_buffers *buf )
+{
+	if( buf->backup.vram ){
+		sceDmacMemcpy( st_vrambase, buf->backup.vram, buf->frame.size * 3 );
+	}
+	
+	if( buf->useVolatileMem ){
+		scePowerVolatileMemUnlock( 0 );
+	} else if( buf->backup.vram ){
+		memsceFree( buf->backup.vram );
+	} else if( buf->frame.draw ){
+		memsceFree( buf->frame.draw );
+	}
+}
+
+static void mf_ready_to_draw( void )
+{
+	gbFillRect( 0, 0, SCR_WIDTH, SCR_HEIGHT, MFM_BG_COLOR );
+}
+
+static void mf_draw_base( void )
+{
+	gbFillRect( 0, 0, SCR_WIDTH, gbOffsetLine( 3 ), MFM_TITLE_BAR_COLOR );
+	gbFillRect( 0, SCR_HEIGHT - gbOffsetLine( 3 ), SCR_WIDTH, SCR_HEIGHT, MFM_INFO_BAR_COLOR );
+	gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 1 ), MFM_TITLE_TEXT_COLOR, MFM_TRANSPARENT, MFM_TOP_MESSAGE );
+}
+
 void mfMenu( void )
 {
 	SceUID thlist[MFM_MAX_NUMBER_OF_THREADS];
-	int    thnum, indicator = 0;
+	int thnum;
 	
 	MfMenuRc       rc = MR_CONTINUE;
 	MfMenuItem     *menu = NULL;
@@ -112,75 +215,87 @@ void mfMenu( void )
 	int            menu_num, menu_selected;
 	
 	bool mf_api_hooked = mfIsApiHooked();
-	bool out_of_memory = false;
-	
-	FbmgrDisplayStat backup_fb;
-	size_t           frame_buf_size, backup_vram_size;
-	void             *clear_raw_image, *vram_restore;
-	
-	/* スレッドリストを取得 */
-	sceKernelGetThreadmanIdList( SCE_KERNEL_TMID_Thread, thlist, MFM_MAX_NUMBER_OF_THREADS, &thnum );
+	struct mf_fbstat  fbstat;
+	struct mf_buffers buf;
 	
 	/* 他のスレッドをサスペンド */
+	sceKernelGetThreadmanIdList( SCE_KERNEL_TMID_Thread, thlist, MFM_MAX_NUMBER_OF_THREADS, &thnum );
 	mf_threads_stat_change( MFM_THREADS_SUSPEND, thlist, thnum );
 	
 	/* APIがフックされていれば一時的に解除 */
 	if( mf_api_hooked ) mfRestoreApi();
 	
-	/* Blitterを初期化 */
-	blitInit();
-	blitSetOptions( BO_AUTOFLUSH | BO_ALPHABLEND );
-	blit8BitCharTableSwitch( B8_BUTTON_SYMBOL );
+	/* VRAMの先頭アドレスを取得 */
+	st_vrambase = (void *)( (unsigned int)sceGeEdramGetAddr() | GB_NOCACHE );
+	
+	/* gbライブラリの初期化と設定 */
+	if( gbBind() < 0 ) goto QUIT;
+	gbSetOpt( GB_AUTOFLUSH | GB_ALPHABLEND );
+	gbUse8BitFont( GB_FONT_PSPSYM );
+	gbPrepare();
 	
 	/* 現在のフレームバッファ情報を保存 */
-	blitGetFrameBufStat( &backup_fb );
+	mf_backup_fbstat( &fbstat );
 	
-	/* フレームバッファのサイズを取得 */
-	frame_buf_size = blitGetFrameBufPixelLength() * backup_fb.bufferWidth * backup_fb.height;
-	
-	/* 拡張メモリから領域を確保 */
-	backup_vram_size = frame_buf_size * 3;
-	
-	if( scePowerVolatileMemTryLock( 0, &vram_restore, (int *)&backup_vram_size ) == 0 ){
-		/* 終了時用メモリの確保に成功していればVRAM全体を保存 */
-		sceDmacMemcpy( vram_restore, (void *)MFM_VRAM_TOP, backup_vram_size );
-	} else{
-		vram_restore = NULL;
+	/* バッファを確保 */
+	if( ! mf_alloc_buffers( &buf, fbstat.frameBuffer ) ){
+		mf_emerg_menu();
+		goto QUIT;
 	}
 	
-	/* 表示バッファにMFM_BG_COLORをのせる */
-	blitFillRect( 0, 0, SCR_WIDTH, SCR_HEIGHT, MFM_BG_COLOR );
-	blitFillRect( 0, 0, SCR_WIDTH, blitOffsetLine( 3 ), MFM_TITLE_BAR_COLOR );
-	blitFillRect( 0, SCR_HEIGHT - blitOffsetLine( 3 ), SCR_WIDTH, SCR_HEIGHT, MFM_INFO_BAR_COLOR );
-	blitString( blitOffsetChar( 3 ), blitOffsetLine( 1 ), MFM_TITLE_TEXT_COLOR, MFM_TRANSPARENT, MFM_TOP_MESSAGE );
-	
 	/* クリア用背景をVRAMの3枚目に保存 */
-	clear_raw_image = (void *)( MFM_VRAM_TOP + ( frame_buf_size * 2 ) );
-	sceDmacMemcpy( clear_raw_image, backup_fb.frameBuffer, frame_buf_size );
+	if( buf.frame.clearImage ){
+		/* 描画準備 */
+		gbSetDisplayBuf( buf.frame.clearImage );
+		gbSetDrawBuf( NULL );
+		gbPrepare();
+		
+		/* 現在表示されている画面をクリア用背景にコピー */
+		sceDisplayWaitVblankStart();
+		sceDmacMemcpy( buf.frame.clearImage, fbstat.frameBuffer, buf.frame.size );
+		
+		/* クリア用背景へ基本となるグラフィックを描画 */
+		mf_ready_to_draw();
+		mf_draw_base();
+	}
+	
+	/* VRAMの1枚目と2枚目を表示バッファと描画バッファに使う */
+	gbSetDisplayBuf( buf.frame.display );
+	gbSetDrawBuf( buf.frame.draw );
+	
+	/* 設定したフレームバッファを適用 */
+	gbPrepare();
 	
 	/* 基本メニューを作成する */
 	menu_num = mftableEntry + MFM_MAIN_MENU_COUNT;
 	menu     = (MfMenuItem *)memsceMalloc( sizeof( MfMenuItem ) * menu_num );
 	if( ! menu ){
-		out_of_memory = true;
+		mf_emerg_menu();
 		goto DESTROY;
 	}
 	mf_menu_create_home_menu( menu, menu_num, &mf_menu );
-	
-	/*
-		フレームバッファマネージャの初期化とバッファの設定。
-		VRAMの1枚目と2枚目を使ってダブルバッファリング。
-	*/
-	fbmgrInit();
-	blitSetFrameBufAddrTop( fbmgrSetBuffers( (void *)MFM_VRAM_TOP, (void *)( MFM_VRAM_TOP + frame_buf_size ) ) );
 	
 	/* パッドのキーリピート計算機を初期化 */
 	ctrlpadInit( &st_cp_params );
 	ctrlpadSetRepeatButtons( &st_cp_params, PSP_CTRL_UP | PSP_CTRL_RIGHT | PSP_CTRL_DOWN | PSP_CTRL_LEFT );
 	
 	mfMenuEnableInterrupt();
+	sceDisplayWaitVblankStart();
 	
 	while( gRunning ){
+		/* 背景を描画 */
+		if( buf.frame.clearImage ){
+			sceDmacMemcpy( gbGetCurrentDrawBuf(), buf.frame.clearImage, buf.frame.size );
+		} else{
+			memset( gbGetCurrentDrawBuf(), 0, buf.frame.size );
+			gbRmvOpt( GB_ALPHABLEND );
+			mf_draw_base();
+			gbAddOpt( GB_ALPHABLEND );
+		}
+		
+		/* インジケータを描画 */
+		mf_indicator();
+		
 		st_pad_data.Buttons = ctrlpadGetData( &st_cp_params, &st_pad_data, CTRLPAD_IGNORE_ANALOG_DIRECTION );
 		
 		if( ( st_interrupt && st_pad_data.Buttons & ( PSP_CTRL_START | PSP_CTRL_HOME ) ) || st_menu_quit ){
@@ -189,18 +304,12 @@ void mfMenu( void )
 			break;
 		}
 		
-		/* 背景を描画 */
-		sceDmacMemcpy( fbmgrGetCurrentDrawBuf(), clear_raw_image, frame_buf_size );
-		
-		/* インジケータを描画 */
-		mf_indicator( &indicator );
-		
-		//mfDebug( &backup_fb );
+		//mfDebug( &buf );
 		
 		if( rc == MR_BACK ){
 			mfMenuQuit();
 		} else if( rc == MR_CONTINUE ){
-			rc = mfMenuUniDraw( blitOffsetChar( 5 ), blitOffsetLine( 4 ), menu, menu_num, &menu_selected, 0 );
+			rc = mfMenuUniDraw( gbOffsetChar( 5 ), gbOffsetLine( 4 ), menu, menu_num, &menu_selected, 0 );
 		} else{
 			MfMenuRc func_rc = ( (MfFuncMenu)mf_menu.func )( &st_pad_data, NULL );
 			if( func_rc == MR_BACK ){
@@ -209,8 +318,8 @@ void mfMenu( void )
 			}
 		}
 		
-		/* 表示バッファと描画バッファを切り替えて、blitterの描画アドレスを新しい描画バッファへ */
-		blitSetFrameBufAddrTop( fbmgrSwapBuffers() );
+		/* 表示バッファと描画バッファを切り替える */
+		gbSwapBuffers();
 		sceDisplayWaitVblankStart();
 		
 		if( st_wait_micro_sec ){
@@ -222,37 +331,24 @@ void mfMenu( void )
 	goto DESTROY;
 	
 	DESTROY:
-		/* ホームメニュー用のメモリすら不足した場合は緊急用の切り替えボタンをチェック */
-		if( out_of_memory ){
-			blitSetFrameBufAddrTop( backup_fb.frameBuffer );
-			mf_not_enough_mem_error();
-		} else{
-			sceDmacMemcpy( fbmgrGetCurrentDrawBuf(), clear_raw_image, frame_buf_size );
-			
-			blitString( blitOffsetChar( 30 ), blitOffsetLine( 17 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Returning to the game..." );
-			fbmgrSwapBuffers();
-			sceKernelDelayThread( 300000 );
-			
-			/* フレームバッファマネージャを破棄し、表示バッファを元の位置に戻す */
-			fbmgrDestroy();
-			
-			if( vram_restore ){
-				/* VRAMのバックアップがあれば書き戻す */
-				sceDmacMemcpy( (void *)MFM_VRAM_TOP, vram_restore, backup_vram_size );
-				scePowerVolatileMemUnlock( 0 );
-			} else{
-				/*
-					VRAMのバックアップがなければ全体をゼロクリア
-					(これはまずい。VRAM上にゲームが置いたテクスチャなどを消してしまうかもしれない。
-					メモリが足りない場合は、運良く消えないことを祈る!)
-				*/
-				//memset( (void *)MFM_VRAM_TOP, 0, backup_vram_size );
-			}
-		}
-		
 		/* メニューリストを解放 */
 		if( menu ) memsceFree( menu );
 		
+		gbPrint( gbOffsetChar( 30 ), gbOffsetLine( 17 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Returning to the game..." );
+		gbSwapBuffers();
+		sceKernelDelayThread( 300000 );
+		
+		sceDisplayWaitVblankStart();
+		
+		/* 表示バッファを元の位置に戻す */
+		mf_restore_fbstat( &fbstat );
+		
+		/* バッファを解放 */
+		mf_free_buffers( &buf );
+		
+		goto QUIT;
+	
+	QUIT:
 		/* APIがフックされていたのならば再度フック */
 		if( mf_api_hooked ) mfHookApi();
 		
@@ -292,48 +388,27 @@ void mfMenuKeyRepeatReset( void )
 	ctrlpadUpdateData( &st_cp_params );
 }
 
-MfMenuRc mfMenuMultiDraw( int x, int y, MfMenuItem **menu, int row, int col, int *select_row, int *select_col, MfMenuOptions options )
+void mfMenuUsage( const char *format, ... )
 {
-	/* 作りかけ。まだ使うところがないのでとりあえず放置 
-	int current_row, current_col, line_x, line_y;
-	char line[MFM_ITEM_LENGTH];
+	va_list ap;
 	
-	if( *select_row < 0 ){
-		*select_row = 0;
-	} else if( *select_row >= row ){
-		*select_row = row - 1;
-	}
+	va_start( ap, format );
+	vsnprintf( st_usage, MFM_ITEM_LENGTH, format, ap );
+	va_end( ap );
+}
+
+void mfMenuLabel( const char *format, ... )
+{
+	va_list ap;
 	
-	if( *select_col < 0 ){
-		*select_col = 0;
-	} else if( *select_col >= col ){
-		*select_col = col - 1;
-	}
-	
-	for( current_col = 0; current_col < col; current_col++ ){
-		line_x = x;
-		line_y = y + blitOffsetLine( current_col );
-		for( current_row = 0; current_row < row; current_row++ ){
-			if( menu[current_col][current_row].type == MT_NULL ) continue;
-			
-			mf_menu_create_item_name( line, sizeof( line ), &(menu[current_col][current_row]) );
-			
-			if( current_col == *select_col && current_row == *select_row ){
-				blitString( line_x, line_y, MFM_TEXT_FCCOLOR, MFM_TEXT_BGCOLOR, line );
-			} else{
-				blitString( line_x, line_y, MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, line );
-			}
-			line_x += menu[current_col][current_row].width;
-		}
-	}
-	*/
-	return MR_CONTINUE;
+	va_start( ap, format );
+	vsnprintf( st_label, MFM_ITEM_LENGTH, format, ap );
+	va_end( ap );
 }
 
 MfMenuRc mfMenuUniDraw( int x, int y, MfMenuItem menu[], size_t max, int *select, MfMenuOptions options )
 {
 	int current;
-	char line[MFM_ITEM_LENGTH];
 	
 	if( *select < 0 ){
 		*select = 0;
@@ -342,52 +417,40 @@ MfMenuRc mfMenuUniDraw( int x, int y, MfMenuItem menu[], size_t max, int *select
 	}
 	
 	for( current = 0; current < max; current++ ){
-		if( menu[current].type == MT_NULL ) continue;
+		if( menu[current].label == NULL ) continue;
 		
-		/* タイプごとにメニュー項目文字列作成 */
-		mf_menu_create_item_name( line, sizeof( line ), &(menu[current]) );
+		/* メニュー項目文字列作成 */
+		( menu[current].proc )( MS_QUERY_LABEL, &st_pad_data, menu[current].var, menu[current].value, (void *)(menu[current].label) );
 		
 		/* メニュー項目 */
-		blitString( x, y + blitOffsetLine( current ), current == *select ? MFM_TEXT_FCCOLOR : MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, line );
+		gbPrint( x, y + gbOffsetLine( current ), current == *select ? MFM_TEXT_FCCOLOR : MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, st_label );
 	}
+	
+	/* 操作方法文字列作成 */
+	( menu[*select].proc )( MS_QUERY_USAGE, &st_pad_data, menu[*select].var, menu[*select].value, NULL );
 	
 	if( options & MO_DISPLAY_ONLY ) return MR_CONTINUE;
 	
 	if( ! st_dialog ){
 		/* 操作方法 */
-		blitString( blitOffsetChar( 3 ), blitOffsetLine( 32 ) - ( BLIT_CHAR_HEIGHT >> 1 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "\x80\x82 = Move, \x86 = Back, START/HOME = Exit" );
-		switch( menu[*select].type ){
-			case MT_BOOL:
-				blitString( blitOffsetChar( 3 ), blitOffsetLine( 32 ) + ( BLIT_CHAR_HEIGHT >> 1 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "\x83\x81 = Toggle switch" );
-				break;
-			case MT_OPTION:
-				blitString( blitOffsetChar( 3 ), blitOffsetLine( 32 ) + ( BLIT_CHAR_HEIGHT >> 1 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "\x83\x81 = Change option" );
-				break;
-			case MT_GET_NUMBERS:
-				blitString( blitOffsetChar( 3 ), blitOffsetLine( 32 ) + ( BLIT_CHAR_HEIGHT >> 1 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "\x83 = Decrease, \x81 = Increase, \x85 = Edit" );
-				break;
-			case MT_GET_BUTTONS:
-				blitString( blitOffsetChar( 3 ), blitOffsetLine( 32 ) + ( BLIT_CHAR_HEIGHT >> 1 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "\x85 = Edit" );
-				break;
-			default:
-				blitString( blitOffsetChar( 3 ), blitOffsetLine( 32 ) + ( BLIT_CHAR_HEIGHT >> 1 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "\x85 = Enter" );
-				break;
-		}
+		gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 32 ) - ( GB_CHAR_HEIGHT >> 1 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "\x80\x82 = Move, \x86 = Back, START/HOME = Exit" );
+		gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 32 ) + ( GB_CHAR_HEIGHT >> 1 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, st_usage );
 		
 		if( st_pad_data.Buttons & PSP_CTRL_UP ){
 			do{
 				(*select)--;
 				if( *select < 0 ) *select = max - 1;
-			} while( menu[*select].type == MT_NULL );
+			} while( menu[*select].label == NULL );
 		} else if( st_pad_data.Buttons & PSP_CTRL_DOWN ){
 			do{
 				(*select)++;
 				if( *select >= max ) *select = 0;
-			} while( menu[*select].type == MT_NULL );
+			} while( menu[*select].label == NULL );
 		} else if( st_pad_data.Buttons & PSP_CTRL_CROSS ){
 			return MR_BACK;
 		}
-		return mf_menu_control( &st_pad_data, &(menu[*select]) );
+		
+		return ( menu[*select].proc )( MS_NONE, &st_pad_data, menu[*select].var, menu[*select].value, NULL );
 	} else{
 		if( mfMenuGetNumberIsReady() ){
 			MfMenuRc rc = mfMenuGetNumber();
@@ -401,104 +464,20 @@ MfMenuRc mfMenuUniDraw( int x, int y, MfMenuItem menu[], size_t max, int *select
 	}
 }
 
-static MfMenuRc mf_menu_control( SceCtrlData *pad_data, MfMenuItem *item )
+static void mf_emerg_menu( void )
 {
-	if( ! pad_data->Buttons ){
-	/* 何も押されていなければすぐ戻る */
-		return MR_CONTINUE;
-	} else if( pad_data->Buttons & PSP_CTRL_LEFT ){
-	/* 左が押された */
-		if( item->type == MT_BOOL ){
-			*((bool *)item->handler) = *((bool *)item->handler) ? false : true;
-		} else if( item->type == MT_OPTION ){
-			if( *((int *)item->handler) == 0 ){
-				for( ; item->value[*((int *)item->handler) + 1].integer; (*((int *)item->handler))++ );
-			} else{
-				(*((int *)item->handler))--;
-			}
-		} else if( item->type == MT_GET_NUMBERS ){
-			if( *((int *)item->handler) > item->value[3].integer ){
-				(*((int *)item->handler)) -= item->value[3].integer;
-			} else{
-				(*((int *)item->handler)) = 0;
-			}
-		}
-	} else if( pad_data->Buttons & PSP_CTRL_RIGHT ){
-	/* 右が押された */
-		if( item->type == MT_BOOL ){
-			*((bool *)item->handler) = *((bool *)item->handler) ? false : true;
-		} else if( item->type == MT_OPTION ){
-			if( item->value[*((int *)item->handler) + 1].pointer == NULL ){
-				*((int *)item->handler) = 0;
-			} else{
-				(*((int *)item->handler))++;
-			}
-		} else if( item->type == MT_GET_NUMBERS ){
-			(*((int *)item->handler)) += item->value[3].integer;
-		}
-	} else if( pad_data->Buttons & PSP_CTRL_CIRCLE ){
-	/* ○が押された */
-		if( item->type == MT_ANCHOR ){
-			return MR_ENTER;
-		} else if( item->type == MT_CALLBACK ){
-			((MfMenuCallback *)(item->handler))->func = item->value[0].pointer;
-			((MfMenuCallback *)(item->handler))->arg  = &(item->value[1]);
-			return MR_ENTER;
-		} else if( item->type == MT_GET_NUMBERS ){
-			MfMenuRc rc = mfMenuGetNumberInit(
-				item->value[0].string,
-				item->value[1].string,
-				(long *)(item->handler),
-				item->value[2].integer
-			);
-			
-			if( rc != MR_ENTER ) return MR_CONTINUE;
-			
-			st_dialog = true;
-		} else if( item->type == MT_GET_BUTTONS ){
-			MfMenuRc rc = mfMenuGetButtonsInit(
-				item->value[0].string,
-				(unsigned int *)(item->handler),
-				(unsigned int)(item->value[1].integer)
-			);
-			
-			if( rc != MR_ENTER ) return MR_CONTINUE;
-			
-			st_dialog = true;
-		}
-	}
+	mf_ready_to_draw();
+	mf_draw_base();
 	
-	return MR_CONTINUE;
-}
-
-static void mf_menu_create_item_name( char line[], size_t max, MfMenuItem *item )
-{
-	switch( item->type ){
-		case MT_BOOL:
-			snprintf( line, max, "%s: %s", item->label, ( *((bool *)item->handler) ? item->value[1].string : item->value[0].string ) );
-			break;
-		case MT_OPTION:
-			snprintf( line, max, "%s: %s", item->label, item->value[*((int *)item->handler)].string );
-			break;
-		case MT_GET_NUMBERS:
-			snprintf( line, max, "%s: %d %s", item->label, *((int *)item->handler), item->value[1].string );
-			break;
-		default:
-			strutilSafeCopy( line, item->label, max );
-	}
-}
-
-static void mf_not_enough_mem_error( void )
-{
-	blitString( blitOffsetChar( 5 ), blitOffsetLine(  4 ), MFM_TEXT_FCCOLOR, MFM_TEXT_BGCOLOR, "Failed to allocate memory for operation." );
-	blitString( blitOffsetChar( 5 ), blitOffsetLine(  6 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "There is not enough available memory." );
-	blitString( blitOffsetChar( 5 ), blitOffsetLine(  7 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "So, MacroFire is launching the emergency dialog." );
+	gbPrint( gbOffsetChar( 5 ), gbOffsetLine(  4 ), MFM_TEXT_FCCOLOR, MFM_TEXT_BGCOLOR, "Failed to allocate memory for operation." );
+	gbPrint( gbOffsetChar( 5 ), gbOffsetLine(  6 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "There is not enough available memory." );
+	gbPrint( gbOffsetChar( 5 ), gbOffsetLine(  7 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "So, MacroFire is launching the emergency dialog." );
 	
-	blitString( blitOffsetChar( 5 ), blitOffsetLine( 9 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Waiting for button press..." );
-	blitString( blitOffsetChar( 9 ), blitOffsetLine( 10 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "START/HOME = Quit." );
-	blitString( blitOffsetChar( 9 ), blitOffsetLine( 11 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "SELECT     = Toggling MacroFire Engine state and quit." );
+	gbPrint( gbOffsetChar( 5 ), gbOffsetLine( 9 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Waiting for button press..." );
+	gbPrint( gbOffsetChar( 9 ), gbOffsetLine( 10 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "START/HOME = Quit." );
+	gbPrint( gbOffsetChar( 9 ), gbOffsetLine( 11 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "SELECT     = Toggling MacroFire Engine state and quit." );
 	
-	blitStringf( blitOffsetChar( 5 ), blitOffsetLine( 13 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Currently MacroFire Engine: %s", gMfEngine ? "ON" : "OFF" );
+	gbPrintf( gbOffsetChar( 5 ), gbOffsetLine( 13 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Currently MacroFire Engine: %s", gMfEngine ? "ON" : "OFF" );
 	
 	do{
 		sceCtrlPeekBufferPositive( &st_pad_data, 1 );
@@ -506,14 +485,14 @@ static void mf_not_enough_mem_error( void )
 	} while( ! ( st_pad_data.Buttons & ( PSP_CTRL_START | PSP_CTRL_SELECT | PSP_CTRL_HOME ) ) );
 	
 	if( st_pad_data.Buttons & ( PSP_CTRL_START | PSP_CTRL_HOME ) ){
-		blitStringf( blitOffsetChar( 5 ), blitOffsetLine( 16 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Quit." );
+		gbPrintf( gbOffsetChar( 5 ), gbOffsetLine( 16 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Quit." );
 	} else if( st_pad_data.Buttons & PSP_CTRL_SELECT ){
 		if( mfIsEnabled() ){
 			mfDisable();
 		} else{
 			mfEnable();
 		}
-		blitStringf( blitOffsetChar( 5 ), blitOffsetLine( 16 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "MacroFire Engine is toggled.\nQuit." );
+		gbPrintf( gbOffsetChar( 5 ), gbOffsetLine( 16 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "MacroFire Engine is toggled.\nQuit." );
 	}
 	
 	sceKernelDelayThread( 2000000 );
@@ -523,62 +502,166 @@ static void mf_menu_create_home_menu( MfMenuItem *menu, int menu_num, MfMenuCall
 {
 	int mftable_index;
 	
-	menu[0].type            = MT_BOOL;
-	menu[0].label           = "MacroFire Engine";
-	menu[0].width           = 0;
-	menu[0].handler         = &gMfEngine;
+	menu[0].label           = "MacroFire Engine: %s";
+	menu[0].proc            = mfMenuDefBoolProc;
+	menu[0].var             = &gMfEngine;
 	menu[0].value[0].string = "OFF";
 	menu[0].value[1].string = "ON";
 	
-	menu[1].type             = MT_NULL;
 	menu[1].label            = NULL;
-	menu[1].width            = 0;
-	menu[1].handler          = NULL;
-	menu[1].value[0].pointer = NULL;
 	
-	menu[2].type             = MT_GET_BUTTONS;
 	menu[2].label            = "Buttons to launch the menu";
-	menu[2].width            = 0;
-	menu[2].handler          = &gMfMenu;
-	menu[2].value[0].string  = "Set launch buttons";
-	menu[2].value[1].integer = (
-		PSP_CTRL_CIRCLE   | PSP_CTRL_CROSS    | PSP_CTRL_SQUARE | PSP_CTRL_TRIANGLE |
-		PSP_CTRL_UP       | PSP_CTRL_RIGHT    | PSP_CTRL_DOWN   | PSP_CTRL_LEFT     |
-		PSP_CTRL_LTRIGGER | PSP_CTRL_RTRIGGER | PSP_CTRL_SELECT | PSP_CTRL_START    |
-		PSP_CTRL_NOTE     | PSP_CTRL_SCREEN   | PSP_CTRL_VOLUP  | PSP_CTRL_VOLDOWN  |
-		CTRLPAD_CTRL_ANALOG_UP   | CTRLPAD_CTRL_ANALOG_RIGHT |
-		CTRLPAD_CTRL_ANALOG_DOWN | CTRLPAD_CTRL_ANALOG_LEFT
-	);
+	menu[2].proc             = mfMenuDefGetButtonsProc;
+	menu[2].var              = &gMfMenu;
+	menu[2].value[0].string  = "Set to launch buttons";
+	menu[2].value[1].integer = MFM_ALL_AVAILABLE_BUTTONS;
 	
-	menu[3].type             = MT_GET_BUTTONS;
 	menu[3].label            = "Buttons to toggle the engine state";
-	menu[3].width            = 0;
-	menu[3].handler          = &gMfToggle;
-	menu[3].value[0].string  = "Set toggle buttons";
-	menu[3].value[1].integer = menu[2].value[1].integer;
+	menu[3].proc             = mfMenuDefGetButtonsProc;
+	menu[3].var              = &gMfToggle;
+	menu[3].value[0].string  = "Set to toggle buttons";
+	menu[3].value[1].integer = MFM_ALL_AVAILABLE_BUTTONS;
 	
-	menu[4].type             = MT_CALLBACK;
 	menu[4].label            = "Tuning the analog stick sensitivity";
-	menu[4].width            = 0;
-	menu[4].handler          = mf_menu;
+	menu[4].proc             = mfMenuDefCallbackProc;
+	menu[4].var              = mf_menu;
 	menu[4].value[0].pointer = analogtuneMenu;
 	menu[4].value[1].pointer = NULL;
 	
-	menu[5].type             = MT_NULL;
 	menu[5].label            = NULL;
-	menu[5].width            = 0;
-	menu[5].handler          = NULL;
-	menu[5].value[0].pointer = NULL;
 	
 	for( mftable_index = MFM_MAIN_MENU_COUNT; mftable_index < menu_num; mftable_index++ ){
-		menu[mftable_index].type     = MT_CALLBACK;
-		menu[mftable_index].label    = mftable[mftable_index - MFM_MAIN_MENU_COUNT].name;
-		menu[mftable_index].width    = 0;
-		menu[mftable_index].handler  = mf_menu;
+		menu[mftable_index].label            = mftable[mftable_index - MFM_MAIN_MENU_COUNT].name;
+		menu[mftable_index].proc             = mfMenuDefCallbackProc;
+		menu[mftable_index].var              = mf_menu;
 		menu[mftable_index].value[0].pointer = mftable[mftable_index - MFM_MAIN_MENU_COUNT].menu.func;
 		menu[mftable_index].value[1].pointer = mftable[mftable_index - MFM_MAIN_MENU_COUNT].menu.quit;
 	}
 }
+
+static void mfRunDialog( void )
+{
+	st_dialog = true;
+}
+
+/*-------------------------------------
+	デフォルトプロシージャ
+-------------------------------------*/
+MfMenuRc mfMenuDefAnchorProc( MfMenuCtrlSignal signal, SceCtrlData *pad, void *var, MfMenuItemValue value[], const void *arg )
+{
+	return MR_CONTINUE;;
+}
+
+MfMenuRc mfMenuDefCallbackProc( MfMenuCtrlSignal signal, SceCtrlData *pad, void *var, MfMenuItemValue value[], const void *arg )
+{
+	if( signal == MS_QUERY_USAGE ){
+		mfMenuUsage( "\x85 = Enter" );
+	} else if( signal == MS_QUERY_LABEL ){
+		mfMenuLabel( (char *)arg );
+	} else{
+		if( pad->Buttons & PSP_CTRL_CIRCLE ){
+			((MfMenuCallback *)(var))->func = value[0].pointer;
+			((MfMenuCallback *)(var))->arg  = &(value[1]);
+			return MR_ENTER;
+		}
+	}
+	return MR_CONTINUE;
+}
+
+MfMenuRc mfMenuDefBoolProc( MfMenuCtrlSignal signal, SceCtrlData *pad, void *var, MfMenuItemValue value[], const void *arg )
+{
+	if( signal == MS_QUERY_USAGE ){
+		mfMenuUsage( "\x83\x81 = Toggle switch" );
+	} else if( signal == MS_QUERY_LABEL ){
+		mfMenuLabel( (char *)arg, *((bool *)var) ? value[1].string :value[0].string );
+	} else{
+		if( pad->Buttons & ( PSP_CTRL_LEFT | PSP_CTRL_RIGHT ) ){
+			*((bool *)var) = *((bool *)var) ? false : true;
+		}
+	}
+	return MR_CONTINUE;
+}
+
+MfMenuRc mfMenuDefOptionProc( MfMenuCtrlSignal signal, SceCtrlData *pad, void *var, MfMenuItemValue value[], const void *arg )
+{
+	if( signal == MS_QUERY_USAGE ){
+		mfMenuUsage( "\x83\x81 = Change option" );
+	} else if( signal == MS_QUERY_LABEL ){
+		mfMenuLabel( (char *)arg, ((char **)value[0].pointer)[*((int *)var)] );
+	} else{
+		if( pad->Buttons & PSP_CTRL_LEFT ){
+			if( *((int *)var) == 0 ){
+				*((int *)var) = value[1].integer - 1;
+			} else{
+				(*((int *)var))--;
+			}
+		} else if( pad->Buttons & PSP_CTRL_RIGHT ){
+			if( *((int *)var) + 1 >= value[1].integer ){
+				*((int *)var) = 0;
+			} else{
+				(*((int *)var))++;
+			}
+		}
+	}
+	return MR_CONTINUE;
+}
+
+MfMenuRc mfMenuDefGetNumberProc( MfMenuCtrlSignal signal, SceCtrlData *pad, void *var, MfMenuItemValue value[], const void *arg )
+{
+	if( signal == MS_QUERY_USAGE ){
+		mfMenuUsage( "\x83 = Decrease, \x81 = Increase, \x85 = Edit" );
+	} else if( signal == MS_QUERY_LABEL ){
+		mfMenuLabel( (char *)arg, *((int *)var), value[1].string );
+	} else{
+		if( pad->Buttons & PSP_CTRL_LEFT ){
+			if( *((int *)var) > value[3].integer ){
+				(*((int *)var)) -= value[3].integer;
+			} else{
+				(*((int *)var)) = 0;
+			}
+		} else if( pad->Buttons & PSP_CTRL_RIGHT ){
+			(*((int *)var)) += value[3].integer;
+			if( *((int *)var) > value[4].integer ){
+				*((int *)var) = value[4].integer;
+			}
+		} else if( pad->Buttons & PSP_CTRL_CIRCLE ){
+			if( 
+				mfMenuGetNumberInit(
+					value[0].string,
+					value[1].string,
+					(long *)(var),
+					value[2].integer
+				) == MR_ENTER
+			){
+				mfRunDialog();
+			}
+		}
+	}
+	return MR_CONTINUE;
+}
+
+MfMenuRc mfMenuDefGetButtonsProc( MfMenuCtrlSignal signal, SceCtrlData *pad, void *var, MfMenuItemValue value[], const void *arg )
+{
+	if( signal == MS_QUERY_USAGE ){
+		mfMenuUsage( "\x85 = Edit" );
+	} else if( signal == MS_QUERY_LABEL ){
+		mfMenuLabel( (char *)arg );
+	} else{
+		if( pad->Buttons & PSP_CTRL_CIRCLE ){
+			if(
+				mfMenuGetButtonsInit(
+					value[0].string,
+					(unsigned int *)(var),
+					(unsigned int)(value[1].integer)
+				) == MR_ENTER
+			){
+				mfRunDialog();
+			}
+		}
+	}
+	return MR_CONTINUE;
+}
+
 
 /*-------------------------------------
 	ダイアログラッパ
@@ -614,8 +697,8 @@ MfMenuRc mfMenuGetNumberInit( const char *title, const char *unit, long *number,
 	params->numberOfData        = 1;
 	params->selectDataNumber    = 0;
 	params->rc                  = 0;
-	params->ui.x                = blitOffsetChar( 39 );
-	params->ui.y                = blitOffsetLine( 6 );
+	params->ui.x                = gbOffsetChar( 39 );
+	params->ui.y                = gbOffsetLine( 6 );
 	params->ui.fgTextColor      = MFM_TEXT_FGCOLOR;
 	params->ui.fcTextColor      = MFM_TEXT_FCCOLOR;
 	params->ui.bgTextColor      = MFM_TRANSPARENT;
@@ -694,8 +777,8 @@ MfMenuRc mfMenuGetButtonsInit( const char *title, unsigned int *buttons, unsigne
 	params->numberOfData           = 1;
 	params->selectDataNumber       = 0;
 	params->rc                     = 0;
-	params->ui.x                   = blitOffsetChar( 39 );
-	params->ui.y                   = blitOffsetLine( 4 );
+	params->ui.x                   = gbOffsetChar( 39 );
+	params->ui.y                   = gbOffsetLine( 4 );
 	params->ui.fgTextColor         = MFM_TEXT_FGCOLOR;
 	params->ui.fcTextColor         = MFM_TEXT_FCCOLOR;
 	params->ui.bgTextColor         = MFM_TRANSPARENT;
@@ -781,8 +864,8 @@ MfMenuRc mfMenuGetFilenameInit( const char *title, unsigned int flags, const cha
 	params->numberOfData         = 1;
 	params->selectDataNumber     = 0;
 	params->rc                   = 0;
-	params->ui.x                 = blitOffsetChar( 0 );
-	params->ui.y                 = blitOffsetLine( 3 );
+	params->ui.x                 = gbOffsetChar( 0 );
+	params->ui.y                 = gbOffsetLine( 3 );
 	params->ui.w                 = 80;
 	params->ui.h                 = 28;
 	params->ui.fgTextColor       = MFM_TEXT_FGCOLOR;

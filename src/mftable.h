@@ -13,12 +13,12 @@
 #define EXPORT extern
 #endif
 
+#include "macrofire.h"
 #include "utils/inimgr.h"
 
 /*-----------------------------------------------
 	機能を実装したソースのヘッダ
 -----------------------------------------------*/
-//#include "function/analogtune.h"
 #include "function/rapidfire.h"
 #include "function/macro.h"
 
@@ -59,16 +59,6 @@ typedef struct {
 EXPORT MfEntry mftable[]
 #ifdef MFTABLE_DEFINE
 = {
-	/* 機能を定義するテーブル */
-	/*
-	{
-		"Analog stick sensitivity settings",
-		NULL, NULL,
-		analogtuneCreateIni, analogtuneLoadIni,
-		{ analogtuneMain, NULL },
-		{ analogtuneMenu, NULL }
-	},
-	*/
 	{
 		"Rapidfire settings",
 		NULL, NULL,

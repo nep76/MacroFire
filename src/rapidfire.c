@@ -35,7 +35,7 @@ MfRapidfireUID mfRapidfireNew( void )
 	if( ! params ) return 0;
 	
 	memcpy( params, st_rfst, sizeof( st_rfst ) );
-	mfClearRapidfireAll( (MfRapidfireUID)params );
+	mfRapidfireClearAll( (MfRapidfireUID)params );
 	
 	return (MfRapidfireUID)params;
 }
@@ -50,7 +50,7 @@ void mfRapidfireDestroy( MfRapidfireUID uid )
 	memsceFree( params );
 }
 
-void mfSetRapidfire( MfRapidfireUID uid, unsigned int buttons, MfRapidfireMode mode, unsigned int pdelay, unsigned int rdelay )
+void mfRapidfireSet( MfRapidfireUID uid, unsigned int buttons, MfRapidfireMode mode, unsigned int pdelay, unsigned int rdelay )
 {
 	struct mf_rapidfire_status *params = mf_rapidfire_get_params( uid );
 	int i;
@@ -68,14 +68,14 @@ void mfSetRapidfire( MfRapidfireUID uid, unsigned int buttons, MfRapidfireMode m
 	}
 }
 
-void mfClearRapidfire( MfRapidfireUID uid, unsigned int buttons )
+void mfRapidfireClear( MfRapidfireUID uid, unsigned int buttons )
 {
-	mfSetRapidfire( uid, buttons, MF_RAPIDFIRE_MODE_NORMAL, 0, 0 );
+	mfRapidfireSet( uid, buttons, MF_RAPIDFIRE_MODE_NORMAL, 0, 0 );
 }
 
-void mfClearRapidfireAll( MfRapidfireUID uid )
+void mfRapidfireClearAll( MfRapidfireUID uid )
 {
-	mfClearRapidfire( uid, 0xFFFFFFFF );
+	mfRapidfireClear( uid, 0xFFFFFFFF );
 }
 
 void mfRapidfire( MfRapidfireUID uid, MfCallMode caller, SceCtrlData *pad_data )

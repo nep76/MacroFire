@@ -242,13 +242,13 @@ static void cmndlg_get_filename_draw_ui( CmndlgGetFilenameParams *params )
 	struct cmndlg_get_filename_tempdata *tempdata = &(((struct cmndlg_get_filename_tempdata *)(params->base.tempBuffer))[params->selectDataNumber]);
 	
 	/* 枠を描画 */
-	blitFillBox( params->ui.x, params->ui.y, blitOffsetChar( params->ui.w ), blitOffsetLine( params->ui.h ), params->ui.bgColor );
-	blitLineBox( params->ui.x, params->ui.y, blitOffsetChar( params->ui.w ), blitOffsetLine( params->ui.h ), params->ui.borderColor );
+	gbFillRectRel( params->ui.x, params->ui.y, gbOffsetChar( params->ui.w ), gbOffsetLine( params->ui.h ), params->ui.bgColor );
+	gbLineRectRel( params->ui.x, params->ui.y, gbOffsetChar( params->ui.w ), gbOffsetLine( params->ui.h ), params->ui.borderColor );
 	
 	/* タイトル描画 */
-	blitString(
-		params->ui.x + blitOffsetChar( 1 ),
-		params->ui.y + blitOffsetLine( 1 ),
+	gbPrint(
+		params->ui.x + gbOffsetChar( 1 ),
+		params->ui.y + gbOffsetLine( 1 ),
 		params->ui.fgTextColor,
 		params->ui.bgTextColor,
 		params->data[params->selectDataNumber].title
@@ -256,18 +256,18 @@ static void cmndlg_get_filename_draw_ui( CmndlgGetFilenameParams *params )
 	
 	/* カレントディレクトリ表示 */
 	if( params->data[params->selectDataNumber].flags & CGF_SAVE ){
-		blitStringf(
-			params->ui.x + blitOffsetChar( 1 ),
-			params->ui.y + blitOffsetLine( 3 ),
+		gbPrintf(
+			params->ui.x + gbOffsetChar( 1 ),
+			params->ui.y + gbOffsetLine( 3 ),
 			params->ui.fgTextColor,
 			params->ui.bgTextColor,
 			"Save in: %s",
 			dirhGetCwd( st_dirh )
 		);
 	} else{
-		blitStringf(
-			params->ui.x + blitOffsetChar( 1 ),
-			params->ui.y + blitOffsetLine( 3 ),
+		gbPrintf(
+			params->ui.x + gbOffsetChar( 1 ),
+			params->ui.y + gbOffsetLine( 3 ),
 			params->ui.fgTextColor,
 			params->ui.bgTextColor,
 			"Look in: %s",
@@ -276,42 +276,42 @@ static void cmndlg_get_filename_draw_ui( CmndlgGetFilenameParams *params )
 	}
 	
 	/* ファイルリストボーダー */
-	blitLineBox(
-		params->ui.x + blitOffsetChar( 1 ),
-		params->ui.y + blitOffsetLine( 4 ),
-		blitOffsetChar( params->ui.w - 2 ),
-		blitOffsetLine( params->ui.h - 12 ),
+	gbLineRectRel(
+		params->ui.x + gbOffsetChar( 1 ),
+		params->ui.y + gbOffsetLine( 4 ),
+		gbOffsetChar( params->ui.w - 2 ),
+		gbOffsetLine( params->ui.h - 12 ),
 		tempdata->focus == CMNDLG_GET_FILENAME_FOCUS_LIST ? params->ui.fcTextColor : params->ui.fgTextColor
 	);
 	
-	blitString(
-		params->ui.x + blitOffsetChar( 1 ),
-		params->ui.y + blitOffsetLine( params->ui.h - 7 ),
+	gbPrint(
+		params->ui.x + gbOffsetChar( 1 ),
+		params->ui.y + gbOffsetLine( params->ui.h - 7 ),
 		params->ui.fgTextColor,
 		params->ui.bgTextColor,
 		"Filename:"
 	);
 	
 	/* ファイル名ボーダー */
-	blitLineBox(
-		params->ui.x + blitOffsetChar( 1 ),
-		params->ui.y + blitOffsetLine( params->ui.h - 6 ),
-		blitOffsetChar( params->ui.w - 2 ),
-		blitOffsetLine( 3 ),
+	gbLineRectRel(
+		params->ui.x + gbOffsetChar( 1 ),
+		params->ui.y + gbOffsetLine( params->ui.h - 6 ),
+		gbOffsetChar( params->ui.w - 2 ),
+		gbOffsetLine( 3 ),
 		tempdata->focus == CMNDLG_GET_FILENAME_FOCUS_NAME ? params->ui.fcTextColor : params->ui.fgTextColor
 	);
 	
-	blitString(
-		params->ui.x + blitOffsetChar( 3 ),
-		params->ui.y + blitOffsetLine( params->ui.h - 5 ),
+	gbPrint(
+		params->ui.x + gbOffsetChar( 3 ),
+		params->ui.y + gbOffsetLine( params->ui.h - 5 ),
 		params->ui.fgTextColor,
 		params->ui.bgTextColor,
 		params->data[params->selectDataNumber].name
 	);
 	
-	blitString(
-		params->ui.x + blitOffsetChar( 1 ),
-		params->ui.y + blitOffsetLine( params->ui.h - 2 ),
+	gbPrint(
+		params->ui.x + gbOffsetChar( 1 ),
+		params->ui.y + gbOffsetLine( params->ui.h - 2 ),
 		params->ui.fgTextColor,
 		params->ui.bgTextColor,
 		"SELECT: Usage"
@@ -331,17 +331,17 @@ static void cmndlg_get_filename_draw_ui( CmndlgGetFilenameParams *params )
 		if( ! dirent_name ) break;
 		
 		if( line_number == ((int *)(params->base.tempBuffer))[params->selectDataNumber] ){
-			blitString(
-				params->ui.x + blitOffsetChar( 2 ),
-				params->ui.y + blitOffsetLine( 5 + drawline ),
+			gbPrint(
+				params->ui.x + gbOffsetChar( 2 ),
+				params->ui.y + gbOffsetLine( 5 + drawline ),
 				params->ui.fcTextColor,
 				params->ui.bgTextColor,
 				dirent_name
 			);
 		} else{
-			blitString(
-				params->ui.x + blitOffsetChar( 2 ),
-				params->ui.y + blitOffsetLine( 5 + drawline ),
+			gbPrint(
+				params->ui.x + gbOffsetChar( 2 ),
+				params->ui.y + gbOffsetLine( 5 + drawline ),
 				line_number < dircnt ? params->extraUi.dirColor : params->ui.fgTextColor,
 				params->ui.bgTextColor,
 				dirent_name

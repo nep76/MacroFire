@@ -65,8 +65,8 @@ int cmndlgMessageStart( CmndlgMessageParams *params )
 	st_lines += 6;
 	
 	if( st_params->options & CMNDLG_MESSAGE_DISPLAY_CENTER ){
-		st_params->ui.x = blitOffsetChar( ( CMNDLG_MESSAGE_MAX_WIDTH  >> 1 ) - ( st_width >> 1 ) );
-		st_params->ui.y = blitOffsetLine( ( CMNDLG_MESSAGE_MAX_HEIGHT >> 1 ) - ( st_lines >> 1 ) );
+		st_params->ui.x = gbOffsetChar( ( CMNDLG_MESSAGE_MAX_WIDTH  >> 1 ) - ( st_width >> 1 ) );
+		st_params->ui.y = gbOffsetLine( ( CMNDLG_MESSAGE_MAX_HEIGHT >> 1 ) - ( st_lines >> 1 ) );
 	}
 	
 	ctrlpadInit( &st_cp_params );
@@ -129,29 +129,29 @@ static void cmndlg_message_count_width_and_lines( char *str, int *width, int *li
 static void cmndlg_message_draw_ui( int width, int lines, CmndlgMessageParams *params )
 {
 	/* ˜g‚ð•`‰æ */
-	blitFillBox( params->ui.x, params->ui.y, blitOffsetChar( width ), blitOffsetLine( lines ), params->ui.bgColor );
-	blitLineBox( params->ui.x, params->ui.y, blitOffsetChar( width ), blitOffsetLine( lines ), params->ui.borderColor );
+	gbFillRectRel( params->ui.x, params->ui.y, gbOffsetChar( width ), gbOffsetLine( lines ), params->ui.bgColor );
+	gbLineRectRel( params->ui.x, params->ui.y, gbOffsetChar( width ), gbOffsetLine( lines ), params->ui.borderColor );
 	
 	/* ƒ^ƒCƒgƒ‹•`‰æ */
-	blitString(
-		params->ui.x + blitOffsetChar( ( width ) >> 1 ) - blitOffsetChar( strlen( params->title ) >> 1 ),
-		params->ui.y + blitOffsetLine( 1 ),
+	gbPrint(
+		params->ui.x + gbOffsetChar( ( width ) >> 1 ) - gbOffsetChar( strlen( params->title ) >> 1 ),
+		params->ui.y + gbOffsetLine( 1 ),
 		params->ui.fgTextColor,
 		params->ui.bgTextColor,
 		params->title
 	);
 	
-	blitString(
-		params->ui.x + blitOffsetChar( 1 ),
-		params->ui.y + blitOffsetLine( 3 ),
+	gbPrint(
+		params->ui.x + gbOffsetChar( 1 ),
+		params->ui.y + gbOffsetLine( 3 ),
 		params->ui.fgTextColor,
 		params->ui.bgTextColor,
 		params->message
 	);
 	
-	blitString(
-		params->ui.x + blitOffsetChar( ( width ) >> 1 ) - blitOffsetChar( strlen( st_prompt ) >> 1 ),
-		params->ui.y + blitOffsetLine( lines - 2 ),
+	gbPrint(
+		params->ui.x + gbOffsetChar( ( width ) >> 1 ) - gbOffsetChar( strlen( st_prompt ) >> 1 ),
+		params->ui.y + gbOffsetLine( lines - 2 ),
 		params->ui.fgTextColor,
 		params->ui.bgTextColor,
 		st_prompt

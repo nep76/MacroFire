@@ -87,8 +87,8 @@ int cmndlgSoskStart( CmndlgSoskParams *params )
 	tempdata->cy = 0;
 	
 	if( st_params->options & CMNDLG_SOSK_DISPLAY_CENTER ){
-		st_params->ui.x = SCR_WIDTH  - ( blitOffsetChar( CMNDLG_SOSK_WIDTH  ) + ( blitOffsetChar( CMNDLG_SOSK_WIDTH  ) >> 1 ) );
-		st_params->ui.y = SCR_HEIGHT - ( blitOffsetChar( CMNDLG_SOSK_HEIGHT ) + ( blitOffsetChar( CMNDLG_SOSK_HEIGHT ) >> 1 ) );
+		st_params->ui.x = ( SCR_WIDTH  - gbOffsetChar( CMNDLG_SOSK_WIDTH  ) ) >> 1;
+		st_params->ui.y = ( SCR_HEIGHT - gbOffsetLine( CMNDLG_SOSK_HEIGHT ) ) >> 1;
 	}
 	
 	ctrlpadInit( &st_cp_params );
@@ -212,12 +212,12 @@ static void cmndlg_sosk_draw_ui( CmndlgSoskParams *params )
 	
 	strutilSafeCopy( outtext, tempdata->workText + tempdata->textOffset, CMNDLG_SOSK_RESULT_WIDTH + 1 );
 	
-	blitFillBox( params->ui.x, params->ui.y, blitOffsetChar( CMNDLG_SOSK_WIDTH ), blitOffsetLine( CMNDLG_SOSK_HEIGHT ), params->ui.bgColor );
-	blitLineBox( params->ui.x, params->ui.y, blitOffsetChar( CMNDLG_SOSK_WIDTH ), blitOffsetLine( CMNDLG_SOSK_HEIGHT ), params->ui.borderColor );
+	gbFillRectRel( params->ui.x, params->ui.y, gbOffsetChar( CMNDLG_SOSK_WIDTH ), gbOffsetLine( CMNDLG_SOSK_HEIGHT ), params->ui.bgColor );
+	gbLineRectRel( params->ui.x, params->ui.y, gbOffsetChar( CMNDLG_SOSK_WIDTH ), gbOffsetLine( CMNDLG_SOSK_HEIGHT ), params->ui.borderColor );
 	
-	blitString(
-		params->ui.x + blitOffsetChar( 1 ),
-		params->ui.y + blitOffsetLine( CMNDLG_SOSK_HEIGHT - 2 ),
+	gbPrint(
+		params->ui.x + gbOffsetChar( 1 ),
+		params->ui.y + gbOffsetLine( CMNDLG_SOSK_HEIGHT - 2 ),
 		params->ui.fgTextColor,
 		params->ui.bgTextColor,
 		"SELECT: Usage"
@@ -225,18 +225,18 @@ static void cmndlg_sosk_draw_ui( CmndlgSoskParams *params )
 	
 	/* 文字の残りを表示 */
 	if( tempdata->textOffset ){
-		blitString(
-			params->ui.x + blitOffsetChar( 1 ),
-			params->ui.y + blitOffsetLine( 1 ),
+		gbPrint(
+			params->ui.x + gbOffsetChar( 1 ),
+			params->ui.y + gbOffsetLine( 1 ),
 			params->ui.fgTextColor,
 			params->ui.bgTextColor,
 			"\x83"
 		);
 	}
 	if( tempdata->currentLength > CMNDLG_SOSK_RESULT_WIDTH && tempdata->textOffset < tempdata->currentLength - CMNDLG_SOSK_RESULT_WIDTH ){
-		blitString(
-			params->ui.x + blitOffsetChar( 4 + CMNDLG_SOSK_RESULT_WIDTH ),
-			params->ui.y + blitOffsetLine( 1 ),
+		gbPrint(
+			params->ui.x + gbOffsetChar( 4 + CMNDLG_SOSK_RESULT_WIDTH ),
+			params->ui.y + gbOffsetLine( 1 ),
 			params->ui.fgTextColor,
 			params->ui.bgTextColor,
 			"\x81"
@@ -244,18 +244,18 @@ static void cmndlg_sosk_draw_ui( CmndlgSoskParams *params )
 	}
 	
 	/* 入力欄表示 */
-	blitLineRel( 
-		params->ui.x + blitOffsetChar( 3 ),
-		params->ui.y + blitOffsetLine( 2 ) + 1,
-		blitOffsetChar( CMNDLG_SOSK_RESULT_WIDTH ),
+	gbLineRel( 
+		params->ui.x + gbOffsetChar( 3 ),
+		params->ui.y + gbOffsetLine( 2 ) + 1,
+		gbOffsetChar( CMNDLG_SOSK_RESULT_WIDTH ),
 		0,
 		params->ui.fgTextColor
 	);
 	
 	/* 文字列表示 */
-	blitString(
-		params->ui.x + blitOffsetChar( 3 ),
-		params->ui.y + blitOffsetLine( 1 ),
+	gbPrint(
+		params->ui.x + gbOffsetChar( 3 ),
+		params->ui.y + gbOffsetLine( 1 ),
 		params->ui.fgTextColor,
 		params->ui.bgTextColor,
 		outtext
@@ -263,18 +263,18 @@ static void cmndlg_sosk_draw_ui( CmndlgSoskParams *params )
 	
 	/* カーソル表示 */
 	
-	blitString(
-		params->ui.x + blitOffsetChar( 3 + tempdata->cursorPos ),
-		params->ui.y + blitOffsetLine( 1 ),
+	gbPrint(
+		params->ui.x + gbOffsetChar( 3 + tempdata->cursorPos ),
+		params->ui.y + gbOffsetLine( 1 ),
 		params->ui.fcTextColor,
 		params->ui.bgTextColor,
 		"_"
 	);
 	
 	/* 文字数表示 */
-	blitStringf(
-		params->ui.x + blitOffsetChar( 1 ),
-		params->ui.y + blitOffsetLine( 2 ) + ( BLIT_CHAR_HEIGHT >> 1 ),
+	gbPrintf(
+		params->ui.x + gbOffsetChar( 1 ),
+		params->ui.y + gbOffsetLine( 2 ) + ( GB_CHAR_HEIGHT >> 1 ),
 		params->ui.fgTextColor,
 		params->ui.bgTextColor,
 		"( %d / %d )",
@@ -284,9 +284,9 @@ static void cmndlg_sosk_draw_ui( CmndlgSoskParams *params )
 	
 	for( iy = 0; iy < CMNDLG_SOSK_ROWS; iy++ ){
 		for( ix = 0; ix < CMNDLG_SOSK_COLS; ix++ ){
-			blitChar(
-				params->ui.x + blitOffsetChar( 6 + ix * 2 ),
-				params->ui.y + blitOffsetLine( 4 + iy * 2 ),
+			gbPutChar(
+				params->ui.x + gbOffsetChar( 6 + ix * 2 ),
+				params->ui.y + gbOffsetLine( 4 + iy * 2 ),
 				( iy == tempdata->cy && ix == tempdata->cx ? params->ui.fcTextColor : params->ui.fgTextColor ),
 				params->ui.bgTextColor,
 				st_char_table[iy][ix]

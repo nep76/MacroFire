@@ -10,19 +10,16 @@
 #include <pspsysmem_kernel.h>
 #include <pspsuspend.h>
 
-#include "psp/blit.h"
 #include "psp/memsce.h"
-#include "psp/graphics/fbmgr.h"
+#include "psp/gb.h"
 #include "psp/cmndlg.h"
 #include "psp/ctrlpad.h"
 #include "utils/strutil.h"
 
-#define MFM_VRAM_TOP         0x44000000
-
 #define MFM_DISPLAY_MICROSEC_INFO  1000000
 #define MFM_DISPLAY_MICROSEC_ERROR 3000000
 
-#define MFM_TRANSPARENT      BLIT_TRANSPARENT
+#define MFM_TRANSPARENT      GB_TRANSPARENT
 #define MFM_BG_COLOR         0xbb000000
 #define MFM_TITLE_BAR_COLOR  0x44aaaaaa
 #define MFM_TITLE_TEXT_COLOR 0xffffffff
@@ -41,6 +38,15 @@
 #define MFM_GET_CB_ARG_BY_PTR( p, n ) ( ((MfMenuItemValue *)( p ))[( n )].pointer )
 #define MFM_GET_CB_ARG_BY_INT( p, n ) ( ((MfMenuItemValue *)( p ))[( n )].integer )
 #define MFM_GET_CB_ARG_BY_STR( p, n ) ( ((MfMenuItemValue *)( p ))[( n )].string )
+
+#define MFM_ALL_AVAILABLE_BUTTONS ( \
+	PSP_CTRL_CIRCLE   | PSP_CTRL_CROSS    | PSP_CTRL_SQUARE | PSP_CTRL_TRIANGLE | \
+	PSP_CTRL_UP       | PSP_CTRL_RIGHT    | PSP_CTRL_DOWN   | PSP_CTRL_LEFT     | \
+	PSP_CTRL_LTRIGGER | PSP_CTRL_RTRIGGER | PSP_CTRL_SELECT | PSP_CTRL_START    | \
+	PSP_CTRL_NOTE     | PSP_CTRL_SCREEN   | PSP_CTRL_VOLUP  | PSP_CTRL_VOLDOWN  | \
+	CTRLPAD_CTRL_ANALOG_UP   | CTRLPAD_CTRL_ANALOG_RIGHT | \
+	CTRLPAD_CTRL_ANALOG_DOWN | CTRLPAD_CTRL_ANALOG_LEFT \
+)
 
 /*-----------------------------------------------
 	プロトタイプのないAPI
@@ -76,6 +82,32 @@ enum mf_thread_chstat {
 	MFM_THREADS_RESUME
 };
 
+
+struct mf_fbstat {
+	int mode;
+	int width;
+	int height;
+	void *frameBuffer;
+	int bufferWidth;
+	enum PspDisplayPixelFormats pixelFormat;
+};
+
+struct mf_buffers {
+	struct {
+		void *vram;
+		void *origAddr;
+	} backup;
+	
+	struct {
+		void *display;
+		void *draw;
+		void *clearImage;
+		unsigned int size;
+	} frame;
+	
+	bool useVolatileMem;
+};
+
 typedef enum {
 	MO_DISPLAY_ONLY = 0x00000001,
 } MfMenuOptions;
@@ -103,17 +135,26 @@ typedef union {
 } MfMenuItemValue;
 
 typedef struct {
-	MfMenuItemType type;
-	char *label;
-	int  width;
-	void *handler;
-	MfMenuItemValue value[10];
-} MfMenuItem;
-
-typedef struct {
 	void *func;
 	MfMenuItemValue *arg;
 } MfMenuCallback;
+
+typedef enum {
+	MS_NONE = 0,
+	MS_QUERY_LABEL,
+	MS_QUERY_USAGE,
+	MS_FOCUS,
+	MS_BLUR,
+} MfMenuCtrlSignal;
+
+typedef MfMenuRc ( *MfMenuProc )( MfMenuCtrlSignal, SceCtrlData*, void*, MfMenuItemValue*, const void* );
+
+typedef struct {
+	char            *label;
+	MfMenuProc      proc;
+	void            *var;
+	MfMenuItemValue value[10];
+} MfMenuItem;
 
 /*-----------------------------------------------
 	関数
@@ -192,5 +233,16 @@ bool mfMenuGetFilenameIsReady( void );
 MfMenuRc mfMenuGetFilenameInit( const char *title, unsigned int flags, const char *initpath );
 MfMenuRc mfMenuGetFilename( char **path, char **name );
 void mfMenuGetFilenameFree( void );
+
+void mfMenuLabel( const char *format, ... );
+void mfMenuUsage( const char *format, ... );
+
+/* デフォルトプロシージャ */
+MfMenuRc mfMenuDefAnchorProc( MfMenuCtrlSignal signal, SceCtrlData *pad, void *var, MfMenuItemValue value[], const void *arg );
+MfMenuRc mfMenuDefCallbackProc( MfMenuCtrlSignal signal, SceCtrlData *pad, void *var, MfMenuItemValue value[], const void *arg );
+MfMenuRc mfMenuDefBoolProc( MfMenuCtrlSignal signal, SceCtrlData *pad, void *var, MfMenuItemValue value[], const void *arg );
+MfMenuRc mfMenuDefOptionProc( MfMenuCtrlSignal signal, SceCtrlData *pad, void *var, MfMenuItemValue value[], const void *arg );
+MfMenuRc mfMenuDefGetNumberProc( MfMenuCtrlSignal signal, SceCtrlData *pad, void *var, MfMenuItemValue value[], const void *arg );
+MfMenuRc mfMenuDefGetButtonsProc( MfMenuCtrlSignal signal, SceCtrlData *pad, void *var, MfMenuItemValue value[], const void *arg );
 
 #endif

@@ -39,9 +39,9 @@ struct mf_rapidfire_status {
 MfRapidfireUID mfRapidfireNew( void );
 void mfRapidfireDestroy( MfRapidfireUID uid );
 
-void mfSetRapidfire( MfRapidfireUID uid, unsigned int buttons, MfRapidfireMode mode, unsigned int pdelay, unsigned int rdelay );
-void mfClearRapidfire( MfRapidfireUID uid, unsigned int buttons );
-void mfClearRapidfireAll( MfRapidfireUID uid );
+void mfRapidfireSet( MfRapidfireUID uid, unsigned int buttons, MfRapidfireMode mode, unsigned int pdelay, unsigned int rdelay );
+void mfRapidfireClear( MfRapidfireUID uid, unsigned int buttons );
+void mfRapidfireClearAll( MfRapidfireUID uid );
 void mfRapidfire( MfRapidfireUID uid, MfCallMode caller, SceCtrlData *pad_data );
 
 #endif

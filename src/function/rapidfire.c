@@ -34,30 +34,36 @@ static MfMenuCallback st_callback;
 static int st_release_delay  = RAPIDFIRE_DEFAULT_RELEASE_DELAY;
 static int st_press_delay    = RAPIDFIRE_DEFAULT_PRESS_DELAY;
 
+char *st_options[] = {
+	RAPIDFIRE_DID_MODENORMAL,
+	RAPIDFIRE_DID_MODERAPID,
+	RAPIDFIRE_DID_MODEAUTORAPID,
+	RAPIDFIRE_DID_MODEHOLD,
+	RAPIDFIRE_DID_MODEAUTOHOLD
+};
+
 static MfMenuItem st_menu_table[] = {
-	{ MT_OPTION, "Circle  ", 0, &(st_rfconf[0].mode),  { { .string = RAPIDFIRE_DID_MODENORMAL }, { .string = RAPIDFIRE_DID_MODERAPID }, { .string = RAPIDFIRE_DID_MODEAUTORAPID }, { .string = RAPIDFIRE_DID_MODEHOLD }, { .string = RAPIDFIRE_DID_MODEAUTOHOLD }, { .string = NULL } } },
-	{ MT_OPTION, "Cross   ", 0, &(st_rfconf[1].mode),  { { .string = RAPIDFIRE_DID_MODENORMAL }, { .string = RAPIDFIRE_DID_MODERAPID }, { .string = RAPIDFIRE_DID_MODEAUTORAPID }, { .string = RAPIDFIRE_DID_MODEHOLD }, { .string = RAPIDFIRE_DID_MODEAUTOHOLD }, { .string = NULL } } },
-	{ MT_OPTION, "Square  ", 0, &(st_rfconf[2].mode),  { { .string = RAPIDFIRE_DID_MODENORMAL }, { .string = RAPIDFIRE_DID_MODERAPID }, { .string = RAPIDFIRE_DID_MODEAUTORAPID }, { .string = RAPIDFIRE_DID_MODEHOLD }, { .string = RAPIDFIRE_DID_MODEAUTOHOLD }, { .string = NULL } } },
-	{ MT_OPTION, "Triangle", 0, &(st_rfconf[3].mode),  { { .string = RAPIDFIRE_DID_MODENORMAL }, { .string = RAPIDFIRE_DID_MODERAPID }, { .string = RAPIDFIRE_DID_MODEAUTORAPID }, { .string = RAPIDFIRE_DID_MODEHOLD }, { .string = RAPIDFIRE_DID_MODEAUTOHOLD }, { .string = NULL } } },
-	{ MT_NULL },
-	{ MT_OPTION, "Up      ", 0, &(st_rfconf[4].mode),  { { .string = RAPIDFIRE_DID_MODENORMAL }, { .string = RAPIDFIRE_DID_MODERAPID }, { .string = RAPIDFIRE_DID_MODEAUTORAPID }, { .string = RAPIDFIRE_DID_MODEHOLD }, { .string = RAPIDFIRE_DID_MODEAUTOHOLD }, { .string = NULL } } },
-	{ MT_OPTION, "Right   ", 0, &(st_rfconf[5].mode),  { { .string = RAPIDFIRE_DID_MODENORMAL }, { .string = RAPIDFIRE_DID_MODERAPID }, { .string = RAPIDFIRE_DID_MODEAUTORAPID }, { .string = RAPIDFIRE_DID_MODEHOLD }, { .string = RAPIDFIRE_DID_MODEAUTOHOLD }, { .string = NULL } } },
-	{ MT_OPTION, "Down    ", 0, &(st_rfconf[6].mode),  { { .string = RAPIDFIRE_DID_MODENORMAL }, { .string = RAPIDFIRE_DID_MODERAPID }, { .string = RAPIDFIRE_DID_MODEAUTORAPID }, { .string = RAPIDFIRE_DID_MODEHOLD }, { .string = RAPIDFIRE_DID_MODEAUTOHOLD }, { .string = NULL } } },
-	{ MT_OPTION, "Left    ", 0, &(st_rfconf[7].mode),  { { .string = RAPIDFIRE_DID_MODENORMAL }, { .string = RAPIDFIRE_DID_MODERAPID }, { .string = RAPIDFIRE_DID_MODEAUTORAPID }, { .string = RAPIDFIRE_DID_MODEHOLD }, { .string = RAPIDFIRE_DID_MODEAUTOHOLD }, { .string = NULL } } },
-	{ MT_NULL },
-	{ MT_OPTION, "L-trig  ", 0, &(st_rfconf[8].mode),  { { .string = RAPIDFIRE_DID_MODENORMAL }, { .string = RAPIDFIRE_DID_MODERAPID }, { .string = RAPIDFIRE_DID_MODEAUTORAPID }, { .string = RAPIDFIRE_DID_MODEHOLD }, { .string = RAPIDFIRE_DID_MODEAUTOHOLD }, { .string = NULL } } },
-	{ MT_OPTION, "R-trig  ", 0, &(st_rfconf[9].mode),  { { .string = RAPIDFIRE_DID_MODENORMAL }, { .string = RAPIDFIRE_DID_MODERAPID }, { .string = RAPIDFIRE_DID_MODEAUTORAPID }, { .string = RAPIDFIRE_DID_MODEHOLD }, { .string = RAPIDFIRE_DID_MODEAUTOHOLD }, { .string = NULL } } },
-	{ MT_NULL },
-	{ MT_OPTION, "START   ", 0, &(st_rfconf[10].mode), { { .string = RAPIDFIRE_DID_MODENORMAL }, { .string = RAPIDFIRE_DID_MODERAPID }, { .string = RAPIDFIRE_DID_MODEAUTORAPID }, { .string = RAPIDFIRE_DID_MODEHOLD }, { .string = RAPIDFIRE_DID_MODEAUTOHOLD }, { .string = NULL } } },
-	{ MT_OPTION, "SELECT  ", 0, &(st_rfconf[11].mode), { { .string = RAPIDFIRE_DID_MODENORMAL }, { .string = RAPIDFIRE_DID_MODERAPID }, { .string = RAPIDFIRE_DID_MODEAUTORAPID }, { .string = RAPIDFIRE_DID_MODEHOLD }, { .string = RAPIDFIRE_DID_MODEAUTOHOLD }, { .string = NULL } } },
-	
-	{ MT_NULL },
-	{ MT_GET_NUMBERS, "Release delay", 0, &(st_release_delay), { { .string = "Set release delay" }, { .string = "ms" }, { .integer = 4 }, { .integer = 18 } } },
-	{ MT_GET_NUMBERS, "Press delay  ", 0, &(st_press_delay),   { { .string = "Set press delay"   }, { .string = "ms" }, { .integer = 4 }, { .integer = 18 } } },
-	
-	{ MT_NULL },
-	{ MT_CALLBACK, "Load from MemoryStick", 0, &(st_callback), { { .pointer = rapidfire_load }, { .pointer = NULL } } },
-	{ MT_CALLBACK, "Save to MemoryStick",   0, &(st_callback), { { .pointer = rapidfire_save }, { .pointer = NULL } } }
+	{ "Circle  : %s", mfMenuDefOptionProc, &(st_rfconf[0].mode),  { { .pointer = &st_options }, { .integer = MF_ARRAY_NUM( st_options ) } } },
+	{ "Cross   : %s", mfMenuDefOptionProc, &(st_rfconf[1].mode),  { { .pointer = &st_options }, { .integer = MF_ARRAY_NUM( st_options ) } } },
+	{ "Square  : %s", mfMenuDefOptionProc, &(st_rfconf[2].mode),  { { .pointer = &st_options }, { .integer = MF_ARRAY_NUM( st_options ) } } },
+	{ "Triangle: %s", mfMenuDefOptionProc, &(st_rfconf[3].mode),  { { .pointer = &st_options }, { .integer = MF_ARRAY_NUM( st_options ) } } },
+	{ NULL },
+	{ "Up      : %s", mfMenuDefOptionProc, &(st_rfconf[4].mode),  { { .pointer = &st_options }, { .integer = MF_ARRAY_NUM( st_options ) } } },
+	{ "Right   : %s", mfMenuDefOptionProc, &(st_rfconf[5].mode),  { { .pointer = &st_options }, { .integer = MF_ARRAY_NUM( st_options ) } } },
+	{ "Down    : %s", mfMenuDefOptionProc, &(st_rfconf[6].mode),  { { .pointer = &st_options }, { .integer = MF_ARRAY_NUM( st_options ) } } },
+	{ "Left    : %s", mfMenuDefOptionProc, &(st_rfconf[7].mode),  { { .pointer = &st_options }, { .integer = MF_ARRAY_NUM( st_options ) } } },
+	{ NULL },
+	{ "L-trig  : %s", mfMenuDefOptionProc, &(st_rfconf[8].mode),  { { .pointer = &st_options }, { .integer = MF_ARRAY_NUM( st_options ) } } },
+	{ "R-trig  : %s", mfMenuDefOptionProc, &(st_rfconf[9].mode),  { { .pointer = &st_options }, { .integer = MF_ARRAY_NUM( st_options ) } } },
+	{ NULL },
+	{ "START   : %s", mfMenuDefOptionProc, &(st_rfconf[10].mode), { { .pointer = &st_options }, { .integer = MF_ARRAY_NUM( st_options ) } } },
+	{ "SELECT  : %s", mfMenuDefOptionProc, &(st_rfconf[11].mode), { { .pointer = &st_options }, { .integer = MF_ARRAY_NUM( st_options ) } } },
+	{ NULL },
+	{ "Release delay: %d %s", mfMenuDefGetNumberProc, &st_release_delay, { { .string = "Set release delay" }, { .string = "ms" }, { .integer = 4 }, { .integer = 18 }, { .integer = 9999 } } },
+	{ "Press delay  : %d %s", mfMenuDefGetNumberProc, &st_press_delay  , { { .string = "Set press delay"   }, { .string = "ms" }, { .integer = 4 }, { .integer = 18 }, { .integer = 9999 } } },
+	{ NULL },
+	{ "Load from MemoryStick", mfMenuDefCallbackProc, &st_callback, { { .pointer = rapidfire_load }, { .pointer = NULL } } },
+	{ "Save to MemoryStick",   mfMenuDefCallbackProc, &st_callback, { { .pointer = rapidfire_save }, { .pointer = NULL } } }
 };
 
 /*=============================================*/
@@ -127,7 +133,7 @@ static MfMenuRc rapidfire_load( void )
 				char mode[16];
 				int version = inimgrGetInt( ini, "default", RAPIDFIRE_DATA_SIGNATURE, 0 );
 				if( version <= 1 ){
-					blitString( blitOffsetChar( 3 ), blitOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FCCOLOR, "Initialization file is invalid or too lower version." );
+					gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FCCOLOR, "Initialization file is invalid or too lower version." );
 					mfMenuWait( MFM_DISPLAY_MICROSEC_ERROR );
 				} else{
 					inimgrGetString( ini, "Mode", RAPIDFIRE_DID_CIRCLE, RAPIDFIRE_DID_MODENORMAL, mode, sizeof( mode ) );
@@ -158,11 +164,11 @@ static MfMenuRc rapidfire_load( void )
 					st_release_delay = inimgrGetInt( ini, "Delay", RAPIDFIRE_DID_RDELAY, RAPIDFIRE_DEFAULT_RELEASE_DELAY );
 					st_press_delay   = inimgrGetInt( ini, "Delay", RAPIDFIRE_DID_PDELAY, RAPIDFIRE_DEFAULT_PRESS_DELAY );
 					
-					blitStringf( blitOffsetChar( 3 ), blitOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FGCOLOR, "Loaded from %s.", inipath );
+					gbPrintf( gbOffsetChar( 3 ), gbOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FGCOLOR, "Loaded from %s.", inipath );
 					mfMenuWait( MFM_DISPLAY_MICROSEC_INFO );
 				}
 			} else{
-				blitStringf( blitOffsetChar( 3 ), blitOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FCCOLOR, "Failed to load from %s: 0x%X", inipath, err );
+				gbPrintf( gbOffsetChar( 3 ), gbOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FCCOLOR, "Failed to load from %s: 0x%X", inipath, err );
 				mfMenuWait( MFM_DISPLAY_MICROSEC_ERROR );
 			}
 			inimgrDestroy( ini );
@@ -221,10 +227,10 @@ static MfMenuRc rapidfire_save( void )
 			inimgrSetInt( ini, "Delay", RAPIDFIRE_DID_PDELAY,   st_press_delay );
 			
 			if( ( err = inimgrSave( ini, inipath ) ) == 0 ){
-				blitStringf( blitOffsetChar( 3 ), blitOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FGCOLOR, "Saved to %s.", inipath );
+				gbPrintf( gbOffsetChar( 3 ), gbOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FGCOLOR, "Saved to %s.", inipath );
 				mfMenuWait( MFM_DISPLAY_MICROSEC_INFO );
 			} else{
-				blitStringf( blitOffsetChar( 3 ), blitOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FCCOLOR, "Failed to save to %s: 0x%X", inipath, err );
+				gbPrintf( gbOffsetChar( 3 ), gbOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FCCOLOR, "Failed to save to %s: 0x%X", inipath, err );
 				mfMenuWait( MFM_DISPLAY_MICROSEC_ERROR );
 			}
 			
@@ -242,19 +248,19 @@ MfMenuRc rapidfireMenu( SceCtrlData *pad_data, void *argp )
 	static int selected    = 0;
 	
 	if( ! st_callback.func ){
-		blitString( blitOffsetChar(  3 ), blitOffsetLine(  4 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Please choose a rapidfire mode per buttons." );
-		blitString( blitOffsetChar( 33 ), blitOffsetLine( 22 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "NORMAL    : Standard control mode." );
-		blitString( blitOffsetChar( 33 ), blitOffsetLine( 23 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "RAPID     : Rapidfire while pressing." );
-		blitString( blitOffsetChar( 33 ), blitOffsetLine( 24 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "AUTO-RAPID: Always rapidfire." );
-		blitString( blitOffsetChar( 33 ), blitOffsetLine( 25 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "HOLD      : Toggle the hold state" );
-		blitString( blitOffsetChar( 33 ), blitOffsetLine( 26 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "AUTO-HOLD : Always to hold." );
+		gbPrint( gbOffsetChar(  3 ), gbOffsetLine(  4 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Please choose a rapidfire mode per buttons." );
+		gbPrint( gbOffsetChar( 33 ), gbOffsetLine( 22 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "NORMAL    : Standard control mode." );
+		gbPrint( gbOffsetChar( 33 ), gbOffsetLine( 23 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "RAPID     : Rapidfire while pressing." );
+		gbPrint( gbOffsetChar( 33 ), gbOffsetLine( 24 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "AUTO-RAPID: Always rapidfire." );
+		gbPrint( gbOffsetChar( 33 ), gbOffsetLine( 25 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "HOLD      : Toggle the hold state." );
+		gbPrint( gbOffsetChar( 33 ), gbOffsetLine( 26 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "AUTO-HOLD : Always to hold." );
 		
 		/* 目立つように警告はSave/Loadにカーソルがのった時のみ表示 */
 		if( selected == RAPIDFIRE_LOAD || selected == RAPIDFIRE_SAVE ){
-			blitString( blitOffsetChar( 5 ), blitOffsetLine( 28 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "IMPORTANT CAUTION\n  Verify that MemoryStick access indicator is not blinking.\n  Otherwise, will CRASH the currently running game!" );
+			gbPrint( gbOffsetChar( 5 ), gbOffsetLine( 28 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "IMPORTANT CAUTION\n  Verify that MemoryStick access indicator is not blinking.\n  Otherwise, will CRASH the currently running game!" );
 		}
 		
-		switch( mfMenuUniDraw( blitOffsetChar( 5 ), blitOffsetLine( 6 ), st_menu_table, MF_ARRAY_NUM( st_menu_table ), &selected, 0 ) ){
+		switch( mfMenuUniDraw( gbOffsetChar( 5 ), gbOffsetLine( 6 ), st_menu_table, MF_ARRAY_NUM( st_menu_table ), &selected, 0 ) ){
 			case MR_CONTINUE:
 				break;
 			case MR_ENTER:
@@ -304,9 +310,9 @@ void rapidfireApply( void )
 		*buttons |= st_rfconf[i].button;
 	}
 	
-	mfSetRapidfire( 0, buttons_normal,    MF_RAPIDFIRE_MODE_NORMAL,    0, 0 );
-	mfSetRapidfire( 0, buttons_rapid,     MF_RAPIDFIRE_MODE_RAPID,     st_press_delay, st_release_delay );
-	mfSetRapidfire( 0, buttons_autorapid, MF_RAPIDFIRE_MODE_AUTORAPID, st_press_delay, st_release_delay );
-	mfSetRapidfire( 0, buttons_hold,      MF_RAPIDFIRE_MODE_HOLD,      0, 0 );
-	mfSetRapidfire( 0, buttons_autohold,  MF_RAPIDFIRE_MODE_AUTOHOLD,  0, 0 );
+	mfRapidfireSet( 0, buttons_normal,    MF_RAPIDFIRE_MODE_NORMAL,    0, 0 );
+	mfRapidfireSet( 0, buttons_rapid,     MF_RAPIDFIRE_MODE_RAPID,     st_press_delay, st_release_delay );
+	mfRapidfireSet( 0, buttons_autorapid, MF_RAPIDFIRE_MODE_AUTORAPID, st_press_delay, st_release_delay );
+	mfRapidfireSet( 0, buttons_hold,      MF_RAPIDFIRE_MODE_HOLD,      0, 0 );
+	mfRapidfireSet( 0, buttons_autohold,  MF_RAPIDFIRE_MODE_AUTOHOLD,  0, 0 );
 }
