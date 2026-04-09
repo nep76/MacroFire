@@ -79,7 +79,7 @@ EXPORT MfEntry mftable[]
 	
 	{
 		"Macro settings",
-		macroInit, NULL,
+		macroInit, macroTerm,
 		NULL, NULL,
 		{ macroMain, macroIntr },
 		{ macroMenu, NULL }

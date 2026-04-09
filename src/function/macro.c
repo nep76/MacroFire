@@ -281,8 +281,6 @@ MfMenuRc macroRecordStop( SceCtrlData *pad_data, void *arg )
 
 MfMenuRc macroRecordStart( SceCtrlData *pad_data, void *arg )
 {
-	/* static int sec = 3; */
-	
 	if( macro_is_busy() || ! macro_is_enabled_mf_engine() ) return MR_BACK;
 	
 	if( st_run_mode == MRM_RECORD ){
@@ -360,7 +358,6 @@ static MacroData *macro_append( MacroData *macro )
 static void macro_record( MfCallMode mode, SceCtrlData *pad_data, void *argp )
 {
 	unsigned int cur_buttons;
-	static bool cur_analog_move = false;
 	u64 cur_analog_coord = MACROMGR_ANALOG_NEUTRAL;
 	static MacroData *cur_macro;
 	
@@ -383,38 +380,50 @@ static void macro_record( MfCallMode mode, SceCtrlData *pad_data, void *argp )
 		if( cur_macro && cur_macro->action == MA_DELAY ){
 			u64 diff = ( waitms - st_temp_ms );
 			cur_macro->data = diff > MACROMGR_MAX_DELAY ? MACROMGR_MAX_DELAY : diff;
-			return;
 		} else{
 			cur_macro = macro_append( cur_macro );
 			if( ! cur_macro ) return;
 			
-			macromgrCmdInit( cur_macro, MA_DELAY, 0, 0 );
-			st_temp_ms        = waitms;
+			macromgrCmdInit( cur_macro, MA_DELAY, 0, st_temp_buttons );
+			st_temp_ms = waitms;
 		}
 	} else{
 		unsigned int press_buttons   = ( st_temp_buttons ^ cur_buttons ) & cur_buttons;
 		unsigned int release_buttons = ( st_temp_buttons ^ cur_buttons ) & st_temp_buttons;
 		
-		if( cur_macro && cur_macro->action == MA_DELAY ){
+		if( cur_macro ){
+			if( ! ( cur_macro->action == MA_DELAY && cur_macro->data == 0 ) ){
+				if( cur_macro->action == MA_DELAY && cur_macro->data != 0 ){
+					u64 waitms;
+					sceRtcGetCurrentTick( &waitms );
+					waitms /= 1000;
+					
+					u64 diff = ( waitms - st_temp_ms );
+					cur_macro->data = diff > MACROMGR_MAX_DELAY ? MACROMGR_MAX_DELAY : diff;
+				}
+				cur_macro = macro_append( cur_macro );
+			}
+		} else{
+			cur_macro = macro_append( cur_macro );
+		}
+		
+		if( ! cur_macro ) return;
+		
+		if( cur_macro->action == MA_DELAY && cur_macro->data != 0 ){
 			u64 waitms;
 			sceRtcGetCurrentTick( &waitms );
 			waitms /= 1000;
 			
 			u64 diff = ( waitms - st_temp_ms );
 			cur_macro->data = diff > MACROMGR_MAX_DELAY ? MACROMGR_MAX_DELAY : diff;
-			
-			cur_macro = macro_append( cur_macro );
-			if( ! cur_macro ) return;
 		}
 		
-		if( press_buttons || release_buttons ){
-			if( press_buttons && release_buttons ){
-				macromgrCmdInit( cur_macro, MA_BUTTONS_CHANGE, cur_buttons, 0 );
-			} else if( press_buttons ){
-				macromgrCmdInit( cur_macro, MA_BUTTONS_PRESS, press_buttons, 0 );
-			} else if( release_buttons ){
-				macromgrCmdInit( cur_macro, MA_BUTTONS_RELEASE, release_buttons, 0 );
-			}
+		if( press_buttons && release_buttons ){
+			macromgrCmdInit( cur_macro, MA_BUTTONS_CHANGE, cur_buttons, st_temp_buttons );
+		} else if( press_buttons ){
+			macromgrCmdInit( cur_macro, MA_BUTTONS_PRESS, press_buttons, st_temp_buttons );
+		} else if( release_buttons ){
+			macromgrCmdInit( cur_macro, MA_BUTTONS_RELEASE, release_buttons, st_temp_buttons );
 		}
 		
 		if( cur_analog_coord != st_temp_analog_coord ){
@@ -423,11 +432,10 @@ static void macro_record( MfCallMode mode, SceCtrlData *pad_data, void *argp )
 			
 			macromgrCmdInit( cur_macro, MA_ANALOG_MOVE, cur_analog_coord, 0 );
 		}
+		
+		st_temp_buttons      = cur_buttons;
+		st_temp_analog_coord = cur_analog_coord;
 	}
-	
-	st_temp_buttons      = cur_buttons;
-	st_temp_analog_move  = cur_analog_move;
-	st_temp_analog_coord = cur_analog_coord;
 }
 
 static bool macro_trace( MfCallMode mode, SceCtrlData *pad_data, void *argp )

@@ -21,7 +21,7 @@
 /*-----------------------------------------------
 	íËêî
 -----------------------------------------------*/
-#define MFM_TOP_MESSAGE       "MacroFire v2.2.0 In-game menu [ClassG: http://classg.sytes.net]"
+#define MFM_TOP_MESSAGE       "MacroFire 2.2.1 In-game menu [ClassG: http://classg.sytes.net]"
 #define MFM_WORKING_DIRECTORY "ms0:/seplugins"
 
 #define MF_INIDEF_MAIN_STARTUP           false
