@@ -2,8 +2,8 @@
 	Directory Handler
 */
 
-#ifndef __DIRH_H__
-#define __DIRH_H__
+#ifndef DIRH_H
+#define DIRH_H
 
 #include <pspkernel.h>
 #include <pspsdk.h>
@@ -23,9 +23,6 @@
 #define DIRH_ERROR_DOPEN_FAILED       0xe0000010
 #define DIRH_ERROR_DREAD_FAILED       0xe0000011
 
-/* オプション */
-#define DIRH_OPT_ADD_DIR_SLASH 0x00000001
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -40,9 +37,13 @@ struct dirh_dirents {
 	int fileCount;
 };
 
+typedef enum {
+	DIRH_OPT_ADD_DIR_SLASH = 0x00000001,
+} DirhOptions;
+
 struct dirh_select_filename {
 	char curDirFullpath[DIRH_MAXPATH];
-	unsigned int options;
+	DirhOptions options;
 	struct dirh_dirents entry;
 	int lError;
 	int sError;
@@ -62,14 +63,14 @@ typedef enum {
 	DW_SEEK_FILE,
 } DirhWhence;
 
-/* 相対パス、あるいは絶対パスでディレクトリを開く */
-DirhUID dirhOpen( const char *dirpath, unsigned int options );
+/* 相対パス、あるいは絶対パスで指定されたディレクトリのリストを取得 */
+DirhUID dirhNew( const char *dirpath, unsigned int options );
 
-/* オプションをそのままに別にディレクトリを相対パス、あるいは絶対パスで開き直す */
-int dirhReopen( DirhUID uid, const char *dirpath );
+/* オプションをそのままに別にディレクトリを相対パス、あるいは絶対パス再取得 */
+int dirhChdir( DirhUID uid, const char *dirpath );
 
-/* 開いているディレクトリを閉じる */
-void dirhClose( DirhUID uid );
+/* 取得したデータを全て破棄 */
+void dirhDestroy( DirhUID uid );
 
 /* ディレクトリエントリを読み出す */
 char* dirhRead( DirhUID uid );

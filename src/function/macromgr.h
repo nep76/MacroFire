@@ -5,8 +5,8 @@
 	マクロの追加や削除、管理を行う。
 */
 
-#ifndef __MACROMGR_H__
-#define __MACROMGR_H__
+#ifndef MACROMGR_H
+#define MACROMGR_H
 
 #include <pspkernel.h>
 #include "psp/memsce.h"
@@ -14,11 +14,12 @@
 /*-----------------------------------------------
 	定数
 -----------------------------------------------*/
-#define MACRO_MAX_DELAY                               999999999UL
-#define MACRO_SET_ANALOG_XY( x, y )                   ( (u64)(( (u64)( x ) << 32 ) | ( y )) )
-#define MACRO_GET_ANALOG_X( x )                       ( (u32)(( x ) >> 32) )
-#define MACRO_GET_ANALOG_Y( y )                       ( (u32)( y ) )
-#define MACRO_ANALOG_THRESHOLD( o_x, o_y, o_r, x, y ) ( ( abs( x - o_x )^2 ) + ( abs( y - o_y )^2 ) >= ( o_r^2 ) )
+#define MACROMGR_MAX_DELAY             999999999UL
+#define MACROMGR_SET_ANALOG_XY( x, y ) ( (u64)(( (u64)( x ) << 32 ) | ( y )) )
+#define MACROMGR_GET_ANALOG_X( x )     ( (u32)(( x ) >> 32) )
+#define MACROMGR_GET_ANALOG_Y( y )     ( (u32)( y ) )
+#define MACROMGR_ANALOG_CENTER         128
+#define MACROMGR_ANALOG_NEUTRAL        MACROMGR_SET_ANALOG_XY( MACROMGR_ANALOG_CENTER, MACROMGR_ANALOG_CENTER )
 
 /*-----------------------------------------------
 	型宣言
@@ -28,7 +29,6 @@ typedef enum {
 	MA_BUTTONS_PRESS,
 	MA_BUTTONS_RELEASE,
 	MA_BUTTONS_CHANGE,
-	MA_ANALOG_NEUTRAL,
 	MA_ANALOG_MOVE
 } MacroAction;
 

@@ -89,8 +89,8 @@ void macromgrRemove( MacroData *macro )
 			/* 先頭なので前のコマンドはなしに */
 			macro->prev = NULL;
 			
-			/* 次のコマンドは削除されるコマンドを指しているので自分を指す */
-			macro->next->prev = macro;
+			/* 次の次のコマンドがある場合は、それは削除されるコマンドを指しているので自分を指す */
+			if( macro->next ) macro->next->prev = macro;
 			
 			/* メモリ解放 */
 			memsceFree( rm_macro );

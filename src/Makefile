@@ -20,7 +20,7 @@ USE_KERNEL_LIBS = 1
 CLASSG_LIBS = libs
 
 INCDIR = $(CLASSG_LIBS)
-CFLAGS = -g -Os -G0 -Wall -fno-strict-aliasing -fno-builtin-printf
+CFLAGS = -O2 -G0 -Wall -fno-strict-aliasing -fno-builtin-printf
 CXXFLAGS = $(CFLAGS) -fno-exceptions -fno-rtti
 ASFLAGS = $(CFLAGS)
 
@@ -36,24 +36,26 @@ OBJS = exports.o \
        main.o \
        menu.o \
        hook.o \
+       function/analogtune.o \
        function/rapidfire.o \
        function/macromgr.o \
        function/macro.o \
        function/macroeditor.o \
        $(CLASSG_LIBS)/utils/strutil.o \
-       $(CLASSG_LIBS)/utils/confmgr.o \
-       $(CLASSG_LIBS)/psp/confmgr/cmpspbtn.o \
+       $(CLASSG_LIBS)/utils/inimgr.o \
+       $(CLASSG_LIBS)/psp/ctrlpad.o \
+       $(CLASSG_LIBS)/psp/graphics/fbmgr.o \
        $(CLASSG_LIBS)/psp/blit.o \
        $(CLASSG_LIBS)/psp/memsce.o \
        $(CLASSG_LIBS)/psp/pathexpand.o \
        $(CLASSG_LIBS)/psp/fileh.o \
        $(CLASSG_LIBS)/psp/dirh.o \
-       $(CLASSG_LIBS)/psp/sosk.o \
        $(CLASSG_LIBS)/psp/cmndlg.o \
-       $(CLASSG_LIBS)/psp/cmndlg/msg.o \
-       $(CLASSG_LIBS)/psp/cmndlg/getdigits.o \
+       $(CLASSG_LIBS)/psp/cmndlg/message.o \
+       $(CLASSG_LIBS)/psp/cmndlg/getnumbers.o \
        $(CLASSG_LIBS)/psp/cmndlg/getbuttons.o \
        $(CLASSG_LIBS)/psp/cmndlg/getfilename.o \
+       $(CLASSG_LIBS)/psp/cmndlg/sosk.o \
 
 PSPSDK = $(shell psp-config --pspsdk-path)
 include $(PSPSDK)/lib/build_prx.mak

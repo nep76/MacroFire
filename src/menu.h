@@ -2,121 +2,196 @@
 	menu.h
 */
 
-#ifndef __MFMENU_H__
-#define __MFMENU_H__
+#ifndef MFMENU_H
+#define MFMENU_H
 
 #include <pspkernel.h>
-#include <pspctrl.h>
 #include <pspdisplay.h>
-#include <stdbool.h>
-#include <string.h>
+#include <pspsysmem_kernel.h>
 
 #include "global.h"
 #include "utils/strutil.h"
 #include "psp/blit.h"
 #include "psp/memsce.h"
+#include "psp/graphics/fbmgr.h"
 #include "psp/cmndlg.h"
-#include "utils/confmgr.h"
+#include "utils/inimgr.h"
+#include "psp/ctrlpad.h"
 
-#define MENU_FGCOLOR 0xffffffff
-#define MENU_BGCOLOR 0xff000000
-#define MENU_FCCOLOR 0xff0000ff
+#define MFM_TRANSPARENT      BLIT_TRANSPARENT
+#define MFM_BG_COLOR         0xbb000000
+#define MFM_TITLE_BAR_COLOR  0x44aaaaaa
+#define MFM_TITLE_TEXT_COLOR 0xffffffff
+#define MFM_INFO_BAR_COLOR   0x44aaaaaa
+#define MFM_INFO_TEXT_COLOR  0xffffffff
+#define MFM_TEXT_FGCOLOR     0xffffffff
+#define MFM_TEXT_BGCOLOR     MFM_TRANSPARENT
+#define MFM_TEXT_FCCOLOR     0xff0000ff
 
-#define MAX_NUMBER_OF_THREADS 64
-#define MENUITEM_LENGTH 64
+#define MFM_OUT_OF_MEM_WARN_SEC 6
+#define MFM_MAIN_MENU_COUNT 4
+
+#define MFM_MAX_NUMBER_OF_THREADS 64
+#define MFM_ITEM_LENGTH 64
 
 /*-----------------------------------------------
 	プロトタイプのないAPI
-	
-	LCDの電源を入れることができるようだ。
 -----------------------------------------------*/
 void sceDisplayEnable( void );
 
 /*-----------------------------------------------
 	型宣言
 -----------------------------------------------*/
-typedef struct _mf_menu_chain {
-	char *mid;
-	struct _mf_menu_chain *prev;
-} MfMenuChain;
+enum mf_thread_chstat {
+	MFM_THREADS_SUSPEND,
+	MFM_THREADS_RESUME
+};
 
 typedef enum {
+	MO_DISPLAY_ONLY = 0x00000001,
+} MfMenuOptions;
+
+typedef enum {
+	MR_CONTINUE,
 	MR_BACK,
 	MR_ENTER,
-	MR_CONTINUE
-} MfMenuReturnCode;
+} MfMenuRc;
 
 typedef enum {
-	MM_NEXT,
-	MM_PREV,
-} MfMenuMoveFocusDir;
-
-typedef enum {
+	MT_NULL = 0,
 	MT_ANCHOR,
+	MT_CALLBACK,
+	MT_BOOL,
 	MT_OPTION,
-	MT_BORDER,
-	MT_GET_DIGITS,
+	MT_GET_NUMBERS,
 	MT_GET_BUTTONS,
 } MfMenuItemType;
 
+typedef union {
+	void *pointer;
+	char *string;
+	int  integer;
+} MfMenuItemValue;
+
 typedef struct {
 	MfMenuItemType type;
-	int  *selected;
 	char *label;
-	char *value[10];
+	int  width;
+	void *handler;
+	MfMenuItemValue value[10];
 } MfMenuItem;
 
 typedef struct {
-	char mid[32];
-	MfMenuItem *mi;
-	int micount;
-} MfMenuIndex;
+	void *func;
+	void *arg;
+} MfMenuCallback;
 
 /*-----------------------------------------------
 	関数
 -----------------------------------------------*/
 bool mfMenuInit( void );
-void mfMenu    ( void );
+void mfMenu( void );
+void mfMenuDrawBase( void );
 
 /*-----------------------------------------------
 	メニュー用API
 -----------------------------------------------*/
+
 /*
-	ユーザの入力なしに、ソフト側からメニューの終了を予約させる。
-	これをセットしたあと、ファンクションがメインメニューに戻った時に終了。
+	カーネルメモリからメモリを確保する。
+	最大でも空きが約3MBしかないので注意する。
+	
+	また、このメモリ空間はPSPのシステムがセーブ/ロードダイアログなどで使用する。
+	そのため、メニュー終了時には完全にメモリを解放した状態でなければ、
+	通常使用に影響が出る可能性が高い。
+	
+	一時保存用のメモリとして使用すること。
+	
+	@param: size_t size
+		確保する容量。
+	
+	@return void*
+		確保したメモリの先頭アドレス。
+*/
+void *mfKernelVolatileMemAlloc( size_t size );
+
+/*
+	確保したカーネルメモリを解放する。
+	このメモリはソニーのセーブ/ロードダイアログなど、システムに使用されるため、
+	解放を忘れると後々フリーズする危険性が高い。
+	
+	@param: void *addr
+		mfKernelVolatileMemAlloc()で得たメモリの先頭アドレス。
+*/
+void mfKernelVolatileMemFree( void *addr );
+
+/*
+	メニュー終了フラグをセットする。
 */
 void mfMenuQuit( void );
 
 /*
-	単純な縦並びメニューを描画。
-	MfMenuItem配列を渡す。
-	
-	選択したメニューアイテムがオプションの場合は、MfMenuItemのselectedメンバのポインタに
-	オプションの通し番号がセットされる。
-	
-	メニューがアンカーの場合は、第5引数のselected変数に項目位置の番号と
-	返り値としてMR_ENTERが返る。
-	
-	×ボタンが押されるとMR_BACKが返る。
+	STARTボタン、HOMEボタンによるメニューの中断を無効にする。
 */
-MfMenuReturnCode mfMenuVertical( int x, int y, int w, MfMenuItem mi[], size_t items_num, int *selected );
+void mfMenuDisableInterrupt( void );
 
-/* スクリーンをクリア */
-void mfClearColor( u32 color );
-
-/* スクリーンに最上段の名前やバージョン部と上部下部の横線を描画 */
-void mfDrawMainFrame( void );
-
-/* メニュー実行の一時停止を予約 */
-void mfWaitScreenReload( int sec );
-
-/* VSYNC時に画面をクリアすることを予約 */
-void mfClearScreenWhenVsync( void );
-
-/* メニューの中断を有効にする */
+/*
+	STARTボタン、HOMEボタンによるメニューの中断を有効に戻す。
+*/
 void mfMenuEnableInterrupt( void );
 
-/* メニューの中断を無効にする */
-void mfMenuDisableInterrupt( void );
+/*
+	指定された時間だけ、画面リロード時に停止する。
+	
+	@param: uint64_t micro_sec
+		停止するマイクロ秒。
+*/
+void mfMenuWait( uint64_t micro_sec );
+
+/*
+	キーリピート時間をリセットする。
+*/
+void mfMenuKeyRepeatReset( void );
+
+/*
+	未実装。
+*/
+MfMenuRc mfMenuMultiDraw( int x, int y, MfMenuItem **menu, int row, int col, int *select_row, int *select_col, MfMenuOptions options );
+
+/*
+	単一カラムのメニューを表示する。
+	
+	@param: int x
+		表示X位置。
+	
+	@param: int y
+		表示Y位置。
+	
+	@param: MfMenuItem menu[]
+		MfMenuItem構造体配列。
+	
+	@param: size_t num
+		上記MfMenuItem構造体配列の要素数。
+	
+	@param: int *select
+		選択項目のインデックス番号を保存するポインタ。
+	
+	@param: MfMenuOptions option
+		表示オプション。
+*/
+MfMenuRc mfMenuUniDraw( int x, int y, MfMenuItem menu[], size_t num, int *select, MfMenuOptions options );
+
+bool mfMenuGetNumberIsReady( void );
+MfMenuRc mfMenuGetNumberInit( const char *title, const char *unit, long *number, int digits );
+MfMenuRc mfMenuGetNumber( long *number );
+
+bool mfMenuGetButtonsIsReady( void );
+MfMenuRc mfMenuGetButtonsInit( const char *title, unsigned int *buttons, unsigned int avail );
+MfMenuRc mfMenuGetButtons( unsigned int *buttons );
+
+bool mfMenuGetFilenameIsReady( void );
+MfMenuRc mfMenuGetFilenameInit( const char *title, unsigned int flags, const char *initpath, char *path, size_t pathmax, char *name, size_t namemax );
+MfMenuRc mfMenuGetFilename( char **path, char **name );
+
 
 #endif

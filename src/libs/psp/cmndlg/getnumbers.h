@@ -1,10 +1,11 @@
 /*
-	Common dialog - Get buttons
+	Common dialog - Get numbers
 */
 
-#ifndef CMNDLG_GET_BUTTONS_H
-#define CMNDLG_GET_BUTTONS_H
+#ifndef CMNDLG_GET_NUMBERS_H
+#define CMNDLG_GET_NUMBERS_H
 
+#include <stdlib.h>
 #include "psp/blit.h"
 #include "psp/ctrlpad.h"
 #include "utils/strutil.h"
@@ -13,6 +14,11 @@
 #undef CMNDLG_FUNCTION_EXPORT
 #include "psp/cmndlg/message.h"
 
+/*-----------------------------------------------
+	定数
+-----------------------------------------------*/
+#define CMNDLG_GET_NUMBERS_MAX_DIGITS 9
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -20,40 +26,31 @@ extern "C" {
 /*-----------------------------------------------
 	型宣言
 -----------------------------------------------*/
-struct cmndlg_get_buttons_buttonstat {
-	char *name;
-	unsigned int button;
-	bool available;
-};
-
-struct cmndlg_get_buttons_tempdata {
-	unsigned int buttons;
-	unsigned int selected;
-};
+typedef struct {
+	const char *title;
+	const char *unit;
+	long       *numSave;
+	int        numDigits;
+	int        selectedPlace;
+} CmndlgGetNumbersData;
 
 typedef struct {
-	const char   *title;
-	unsigned int *buttonsSave;
-	unsigned int buttonsAvailable;
-} CmndlgGetButtonsData;
-
-typedef struct {
-	CmndlgGetButtonsData *data;
+	CmndlgGetNumbersData *data;
 	int                  numberOfData;
 	int                  selectDataNumber;
 	CmndlgRc             rc;
 	CmndlgUI             ui;
 	CmndlgBaseParams     base; /* ダイアログが内部で使用。変更してはいけない。 */
-} CmndlgGetButtonsParams;
+} CmndlgGetNumbersParams;
 
 /*-----------------------------------------------
 	関数
 -----------------------------------------------*/
-CmndlgGetButtonsParams *cmndlgGetButtonsGetParams( void );
-CmndlgState cmndlgGetButtonsGetStatus( void );
-int cmndlgGetButtonsStart( CmndlgGetButtonsParams *params );
-int cmndlgGetButtonsUpdate( void );
-int cmndlgGetButtonsShutdownStart( void );
+CmndlgGetNumbersParams *cmndlgGetNumbersGetParams( void );
+CmndlgState cmndlgGetNumbersGetStatus( void );
+int cmndlgGetNumbersStart( CmndlgGetNumbersParams *params );
+int cmndlgGetNumbersUpdate( void );
+int cmndlgGetNumbersShutdownStart( void );
 
 #ifdef __cplusplus
 }

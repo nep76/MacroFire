@@ -4,8 +4,8 @@
 	macro.cÇ©ÇÁåƒÇŒÇÍÇÈ
 */
 
-#ifndef __MACROEDITOR_H__
-#define __MACROEDITOR_H__
+#ifndef MACROEDITOR_H
+#define MACROEDITOR_H
 
 #include <pspkernel.h>
 #include <pspctrl.h>
@@ -20,7 +20,7 @@
 /*-----------------------------------------------
 	íËêî
 -----------------------------------------------*/
-#define MACROEDITOR_LINES_PER_PAGE 28
+#define MACROEDITOR_LINES_PER_PAGE 26
 
 #define MACROEDITOR_MAINMENU_POS_X blitOffsetChar( 39 )
 #define MACROEDITOR_MAINMENU_POS_Y blitOffsetLine( 5 )
@@ -40,11 +40,11 @@
 /*-----------------------------------------------
 	å^êÈåæ
 -----------------------------------------------*/
-typedef MfMenuReturnCode ( *MacroeditorEditFunction )( SceCtrlLatch*, MacroData* );
+typedef MfMenuRc ( *MacroeditorEditFunction )( SceCtrlData*, MacroData* );
 
 /*-----------------------------------------------
 	ä÷êî
 -----------------------------------------------*/
-MfMenuReturnCode macroeditorMain( SceCtrlLatch *pad_latch, SceCtrlData *pad_data, MacroData *macro );
+MfMenuRc macroeditorMain( SceCtrlData *pad_data, MacroData *macro );
 
 #endif

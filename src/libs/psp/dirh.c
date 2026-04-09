@@ -122,7 +122,7 @@ static void dirh_destroy_dirent( struct dirh_dirents *entry )
 	entry->fileCount  = 0;
 }
 
-DirhUID dirhOpen( const char *dirpath, unsigned int options )
+DirhUID dirhNew( const char *dirpath, unsigned int options )
 {
 	struct dirh_select_filename *sf = (struct dirh_select_filename *)memsceMalloc( sizeof( struct dirh_select_filename ) );
 	if( ! sf ) return 0;
@@ -136,20 +136,18 @@ DirhUID dirhOpen( const char *dirpath, unsigned int options )
 	sf->entry.fileList  = NULL;
 	sf->entry.fileCount = 0;
 	
-	if( dirhReopen( (DirhUID)sf, dirpath ) < 0 ){
-		dirhClose( (DirhUID)sf );
-	}
+	dirhChdir( (DirhUID)sf, dirpath );
 	
 	return (DirhUID)sf;
 }
 
-void dirhClose( DirhUID uid )
+void dirhDestroy( DirhUID uid )
 {
 	dirh_destroy_dirent( &(((struct dirh_select_filename *)uid)->entry) );
 	memsceFree( (struct dirh_select_filename *)uid );
 }
 
-int dirhReopen( DirhUID uid, const char *dirpath )
+int dirhChdir( DirhUID uid, const char *dirpath )
 {
 	int ret;
 	SceIoStat stat;

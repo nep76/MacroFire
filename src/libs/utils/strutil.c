@@ -31,7 +31,7 @@ char *strutilSafeCat( char *dest, const char *src, size_t max )
 	return retp;
 }
 
-char *strutilCounterPbrk( char *src, const char *search )
+char *strutilCounterPbrk( const char *src, const char *search )
 {
 	bool find = false;
 	
@@ -54,11 +54,11 @@ char *strutilCounterPbrk( char *src, const char *search )
 	if( *src == '\0' ){
 		return NULL;
 	} else{
-		return src;
+		return (char *)src;
 	}
 }
 
-char *strutilCounterReversePbrk( char *src, const char *search )
+char *strutilCounterReversePbrk( const char *src, const char *search )
 {
 	int src_index, search_index, search_len;
 	bool find = false;
@@ -83,7 +83,7 @@ char *strutilCounterReversePbrk( char *src, const char *search )
 	if( src[src_index] == '\0' ){
 		return NULL;
 	} else{
-		return &src[src_index];
+		return (char *)(&src[src_index]);
 	}
 }
 

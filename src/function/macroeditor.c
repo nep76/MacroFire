@@ -5,27 +5,21 @@
 #include "macroeditor.h"
 
 /*-----------------------------------------------
+	ローカル関数
+-----------------------------------------------*/
+static unsigned int macroeditor_count_macro_lines  ( MacroData *macro );
+static void         macroeditor_print_button_symbol( unsigned int buttons, char *command, size_t len );
+static MfMenuRc     macroeditor_edit_data          ( SceCtrlData *pad_data, MacroData *macro );
+static MfMenuRc     macroeditor_ch_type            ( SceCtrlData *pad_data, MacroData *macro );
+
+/*-----------------------------------------------
 	ローカル変数と定数
 -----------------------------------------------*/
+static int st_macro_all_lines    = -1;
 static int st_selected_macro_num = 0;
-static int st_macro_all_lines    = 0;
-
-#define MACROEDITOR_EDIT_DATA  0
-#define MACROEDITOR_CH_TYPE    1
-#define MACROEDITOR_INS_BEFORE 3
-#define MACROEDITOR_INS_AFTER  4
-#define MACROEDITOR_DELETE     5
-static MfMenuItem st_editmenu[] = {
-	{ MT_ANCHOR, 0, "Edit data", { 0 } },
-	{ MT_ANCHOR, 0, "Change type", { 0 } },
-	{ MT_BORDER, 0, 0, { 0 } },
-	{ MT_ANCHOR, 0, "Insert before", { 0 } },
-	{ MT_ANCHOR, 0, "Insert after", { 0 } },
-	{ MT_ANCHOR, 0, "Delete", { 0 } }
-};
 
 #define MACROEDITOR_WAITMS_DIGIT 9
-char st_edit_waitms[MACROEDITOR_WAITMS_DIGIT + 1]; /* 999,999,999マイクロ秒(999秒)まで */
+char st_edit_waitms[MACROEDITOR_WAITMS_DIGIT + 1]; /* 999,999,999ミリ秒まで */
 
 #define MACROEDITOR_COORD_DIGIT 3
 char st_edit_coord_x[MACROEDITOR_COORD_DIGIT + 1];
@@ -35,152 +29,127 @@ char st_edit_coord_y[MACROEDITOR_COORD_DIGIT + 1];
 #define MACROEDITOR_TYPE_BUTTONS_PRESS   1
 #define MACROEDITOR_TYPE_BUTTONS_RELEASE 2
 #define MACROEDITOR_TYPE_BUTTONS_CHANGE  3
-#define MACROEDITOR_TYPE_ANALOG_NEUTRAL  4
-#define MACROEDITOR_TYPE_ANALOG_MOVE     5
+#define MACROEDITOR_TYPE_ANALOG_MOVE     4
 static MfMenuItem st_edit_chtype[] = {
-	{ MT_ANCHOR, 0, "Delay",           { 0 } },
-	{ MT_ANCHOR, 0, "Buttons press",   { 0 } },
-	{ MT_ANCHOR, 0, "Buttons release", { 0 } },
-	{ MT_ANCHOR, 0, "Buttons change",  { 0 } },
-	{ MT_ANCHOR, 0, "Analog neutral",  { 0 } },
-	{ MT_ANCHOR, 0, "Analog move",     { 0 } }
+	{ MT_ANCHOR, "Delay",           0, NULL },
+	{ MT_ANCHOR, "Buttons press",   0, NULL },
+	{ MT_ANCHOR, "Buttons release", 0, NULL },
+	{ MT_ANCHOR, "Buttons change",  0, NULL },
+	{ MT_ANCHOR, "Analog move",     0, NULL }
 };
-
-/*-----------------------------------------------
-	ローカル関数
------------------------------------------------*/
-static unsigned int     macroeditor_count_macro_lines  ( MacroData *macro );
-static void             macroeditor_print_button_symbol( unsigned int buttons, char *command, size_t len );
-static MfMenuReturnCode macroeditor_menu               ( SceCtrlLatch *pad_latch, MacroData *macro, unsigned int num );
-static MfMenuReturnCode macroeditor_edit_data          ( SceCtrlLatch *pad_latch, MacroData *macro );
-static MfMenuReturnCode macroeditor_ch_type            ( SceCtrlLatch *pad_latch, MacroData *macro );
-static MfMenuReturnCode macroeditor_ins_before         ( SceCtrlLatch *pad_latch, MacroData *macro );
-static MfMenuReturnCode macroeditor_ins_after          ( SceCtrlLatch *pad_latch, MacroData *macro );
-static MfMenuReturnCode macroeditor_delete             ( SceCtrlLatch *pad_latch, MacroData *macro );
 
 /*=============================================*/
 
 void macroeditorReset( void )
 {
-	st_macro_all_lines    = 0;
+	st_macro_all_lines    = -1;
 	st_selected_macro_num = 0;
 }
 
-MfMenuReturnCode macroeditorMain( SceCtrlLatch *pad_latch, SceCtrlData *pad_data, MacroData *macro )
+MfMenuRc macroeditorMain( SceCtrlData *pad_data, MacroData *macro )
 {
-	static bool run_menu = false;
-	static int prev_start_line = -1;
+	static bool                    menu_start = false;
+	static MacroeditorEditFunction menu_func  = NULL;
 	
-	int y = 2, line = 1, rest;
-	bool redraw = false;
+	MacroData *selected_macro   = NULL;
+	int rest_lines, line_number = 1;
+	int y = 4;
 	
-	/* メニュー表示 */
-	if( run_menu ){
-		switch( macroeditor_menu( pad_latch, macro, st_selected_macro_num ) ){
-			case MR_CONTINUE:
-				run_menu = true;
-				break;
-			case MR_BACK:
-				run_menu = false;
-				mfMenuEnableInterrupt();
-				break;
-			case MR_ENTER:    break; /* MR_ENTERが返ることはない。コンパイラの警告抑止の為。 */
-		}
-		return MR_CONTINUE;
-	}
-	
-	/* 操作 */
-	if( ! st_macro_all_lines ){
+	if( st_macro_all_lines < 0 ){
 		st_macro_all_lines = macroeditor_count_macro_lines( macro );
-		if( st_selected_macro_num > st_macro_all_lines ) st_selected_macro_num = st_macro_all_lines;
-	}
-	
-	if( pad_latch->uiMake & PSP_CTRL_CROSS ){
-		macroeditorReset();
-		return MR_BACK;
-	} else if( pad_latch->uiMake & PSP_CTRL_CIRCLE ){
-		/* 0にリセットして、編集後に再取得させる */
-		st_macro_all_lines = 0;
-		
-		run_menu = true;
-		mfMenuDisableInterrupt();
-		
-		return MR_CONTINUE;
-	} else if( pad_latch->uiMake & PSP_CTRL_UP ){
-		st_selected_macro_num--;
-	} else if( pad_latch->uiMake & PSP_CTRL_DOWN ){
-		st_selected_macro_num++;
-	} else if( pad_latch->uiMake & PSP_CTRL_LEFT ){
-		st_selected_macro_num -= MACROEDITOR_LINES_PER_PAGE;
-	} else if( pad_latch->uiMake & PSP_CTRL_RIGHT ){
-		st_selected_macro_num += MACROEDITOR_LINES_PER_PAGE;
-	}
-	
-	/* 負数の場合は先頭で上を押されていたら末尾へ */
-	if( st_selected_macro_num < 0 ){
-		if( pad_latch->uiMake & PSP_CTRL_UP ){
-			st_selected_macro_num = st_macro_all_lines;
-		} else{
-			st_selected_macro_num = 0;
-		}
-	}
-	/* 最大数を超えている場合は末尾で下を押されているので先頭へ */
-	if( st_selected_macro_num > st_macro_all_lines ){
-		if( pad_latch->uiMake & PSP_CTRL_DOWN ){
-			st_selected_macro_num = 0;
-		} else{
-			st_selected_macro_num = st_macro_all_lines;
-		}
 	}
 	
 	/* スクロール */
-	for( rest = st_selected_macro_num - ( MACROEDITOR_LINES_PER_PAGE >> 1 ); rest > 0 && macro; ( macro = macro->next ), line++, rest-- ){
-		if( st_macro_all_lines - ( line - 1 ) < MACROEDITOR_LINES_PER_PAGE ){ break; }
-		continue;
+	for( rest_lines = st_selected_macro_num - ( MACROEDITOR_LINES_PER_PAGE >> 1 ); rest_lines > 0 && macro; macro = macro->next, line_number++, rest_lines-- ){
+		if( st_macro_all_lines - ( line_number - 1 ) < MACROEDITOR_LINES_PER_PAGE ){
+			break;
+		}
 	}
 	
-	if( prev_start_line != line - 1 ){
-		redraw = true;
-		prev_start_line = line - 1;
-	}
-	
-	/* 表示開始 */
-	for( rest = MACROEDITOR_LINES_PER_PAGE; macro && rest; ( macro = macro->next ), line++, rest-- ){
+	for( rest_lines = MACROEDITOR_LINES_PER_PAGE; macro && rest_lines; macro = macro->next, rest_lines--, line_number++ ){
 		char command[255];
 		
 		if( macro->action == MA_DELAY ){
-			snprintf( command, sizeof( command ), "%03d: Delay -----------> %llu ms", line, (uint64_t)macro->data );
+			snprintf( command, sizeof( command ), "%03d: Delay -----------> %llu ms", line_number, (uint64_t)macro->data );
 		} else if( macro->action == MA_BUTTONS_PRESS ){
-			snprintf( command, sizeof( command ), "%03d: Buttons press ---> ", line );
+			snprintf( command, sizeof( command ), "%03d: Buttons press ---> ", line_number );
 			macroeditor_print_button_symbol( macro->data, command, 255 );
 		} else if( macro->action == MA_BUTTONS_RELEASE ){
-			snprintf( command, sizeof( command ), "%03d: Buttons release -> ", line );
+			snprintf( command, sizeof( command ), "%03d: Buttons release -> ", line_number );
 			macroeditor_print_button_symbol( macro->data, command, 255 );
 		} else if( macro->action == MA_BUTTONS_CHANGE ){
-			snprintf( command, sizeof( command ), "%03d: Buttons change --> ", line );
+			snprintf( command, sizeof( command ), "%03d: Buttons change --> ", line_number );
 			macroeditor_print_button_symbol( macro->data, command, 255 );
-		} else if( macro->action == MA_ANALOG_NEUTRAL ){
-			snprintf( command, sizeof( command ), "%03d: Analog(x,y)------> NEUTRAL", line );
 		} else if( macro->action == MA_ANALOG_MOVE ){
-			snprintf( command, sizeof( command ), "%03d: Analog(x,y)------> %lu, %lu", line, (uint32_t)MACRO_GET_ANALOG_X( macro->data ), (uint32_t)MACRO_GET_ANALOG_Y( macro->data ) );
+			snprintf( command, sizeof( command ), "%03d: Analog(x,y)------> %d, %d", line_number, (int)MACROMGR_GET_ANALOG_X( macro->data ), (int)MACROMGR_GET_ANALOG_Y( macro->data ) );
 		}
 		
-		if( redraw ) blitFillBox( 0, blitOffsetLine( y ), 480, blitMeasureLine( 2 ), MENU_BGCOLOR );
-		
-		if( line - 1 == st_selected_macro_num ){
-			blitString( blitOffsetChar( 3 ), blitOffsetLine( y ), MENU_FCCOLOR, MENU_BGCOLOR, command );
+		if( line_number - 1 == st_selected_macro_num ){
+			selected_macro = macro;
+			blitString( blitOffsetChar( 3 ), blitOffsetLine( y++ ), MFM_TEXT_FCCOLOR, MFM_TEXT_BGCOLOR, command );
 		} else{
-			blitString( blitOffsetChar( 3 ), blitOffsetLine( y ), MENU_FGCOLOR, MENU_BGCOLOR, command );
+			blitString( blitOffsetChar( 3 ), blitOffsetLine( y++ ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, command );
 		}
-		y++;
 	}
 	
-	if( rest && redraw )
-		blitFillBox( 0, blitOffsetLine( y ), 480, blitMeasureLine( rest ), MENU_BGCOLOR );
+	if( menu_start ){
+		switch( menu_func( pad_data, selected_macro ) ){
+			case MR_ENTER: /* 無視 */
+			case MR_CONTINUE:
+				break;
+			case MR_BACK:
+				menu_start = false;
+				break;
+		}
+		return MR_CONTINUE;
+	}
 	
-	redraw = false;
+	blitStringf( blitOffsetChar( 3 ), blitOffsetLine( 31 ) + ( BLIT_CHAR_HEIGHT >> 1 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "\x80\x82 = Move, \x83\x81 = PageMove, \x85 = Edit data, \x84 = Change type, \x87 = Delete\nL = Insert before, R = Insert after, \x86 = Back, START = Exit" );
 	
-	blitString( blitOffsetChar( 3 ), blitOffsetLine( 31 ), MENU_FGCOLOR, MENU_BGCOLOR, "\x80 = MoveUp, \x82 = MoveDown, \x83 = PageUp, \x81 = PageDown\n\x85 = Edit menu, \x86 = Back, START = Exit" );
+	if( pad_data->Buttons & PSP_CTRL_CROSS ){
+		macroeditorReset();
+		return MR_BACK;
+	} else if( pad_data->Buttons & PSP_CTRL_CIRCLE ){
+		menu_start = true;
+		menu_func  = macroeditor_edit_data;
+	} else if( pad_data->Buttons & PSP_CTRL_TRIANGLE ){
+		menu_start = true;
+		menu_func  = macroeditor_ch_type;
+	} else if( pad_data->Buttons & PSP_CTRL_SQUARE ){
+		macromgrRemove( selected_macro );
+		if( st_macro_all_lines > 0 ) st_macro_all_lines--;
+	} else if( pad_data->Buttons & PSP_CTRL_LTRIGGER ){
+		if( macromgrInsert( MIP_BEFORE, selected_macro ) ) st_macro_all_lines++;
+	} else if( pad_data->Buttons & PSP_CTRL_RTRIGGER ){
+		if( macromgrInsert( MIP_AFTER,  selected_macro ) ){
+			st_macro_all_lines++;
+			st_selected_macro_num++;
+		}
+	} else if( pad_data->Buttons & PSP_CTRL_UP ){
+		st_selected_macro_num--;
+	} else if( pad_data->Buttons & PSP_CTRL_DOWN ){
+		st_selected_macro_num++;
+	} else if( pad_data->Buttons & PSP_CTRL_LEFT ){
+		st_selected_macro_num -= MACROEDITOR_LINES_PER_PAGE;
+	} else if( pad_data->Buttons & PSP_CTRL_RIGHT ){
+		st_selected_macro_num += MACROEDITOR_LINES_PER_PAGE;
+	}
+	
+	if( st_selected_macro_num < 0 ){
+		if( pad_data->Buttons & PSP_CTRL_UP ){
+			st_selected_macro_num = st_macro_all_lines;
+		} else{
+			st_selected_macro_num = 0;
+		}
+	}
+	
+	if( st_selected_macro_num > st_macro_all_lines ){
+		if( pad_data->Buttons & PSP_CTRL_DOWN ){
+			st_selected_macro_num = 0;
+		} else{
+			st_selected_macro_num = st_macro_all_lines;
+		}
+	}
 	
 	return MR_CONTINUE;
 }
@@ -198,149 +167,227 @@ static unsigned int macroeditor_count_macro_lines( MacroData *macro )
 
 static void macroeditor_print_button_symbol( unsigned int buttons, char *command, size_t len )
 {
-	if( buttons & PSP_CTRL_UP       ) strutilSafeCat( command, "\x80 ", len );
-	if( buttons & PSP_CTRL_RIGHT    ) strutilSafeCat( command, "\x81 ", len );
-	if( buttons & PSP_CTRL_DOWN     ) strutilSafeCat( command, "\x82 ", len );
-	if( buttons & PSP_CTRL_LEFT     ) strutilSafeCat( command, "\x83 ", len );
-	if( buttons & PSP_CTRL_LTRIGGER ) strutilSafeCat( command, "L ", len );
-	if( buttons & PSP_CTRL_RTRIGGER ) strutilSafeCat( command, "R ", len );
-	if( buttons & PSP_CTRL_TRIANGLE ) strutilSafeCat( command, "\x84 ", len );
-	if( buttons & PSP_CTRL_CIRCLE   ) strutilSafeCat( command, "\x85 ", len );
-	if( buttons & PSP_CTRL_CROSS    ) strutilSafeCat( command, "\x86 ", len );
-	if( buttons & PSP_CTRL_SQUARE   ) strutilSafeCat( command, "\x87 ", len );
+	if( buttons & PSP_CTRL_CIRCLE   ) strutilSafeCat( command, "\x85 "  , len );
+	if( buttons & PSP_CTRL_CROSS    ) strutilSafeCat( command, "\x86 "  , len );
+	if( buttons & PSP_CTRL_SQUARE   ) strutilSafeCat( command, "\x87 "  , len );
+	if( buttons & PSP_CTRL_TRIANGLE ) strutilSafeCat( command, "\x84 "  , len );
+	if( buttons & PSP_CTRL_UP       ) strutilSafeCat( command, "\x80 "  , len );
+	if( buttons & PSP_CTRL_RIGHT    ) strutilSafeCat( command, "\x81 "  , len );
+	if( buttons & PSP_CTRL_DOWN     ) strutilSafeCat( command, "\x82 "  , len );
+	if( buttons & PSP_CTRL_LEFT     ) strutilSafeCat( command, "\x83 "  , len );
+	if( buttons & PSP_CTRL_LTRIGGER ) strutilSafeCat( command, "L "     , len );
+	if( buttons & PSP_CTRL_RTRIGGER ) strutilSafeCat( command, "R "     , len );
 	if( buttons & PSP_CTRL_SELECT   ) strutilSafeCat( command, "SELECT ", len );
-	if( buttons & PSP_CTRL_START    ) strutilSafeCat( command, "START ", len );
+	if( buttons & PSP_CTRL_START    ) strutilSafeCat( command, "START " , len );
 }
 
-static MfMenuReturnCode macroeditor_menu( SceCtrlLatch *pad_latch, MacroData *macro, unsigned int num )
+static MfMenuRc macroeditor_edit_delay( SceCtrlData *pad_data, MacroData *macro )
 {
-	MfMenuReturnCode rc = MR_CONTINUE;
-	static int selected = -1;
-	static MacroeditorEditFunction function = NULL;
-	static MacroData *req_macro;
-	
-	/* selectedが0未満の場合は初回の呼び出しなので描画範囲を塗りつぶし */
-	if( selected < 0 ){
-		blitFillBox( MACROEDITOR_MAINMENU_POS_X, MACROEDITOR_MAINMENU_POS_Y, blitMeasureChar( 15 ), blitMeasureLine( 8 ), MENU_BGCOLOR );
-		blitLineBox( MACROEDITOR_MAINMENU_POS_X, MACROEDITOR_MAINMENU_POS_Y, blitMeasureChar( 15 ), blitMeasureLine( 8 ), MENU_FGCOLOR );
-		selected = 0;
-	}
-	
-	if( ! function ){
-		switch( mfMenuVertical( MACROEDITOR_MAINMENU_POS_X + BLIT_CHAR_WIDTH, MACROEDITOR_MAINMENU_POS_Y + BLIT_CHAR_HEIGHT, blitMeasureChar( 13 ), st_editmenu, MF_ARRAY_NUM( st_editmenu ), &selected ) ){
-			case MR_CONTINUE: break;
-			case MR_ENTER:
-				switch( selected ){
-					case MACROEDITOR_EDIT_DATA:  function = macroeditor_edit_data;  break;
-					case MACROEDITOR_CH_TYPE:    function = macroeditor_ch_type;    break;
-					case MACROEDITOR_INS_BEFORE: function = macroeditor_ins_before; break;
-					case MACROEDITOR_INS_AFTER:  function = macroeditor_ins_after;  break;
-					case MACROEDITOR_DELETE:     function = macroeditor_delete;     break;
-				}
-				for( req_macro = macro; num; num-- ){
-					if( req_macro->next ){
-						req_macro = req_macro->next;
-					} else{
-						break;
-					}
-				}
-				break;
-			case MR_BACK:
-				rc = MR_BACK;
+	if( cmndlgGetNumbersGetStatus() == CMNDLG_NONE ){
+		CmndlgGetNumbersParams *params = (CmndlgGetNumbersParams *)memsceMalloc( sizeof( CmndlgGetNumbersParams ) );
+		if( params ){
+			params->data = (CmndlgGetNumbersData *)memsceMalloc( sizeof( CmndlgGetNumbersData ) );
+			if( ! params->data ){
+				memsceFree( params );
+				return MR_BACK;
+			}
+			
+			params->numberOfData        = 1;
+			params->selectDataNumber    = 0;
+			params->rc                  = 0;
+			params->ui.x                = MACROEDITOR_EDIT_WAITMS_POS_X;
+			params->ui.y                = MACROEDITOR_EDIT_WAITMS_POS_Y;
+			params->ui.fgTextColor      = MFM_TEXT_FGCOLOR;
+			params->ui.fcTextColor      = MFM_TEXT_FCCOLOR;
+			params->ui.bgTextColor      = MFM_TRANSPARENT;
+			params->ui.bgColor          = MFM_BG_COLOR;
+			params->ui.borderColor      = MFM_TRANSPARENT;
+			params->data->title         = "Set delay (1sec = 1000ms)";
+			params->data->unit          = "ms";
+			params->data->numSave       = (long *)&(macro->data);
+			params->data->numDigits     = 9;
+			params->data->selectedPlace = 0;
+			
+			if( cmndlgGetNumbersStart( params ) ){
+				cmndlgGetNumbersShutdownStart();
+				memsceFree( params->data );
+				memsceFree( params );
+				return MR_BACK;
+			}
+		} else{
+			//エラー
 		}
 	} else{
-		if( ( function )( pad_latch, req_macro ) == MR_BACK ){
-				function = NULL;
-				rc = MR_BACK;
+		CmndlgState state;
+		if( cmndlgGetNumbersUpdate() ){
+			//エラー
+		}
+		state = cmndlgGetNumbersGetStatus();
+		if( state == CMNDLG_SHUTDOWN ){
+			CmndlgGetNumbersParams *params = cmndlgGetNumbersGetParams();
+			cmndlgGetNumbersShutdownStart();
+			memsceFree( params->data );
+			memsceFree( params );
+			mfMenuKeyRepeatReset();
+			return MR_BACK;
 		}
 	}
 	
-	if( rc == MR_BACK ){
-		mfClearColor ( MENU_BGCOLOR );
-		selected = -1;
+	return MR_CONTINUE;
+}
+
+static MfMenuRc macroeditor_edit_buttons( SceCtrlData *pad_data, MacroData *macro )
+{
+	if( cmndlgGetButtonsGetStatus() == CMNDLG_NONE ){
+		CmndlgGetButtonsParams *params = (CmndlgGetButtonsParams *)memsceMalloc( sizeof( CmndlgGetButtonsParams ) );
+		if( params ){
+			params->data = (CmndlgGetButtonsData *)memsceMalloc( sizeof( CmndlgGetButtonsData ) );
+			if( ! params->data ){
+				memsceFree( params );
+				return MR_BACK;
+			}
+			
+			params->numberOfData           = 1;
+			params->selectDataNumber       = 0;
+			params->rc                     = 0;
+			params->ui.x                   = MACROEDITOR_EDIT_WAITMS_POS_X;
+			params->ui.y                   = MACROEDITOR_EDIT_WAITMS_POS_Y;
+			params->ui.fgTextColor         = MFM_TEXT_FGCOLOR;
+			params->ui.fcTextColor         = MFM_TEXT_FCCOLOR;
+			params->ui.bgTextColor         = MFM_TRANSPARENT;
+			params->ui.bgColor             = MFM_BG_COLOR;
+			params->ui.borderColor         = MFM_TRANSPARENT;
+			params->data->title            = "Set new buttons state";
+			params->data->buttonsSave      = (unsigned int *)&(macro->data);
+			/* 十字キー、START、SELECT、○×□△ボタンとLR */
+			params->data->buttonsAvailable = 0x0000FFFF;
+			
+			if( cmndlgGetButtonsStart( params ) ){
+				cmndlgGetButtonsShutdownStart();
+				memsceFree( params->data );
+				memsceFree( params );
+				return MR_BACK;
+			}
+		} else{
+			//エラー
+		}
+	} else{
+		CmndlgState state;
+		if( cmndlgGetButtonsUpdate() ){
+			//エラー
+		}
+		state = cmndlgGetButtonsGetStatus();
+		if( state == CMNDLG_SHUTDOWN ){
+			CmndlgGetButtonsParams *params = cmndlgGetButtonsGetParams();
+			cmndlgGetButtonsShutdownStart();
+			memsceFree( params->data );
+			memsceFree( params );
+			mfMenuKeyRepeatReset();
+			return MR_BACK;
+		}
+	}
+	
+	return MR_CONTINUE;
+}
+
+static MfMenuRc macroeditor_edit_analog( SceCtrlData *pad_data, MacroData *macro )
+{
+	if( cmndlgGetNumbersGetStatus() == CMNDLG_NONE ){
+		int *x = (int *)memsceMalloc( sizeof( int ) );
+		int *y = (int *)memsceMalloc( sizeof( int ) );
+		CmndlgGetNumbersParams *params = (CmndlgGetNumbersParams *)memsceMalloc( sizeof( CmndlgGetNumbersParams ) );
+		if( params ){
+			params->data = (CmndlgGetNumbersData *)memsceMalloc( sizeof( CmndlgGetNumbersData ) * 2 );
+			if( ! params->data ){
+				memsceFree( x );
+				memsceFree( y );
+				memsceFree( params );
+				return MR_BACK;
+			}
+			
+			*x = MACROMGR_GET_ANALOG_X( macro->data );
+			*y = MACROMGR_GET_ANALOG_Y( macro->data );
+			
+			params->numberOfData        = 2;
+			params->selectDataNumber    = 0;
+			params->rc                  = 0;
+			params->ui.x                = MACROEDITOR_EDIT_WAITMS_POS_X;
+			params->ui.y                = MACROEDITOR_EDIT_WAITMS_POS_Y;
+			params->ui.fgTextColor      = MFM_TEXT_FGCOLOR;
+			params->ui.fcTextColor      = MFM_TEXT_FCCOLOR;
+			params->ui.bgTextColor      = MFM_TRANSPARENT;
+			params->ui.bgColor          = MFM_BG_COLOR;
+			params->ui.borderColor      = MFM_TRANSPARENT;
+			params->data[0].title         = "Set analog X-coordinate";
+			params->data[0].unit          = "(0-255)";
+			params->data[0].numSave       = (long *)x;
+			params->data[0].numDigits     = 3;
+			params->data[0].selectedPlace = 0;
+			params->data[1].title         = "Set analog Y-coordinate";
+			params->data[1].unit          = "(0-255)";
+			params->data[1].numSave       = (long *)y;
+			params->data[1].numDigits     = 3;
+			params->data[1].selectedPlace = 0;
+			
+			if( cmndlgGetNumbersStart( params ) ){
+				cmndlgGetNumbersShutdownStart();
+				memsceFree( x );
+				memsceFree( y );
+				memsceFree( params->data );
+				memsceFree( params );
+				return MR_BACK;
+			}
+		} else{
+			//エラー
+		}
+	} else{
+		CmndlgState state;
+		if( cmndlgGetNumbersUpdate() ){
+			//エラー
+		}
+		state = cmndlgGetNumbersGetStatus();
+		if( state == CMNDLG_SHUTDOWN ){
+			CmndlgGetNumbersParams *params = cmndlgGetNumbersGetParams();
+			cmndlgGetNumbersShutdownStart();
+			if( *((int *)params->data[0].numSave) > 255 ) *((int *)params->data[0].numSave) = 255;
+			if( *((int *)params->data[1].numSave) > 255 ) *((int *)params->data[1].numSave) = 255;
+			macro->data = MACROMGR_SET_ANALOG_XY( *((int *)params->data[0].numSave), *((int *)params->data[1].numSave) );
+			memsceFree( params->data[0].numSave );
+			memsceFree( params->data[1].numSave );
+			memsceFree( params->data );
+			memsceFree( params );
+			mfMenuKeyRepeatReset();
+			return MR_BACK;
+		}
+	}
+	
+	return MR_CONTINUE;
+}
+
+static MfMenuRc macroeditor_edit_data( SceCtrlData *pad_data, MacroData *macro )
+{
+	MfMenuRc rc = MR_BACK;
+	
+	if( macro->action == MA_DELAY ){
+		rc = macroeditor_edit_delay( pad_data, macro );
+	} else if( macro->action == MA_BUTTONS_PRESS || macro->action == MA_BUTTONS_RELEASE || macro->action == MA_BUTTONS_CHANGE ){
+		rc = macroeditor_edit_buttons( pad_data, macro );
+	} else if( macro->action == MA_ANALOG_MOVE ){
+		rc = macroeditor_edit_analog( pad_data, macro );
 	}
 	
 	return rc;
 }
 
-static MfMenuReturnCode macroeditor_edit_delay( SceCtrlLatch *pad_latch, MacroData *macro, int *selected )
+static MfMenuRc macroeditor_ch_type( SceCtrlData *pad_data, MacroData *macro )
 {
-	CmndlgGetDigitsData cgd[1];
-	cgd[0].title = "Set delay (1sec = 1000ms)";
-	cgd[0].unit  = "ms";
-	cgd[0].number = (long *)&(macro->data);
-	cgd[0].numDigits = 9;
+	static int selected = 0;
 	
-	cmndlgGetDigits( MACROEDITOR_EDIT_WAITMS_POS_X, MACROEDITOR_EDIT_WAITMS_POS_Y, cgd, 1 );
+	blitFillBox( MACROEDITOR_EDIT_TYPE_POS_X, MACROEDITOR_EDIT_TYPE_POS_Y, blitMeasureChar( 21 ), blitMeasureLine( 9 ), MFM_BG_COLOR );
+	blitLineBox( MACROEDITOR_EDIT_TYPE_POS_X, MACROEDITOR_EDIT_TYPE_POS_Y, blitMeasureChar( 21 ), blitMeasureLine( 9 ), MFM_TRANSPARENT );
+	blitString( MACROEDITOR_EDIT_TYPE_POS_X + blitOffsetChar( 1 ), MACROEDITOR_EDIT_TYPE_POS_Y + blitOffsetLine( 1 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Choose a new action" );
 	
-	return MR_BACK;
-}
-
-static MfMenuReturnCode macroeditor_edit_buttons( SceCtrlLatch *pad_latch, MacroData *macro, int *selected )
-{
-	CmndlgGetButtonsData cgb[1];
-	
-	cgb[0].title   = "Set buttons state";
-	cgb[0].buttons = (unsigned int *)&(macro->data);
-	cgb[0].btnMask = PSP_CTRL_NOTE | PSP_CTRL_SCREEN | PSP_CTRL_VOLUP | PSP_CTRL_VOLDOWN;
-	
-	cmndlgGetButtons( MACROEDITOR_EDIT_BUTTONS_POS_X, MACROEDITOR_EDIT_BUTTONS_POS_Y, cgb, 1 );
-	
-	return MR_BACK;
-}
-
-static MfMenuReturnCode macroeditor_edit_analog( SceCtrlLatch *pad_latch, MacroData *macro, int *selected )
-{
-	CmndlgGetDigitsData cgd[2];
-	int x, y;
-	
-	x = MACRO_GET_ANALOG_X( macro->data );
-	y = MACRO_GET_ANALOG_Y( macro->data );
-	
-	cgd[0].title     = "Set analog X-coordinate";
-	cgd[0].unit      = "(0-255)";
-	cgd[0].number    = (long *)&x;
-	cgd[0].numDigits = 3;
-	cgd[1].title     = "Set analog Y-coordinate";
-	cgd[1].unit      = "(0-255)";
-	cgd[1].number    = (long *)&y;
-	cgd[1].numDigits = 3;
-	
-	cmndlgGetDigits( MACROEDITOR_EDIT_WAITMS_POS_X, MACROEDITOR_EDIT_WAITMS_POS_Y, cgd, 2 );
-	
-	if( x > 255 ) x = 255;
-	if( y > 255 ) y = 255;
-	macro->data = MACRO_SET_ANALOG_XY( x, y );
-	
-	return MR_BACK;
-}
-
-static MfMenuReturnCode macroeditor_edit_data( SceCtrlLatch *pad_latch, MacroData *macro )
-{
-	static int selected = -1;
-	
-	if( macro->action == MA_DELAY ){
-		return macroeditor_edit_delay( pad_latch, macro, &selected );
-	} else if( macro->action == MA_BUTTONS_PRESS || macro->action == MA_BUTTONS_RELEASE || macro->action == MA_BUTTONS_CHANGE ){
-		return macroeditor_edit_buttons( pad_latch, macro, &selected );
-	} else if( macro->action == MA_ANALOG_MOVE ){
-		return macroeditor_edit_analog( pad_latch, macro, &selected );
-	}
-	
-	return MR_BACK;
-}
-
-static MfMenuReturnCode macroeditor_ch_type( SceCtrlLatch *pad_latch, MacroData *macro )
-{
-	static int selected = -1;
-	
-	if( selected < 0 ){
-		blitFillBox( MACROEDITOR_EDIT_TYPE_POS_X, MACROEDITOR_EDIT_TYPE_POS_Y, blitMeasureChar( 17 ), blitMeasureLine( 8 ), MENU_BGCOLOR );
-		blitLineBox( MACROEDITOR_EDIT_TYPE_POS_X, MACROEDITOR_EDIT_TYPE_POS_Y, blitMeasureChar( 17 ), blitMeasureLine( 8 ), MENU_FGCOLOR );
-		selected = 0;
-	}
-	
-	switch( mfMenuVertical( MACROEDITOR_EDIT_TYPE_POS_X + BLIT_CHAR_WIDTH, MACROEDITOR_EDIT_TYPE_POS_Y + BLIT_CHAR_HEIGHT, blitMeasureChar( 15 ), st_edit_chtype, MF_ARRAY_NUM( st_edit_chtype ), &selected ) ){
+	switch( mfMenuUniDraw( MACROEDITOR_EDIT_TYPE_POS_X + blitOffsetChar( 3 ), MACROEDITOR_EDIT_TYPE_POS_Y + blitOffsetLine( 3 ), st_edit_chtype, MF_ARRAY_NUM( st_edit_chtype ), &selected, 0 ) ){
 		case MR_CONTINUE: return MR_CONTINUE;
 		case MR_ENTER:
 			switch( selected ){
@@ -360,42 +407,16 @@ static MfMenuReturnCode macroeditor_ch_type( SceCtrlLatch *pad_latch, MacroData 
 					macro->action = MA_BUTTONS_CHANGE;
 					macro->data   = 0;
 					break;
-				case MACROEDITOR_TYPE_ANALOG_NEUTRAL:
-					macro->action = MA_ANALOG_NEUTRAL;
-					macro->data   = 0;
-					break;
 				case MACROEDITOR_TYPE_ANALOG_MOVE:
 					macro->action = MA_ANALOG_MOVE;
-					macro->data   = MACRO_SET_ANALOG_XY( 128, 128 );
+					macro->data   = MACROMGR_ANALOG_NEUTRAL;
 					break;
 			}
+			selected = 0;
 		case MR_BACK:
-			selected = -1;
+			selected = 0;
 			break;
 	}
 	
-	return MR_BACK;
-}
-
-static MfMenuReturnCode macroeditor_ins_before( SceCtrlLatch *pad_latch, MacroData *macro )
-{
-	macromgrInsert( MIP_BEFORE, macro );
-	
-	return MR_BACK;
-}
-
-static MfMenuReturnCode macroeditor_ins_after( SceCtrlLatch *pad_latch, MacroData *macro )
-{
-	macromgrInsert( MIP_AFTER, macro );
-	
-	/* 後ろに追加したのでフォーカスを一つ次へずらす */
-	st_selected_macro_num++;
-	
-	return MR_BACK;
-}
-
-static MfMenuReturnCode macroeditor_delete( SceCtrlLatch *pad_latch, MacroData *macro )
-{
-	macromgrRemove( macro );
 	return MR_BACK;
 }

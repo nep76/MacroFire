@@ -2,19 +2,31 @@
 	PSPのVRAM上に図形を転送する。
 */
 
-#ifndef __BLIT_H__
-#define __BLIT_H__
+#ifndef SCR_WIDTH
+#define SCR_WIDTH  480
+#endif
+#ifndef SCR_HEIGHT
+#define SCR_HEIGHT 272
+#endif
+#ifndef BUF_WIDTH
+#define BUF_WIDTH  512
+#endif
+
+#ifndef BLIT_H
+#define BLIT_H
 
 #include <pspkernel.h>
 #include <pspdisplay.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
+#include "psp/graphics/fbmgr.h"
 
-#define ALPHA_BIT 0x8000
-#define MASK_4BIT 0xF
-#define MASK_5BIT 0x1F
-#define MASK_6BIT 0x3F
+/* 透明色 */
+#define BLIT_TRANSPARENT 0
+
+/* アルファブレンド */
+#define BLIT_ALPHA_BLEND( s, d, a, b ) ( ( ( ( s ) + 1 - ( d ) ) * ( a ) >> ( b ) ) + ( d ) )
 
 /* 字間の幅 */
 #define BLIT_LETTER_SPACE 1
@@ -23,14 +35,12 @@
 #define BLIT_CHAR_WIDTH  ( 5 + BLIT_LETTER_SPACE )
 #define BLIT_CHAR_HEIGHT 8
 
-#define BLIT_SCR_WIDTH  480
-#define BLIT_SCR_HEIGHT 272
-
 /* 関数にみえるマクロ */
 #define blitOffsetChar( x ) ( ( x ) * BLIT_CHAR_WIDTH  )
 #define blitOffsetLine( x ) ( ( x ) * BLIT_CHAR_HEIGHT )
 #define blitMeasureChar( x ) ( ( x ) * BLIT_CHAR_WIDTH )
 #define blitMeasureLine( x ) ( ( x ) * BLIT_CHAR_HEIGHT )
+#define blitLineRel( x, y, e, f, c ) blitLine( x, y, x + e, y + f, c )
 #define blitFillBox( x, y, w, h, c ) blitFillRect( x, y, x + w, y + h, c )
 #define blitLineBox( x, y, w, h, c ) blitLineRect( x, y, x + w, y + h, c )
 
@@ -38,24 +48,26 @@
 extern "C" {
 #endif
 
+typedef uint32_t ( *BlitAlphaBlender )( void *, void * );
+
 typedef enum {
 	B8_PSPSDK,
 	B8_BUTTON_SYMBOL,
 } Blit8BitCharTable;
 
 typedef struct {
-	int mode;
-	int width;
-	int height;
-	int bufferWidth;
-	enum PspDisplayPixelFormats pixelFormat;
-	void *frameBuffer;
-} BlitDisplayStatus;
-
-typedef struct {
 	u8 *table;
 	int charnum;
 } BlitFontTable;
+
+int blitInit( void );
+void blitGetFrameBufStat( FbmgrDisplayStat *stat );
+void blitSetFrameBufAddrTop( void *addr );
+int  blitGetFrameBufPixelLength( void );
+uint32_t blitAlphaBlending8888( void *fg, void *bg );
+uint32_t blitAlphaBlending4444( void *fg, void *bg );
+uint32_t blitAlphaBlending5551( void *fg, void *bg );
+uint32_t blitAlphaBlending565( void *fg, void *bg );
 
 /* blitColorConvert565
 	PSP_DISPLAY_PIXEL_FORAMT_8888形式の色を
@@ -105,6 +117,20 @@ u16 blitColorConvert4444( u32 color );
 */
 u32 blitConvertColorFrom8888( enum PspDisplayPixelFormats pxfmt, u32 color );
 
+/* blitSetBufSync
+	転送先バッファを設定する。
+	デフォルトはPSP_DISPLAY_SETBUF_IMMEDIATEであり、
+	表示バッファに直接書き込む。
+	
+	自前でblitGetDisplayStat()を使ってダブルバッファにする場合、
+	PSP_DISPLAY_SETBUF_NEXTFRAMEに設定しておくと、
+	全てのblit*()描画関数は、描画バッファに描画する。
+	
+	@param enum PspDisplaySetBufSync sync
+		転送先にしたいバッファ。
+*/
+void blitSetBufSync( enum PspDisplaySetBufSync sync );
+
 /* blitGetPixelLength
 	渡したピクセルフォーマットのデータのバイト数を返す。
 	
@@ -141,7 +167,7 @@ int blitGetPixelLength( enum PspDisplayPixelFormats pxfmt );
 	@return int
 		描画した文字数。
 */
-int blitChar( unsigned int sx, unsigned int sy, const char chr, u32 fgcolor, u32 bgcolor );
+int blitChar( unsigned int sx, unsigned int sy, u32 fgcolor, u32 bgcolor, const char chr );
 
 /* blitString
 	任意の位置に文字列を描画する。

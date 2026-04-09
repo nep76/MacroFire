@@ -1,251 +1,292 @@
 /*
-	getdigits.c
+	getbuttons.c
 */
 
 #include "getbuttons.h"
 
-#define CMNDLG_GETBUTTONS_ALL_AVAIL_BUTTONS 16
-static struct cmndlg_getbuttons_buttonstat st_btnstat[CMNDLG_GETBUTTONS_ALL_AVAIL_BUTTONS] = {
-	{ PSP_CTRL_CIRCLE,   false },
-	{ PSP_CTRL_CROSS,    false },
-	{ PSP_CTRL_SQUARE,   false },
-	{ PSP_CTRL_TRIANGLE, false },
-	{ PSP_CTRL_UP,       false },
-	{ PSP_CTRL_RIGHT,    false },
-	{ PSP_CTRL_DOWN,     false },
-	{ PSP_CTRL_LEFT,     false },
-	{ PSP_CTRL_LTRIGGER, false },
-	{ PSP_CTRL_RTRIGGER, false },
-	{ PSP_CTRL_SELECT,   false },
-	{ PSP_CTRL_START,    false },
-	{ PSP_CTRL_NOTE,     false },
-	{ PSP_CTRL_SCREEN,   false },
-	{ PSP_CTRL_VOLUP,    false },
-	{ PSP_CTRL_VOLDOWN,  false }
+/*-----------------------------------------------
+	ローカル関数
+-----------------------------------------------*/
+static void cmndlg_get_buttons_draw_ui( CmndlgGetButtonsParams *params );
+static int cmndlg_get_buttons_focus_next( int current_focus );
+static int cmndlg_get_buttons_focus_prev( int current_focus );
+
+/*-----------------------------------------------
+	ローカル変数
+-----------------------------------------------*/
+static CmndlgGetButtonsParams *st_params;
+static CtrlpadParams          st_cp_params;
+static bool                   st_show_usage = false;
+static bool                   st_reload = true;
+static int                    st_avail_buttons_num;
+static struct cmndlg_get_buttons_buttonstat st_btnstat[] = {
+	{ "Circle       ", PSP_CTRL_CIRCLE,   false },
+	{ "Cross        ", PSP_CTRL_CROSS,    false },
+	{ "Square       ", PSP_CTRL_SQUARE,   false },
+	{ "Triangle     ", PSP_CTRL_TRIANGLE, false },
+	{ "Up           ", PSP_CTRL_UP,       false },
+	{ "Right        ", PSP_CTRL_RIGHT,    false },
+	{ "Down         ", PSP_CTRL_DOWN,     false },
+	{ "Left         ", PSP_CTRL_LEFT,     false },
+	{ "L-trig       ", PSP_CTRL_LTRIGGER, false },
+	{ "R-trig       ", PSP_CTRL_RTRIGGER, false },
+	{ "SELECT       ", PSP_CTRL_SELECT,   false },
+	{ "START        ", PSP_CTRL_START,    false },
+	{ "MusicNote(\x88) ", PSP_CTRL_NOTE,     false },
+	{ "Brightness   ", PSP_CTRL_SCREEN,   false },
+	{ "VolumeUp     ", PSP_CTRL_VOLUP,    false },
+	{ "VolumeDown   ", PSP_CTRL_VOLDOWN,  false },
+	{ "Hold         ", PSP_CTRL_HOLD,     false },
+	{ "WLAN-SwitchUp", PSP_CTRL_WLAN_UP,  false },
+	{ "HOME         ", PSP_CTRL_HOME,     false }
 };
 
-static u32 fgcolor = 0xffffffff;
-static u32 bgcolor = 0xff000000;
-static u32 fccolor = 0xff0000ff;
+/*=============================================*/
 
-static void cmndlg_getbuttons_move_prev( unsigned int mask, int *selected )
+CmndlgGetButtonsParams *cmndlgGetButtonsGetParams( void )
 {
-	int i;
-	
-	if( ! selected ) return;
-	
-	for( i = *selected - 1; i >= 0; i-- ){
-		if( ! ( mask & st_btnstat[i].button ) ){
-			*selected = i;
-			break;
-		}
+	return st_params;
+}
+
+CmndlgState cmndlgGetButtonsGetStatus( void )
+{
+	if( ! st_params ){
+		return CMNDLG_NONE;
+	} else{
+		return st_params->base.state;
 	}
 }
 
-static void cmndlg_getbuttons_move_next( unsigned int mask, int *selected )
+int cmndlgGetButtonsStart( CmndlgGetButtonsParams *params )
 {
-	int i;
+	int i, j;
+	struct cmndlg_get_buttons_tempdata *tempdata;
 	
-	if( ! selected ) return;
+	if( st_params || ! params ) return -1;
 	
-	for( i = *selected + 1; i < CMNDLG_GETBUTTONS_ALL_AVAIL_BUTTONS; i++ ){
-		if( ! ( mask & st_btnstat[i].button ) ){
-			*selected = i;
-			break;
+	st_params = params;
+	st_params->base.state = CMNDLG_INIT;
+	
+	st_params->base.tempBuffer = memsceMalloc( sizeof( struct cmndlg_get_buttons_tempdata ) * st_params->numberOfData );
+	if( ! st_params->base.tempBuffer ) return -2;
+	
+	tempdata = st_params->base.tempBuffer;
+	for( i = 0; i < st_params->numberOfData; i++ ){
+		*(st_params->data[i].buttonsSave) &= st_params->data[i].buttonsAvailable;
+		tempdata[i].buttons  = *(st_params->data[i].buttonsSave);
+		for( j = 0; j < sizeof( st_btnstat ) / sizeof( st_btnstat[0] ); j++ ){
+			if( st_params->data[i].buttonsAvailable & st_btnstat[j].button ){
+				tempdata[i].selected = j;
+				break;
+			}
 		}
 	}
+	
+	ctrlpadInit( &st_cp_params );
+	ctrlpadSetRepeatButtons( &st_cp_params, PSP_CTRL_UP | PSP_CTRL_RIGHT | PSP_CTRL_DOWN | PSP_CTRL_LEFT );
+	
+	params->base.state = CMNDLG_VISIBLE;
+	
+	return 0;
 }
 
-static void cmndlg_getbuttons_set_buttons( unsigned int buttons )
+int cmndlgGetButtonsUpdate( void )
 {
 	int i;
-	for( i = 0; i < CMNDLG_GETBUTTONS_ALL_AVAIL_BUTTONS; i++ ){
-		if( buttons & st_btnstat[i].button ){
-			st_btnstat[i].stat = true;
+	CmndlgGetButtonsData *selected_data          = &(st_params->data[st_params->selectDataNumber]);
+	struct cmndlg_get_buttons_tempdata *tempdata = &(((struct cmndlg_get_buttons_tempdata *)(st_params->base.tempBuffer))[st_params->selectDataNumber]);
+	SceCtrlData pad_data;
+	pad_data.Buttons = ctrlpadGetData( &st_cp_params, &pad_data );
+	
+	if( st_reload ){
+		st_avail_buttons_num = 0;
+		for( i = 0; i < sizeof( st_btnstat ) / sizeof( st_btnstat[0] ); i++ ){
+			if( selected_data->buttonsAvailable & st_btnstat[i].button ){
+				st_avail_buttons_num++;
+				st_btnstat[i].available = true;
+			} else{
+				st_btnstat[i].available = false;
+			}
+		}
+		st_reload = false;
+	}
+	
+	cmndlg_get_buttons_draw_ui( st_params );
+	
+	if( st_show_usage ){
+		CmndlgState state;
+		
+		cmndlgMessageUpdate();
+		state = cmndlgMessageGetStatus();
+		if( state == CMNDLG_SHUTDOWN ){
+			CmndlgMessageParams *msg_params = cmndlgMessageGetParams();
+			cmndlgMessageShutdownStart();
+			memsceFree( msg_params );
+			ctrlpadUpdateData( &st_cp_params );
+			st_show_usage = false;
+		}
+		return 0;
+	}
+	
+	if( pad_data.Buttons & PSP_CTRL_SELECT ){
+		CmndlgMessageParams *msg_params = (CmndlgMessageParams *)memsceMalloc( sizeof( CmndlgMessageParams ) );
+		if( msg_params ){
+			strutilSafeCopy( msg_params->title, "Usage", 64 );
+			strutilSafeCopy(
+				msg_params->message,
+				"\x80\x82 = Move\n\x83\x81 = Switch\n\n\x85  = Accept\n\x86  = Cancel",
+				512
+			);
+			msg_params->options        = CMNDLG_MESSAGE_DISPLAY_CENTER;
+			msg_params->rc             = 0;
+			msg_params->ui.x           = 0;
+			msg_params->ui.y           = 0;
+			msg_params->ui.fgTextColor = st_params->ui.fgTextColor;
+			msg_params->ui.fcTextColor = st_params->ui.fcTextColor;
+			msg_params->ui.bgTextColor = st_params->ui.bgTextColor;
+			msg_params->ui.bgColor     = 0xdd000000;
+			msg_params->ui.borderColor = 0x0;
+			
+			if( cmndlgMessageStart( msg_params ) ){
+				memsceFree( msg_params );
+			}
+			st_show_usage = true;
+		}
+	} else if( pad_data.Buttons & PSP_CTRL_CROSS ){
+		st_params->rc = CMNDLG_CANCEL;
+		st_params->base.state = CMNDLG_SHUTDOWN;
+	} else if( pad_data.Buttons & PSP_CTRL_CIRCLE ){
+		int i;
+		/* 一時保存していたボタン情報を実際に代入 */
+		for( i = 0; i < st_params->numberOfData; i++ ){
+			*(st_params->data[i].buttonsSave) = ((struct cmndlg_get_buttons_tempdata *)(st_params->base.tempBuffer))[i].buttons;
+		}
+		st_params->rc = CMNDLG_ACCEPT;
+		st_params->base.state = CMNDLG_SHUTDOWN;
+	} else if( pad_data.Buttons & PSP_CTRL_UP ){
+		tempdata->selected = cmndlg_get_buttons_focus_prev( tempdata->selected );
+	} else if( pad_data.Buttons & PSP_CTRL_DOWN ){
+		tempdata->selected = cmndlg_get_buttons_focus_next( tempdata->selected );
+	} else if( pad_data.Buttons & ( PSP_CTRL_LEFT | PSP_CTRL_RIGHT ) ){
+		if( tempdata->buttons & st_btnstat[tempdata->selected].button ){
+			tempdata->buttons ^= st_btnstat[tempdata->selected].button;
 		} else{
-			st_btnstat[i].stat = false;
+			tempdata->buttons |= st_btnstat[tempdata->selected].button;
 		}
+	} else if( pad_data.Buttons & PSP_CTRL_LTRIGGER && st_params->selectDataNumber ){
+		st_params->selectDataNumber--;
+		st_reload = true;
+	} else if( pad_data.Buttons & PSP_CTRL_RTRIGGER && ( st_params->selectDataNumber < st_params->numberOfData - 1 ) ){
+		st_params->selectDataNumber++;
+		st_reload = true;
 	}
+	
+	return 0;
 }
 
-static unsigned int cmndlg_getbuttons_get_buttons( void )
+int cmndlgGetButtonsShutdownStart( void )
 {
-	unsigned int buttons = 0;
+	if( st_params->base.state != CMNDLG_SHUTDOWN ){
+		st_params->rc         = CMNDLG_CANCEL;
+		st_params->base.state = CMNDLG_SHUTDOWN;
+	}
+	
+	memsceFree( st_params->base.tempBuffer );
+	st_params->base.tempBuffer = NULL;
+	
+	st_params = NULL;
+	ctrlpadReset( &st_cp_params );
+	
+	return 0;
+}
+
+static void cmndlg_get_buttons_draw_ui( CmndlgGetButtonsParams *params )
+{
 	int i;
-	for( i = 0; i < CMNDLG_GETBUTTONS_ALL_AVAIL_BUTTONS; i++ ){
-		if( st_btnstat[i].stat ) buttons |= st_btnstat[i].button;
-	}
-	return buttons;
-}
-
-static void cmndlg_getbuttons_drawdialog( unsigned int x, unsigned int y, u32 fgcolor, u32 bgcolor, CmndlgGetButtonsData cgb[], unsigned int target, unsigned int count )
-{
-	if( ! cgb || ! count ) return;
 	
-	int i, lines = 0;
-	for( i = 0; i < CMNDLG_GETBUTTONS_ALL_AVAIL_BUTTONS; i++ ){
-		if( ! ( cgb[target].btnMask & st_btnstat[i].button ) ) lines++;
-	}
-	
-	if( count > 1 ){
-		int y_offset = 7 + lines;
+	if( params->numberOfData > 1 ){
+		int switch_info_pos_y = 9;
 		
-		blitFillBox( x, y, blitMeasureChar( 30 ), blitMeasureLine( 9 + lines ), bgcolor );
-		blitLineBox( x, y, blitMeasureChar( 30 ), blitMeasureLine( 9 + lines ), fgcolor );
+		blitFillBox( params->ui.x, params->ui.y, blitMeasureChar( 30 ), blitMeasureLine( 8 + st_avail_buttons_num ), params->ui.bgColor );
+		blitLineBox( params->ui.x, params->ui.y, blitMeasureChar( 30 ), blitMeasureLine( 8 + st_avail_buttons_num ), params->ui.borderColor );
 		
-		if( target ){
+		if( params->selectDataNumber ){
 			blitStringf(
-				x + 2,
-				y + BLIT_CHAR_HEIGHT * y_offset++,
-				fgcolor,
-				bgcolor,
+				params->ui.x + blitOffsetChar( 1 ),
+				params->ui.y + blitOffsetLine( 7 + st_avail_buttons_num + switch_info_pos_y++ ),
+				params->ui.fgTextColor,
+				params->ui.bgTextColor,
 				"L = %s",
-				cgb[target - 1].title
+				params->data[params->selectDataNumber - 1].title
 			);
 		}
 		
-		if( target < count - 1 ){
+		if( params->selectDataNumber < params->numberOfData - 1 ){
 			blitStringf(
-				x + 2,
-				y + BLIT_CHAR_HEIGHT * y_offset,
-				fgcolor,
-				bgcolor,
+				params->ui.x + blitOffsetChar( 1 ),
+				params->ui.y + blitOffsetLine( 7 + st_avail_buttons_num + switch_info_pos_y ),
+				params->ui.fgTextColor,
+				params->ui.bgTextColor,
 				"R = %s",
-				cgb[target + 1].title
+				params->data[params->selectDataNumber + 1].title
 			);
 		}
 	} else{
-		blitFillBox( x, y, blitMeasureChar( 30 ), blitMeasureLine( 7 + lines ), bgcolor );
-		blitLineBox( x, y, blitMeasureChar( 30 ), blitMeasureLine( 7 + lines ), fgcolor );
+		blitFillBox( params->ui.x, params->ui.y, blitMeasureChar( 30 ), blitMeasureLine( 6 + st_avail_buttons_num ), params->ui.bgColor );
+		blitLineBox( params->ui.x, params->ui.y, blitMeasureChar( 30 ), blitMeasureLine( 6 + st_avail_buttons_num ), params->ui.borderColor );
 	}
 	
 	blitString(
-		x + BLIT_CHAR_WIDTH,
-		y + BLIT_CHAR_HEIGHT,
-		fgcolor,
-		bgcolor,
-		cgb[target].title
+		params->ui.x + blitOffsetChar( 1 ),
+		params->ui.y + blitOffsetLine( 1 ),
+		params->ui.fgTextColor,
+		params->ui.bgTextColor,
+		params->data[params->selectDataNumber].title
 	);
+	
 	blitString(
-		x + BLIT_CHAR_WIDTH,
-		y + BLIT_CHAR_HEIGHT * ( 4 + lines ),
-		fgcolor,
-		bgcolor,
-		"\x80\x82 = Move, \x83\x81 = Change value\n\x85 = Accept, \x86 = Cancel"
+		params->ui.x + blitOffsetChar( 1 ),
+		params->ui.y + blitOffsetLine( 4 + st_avail_buttons_num ),
+		params->ui.fgTextColor,
+		params->ui.bgTextColor,
+		"SELECT: Usage"
 	);
+	
+	for( i = 0; i < sizeof( st_btnstat ) / sizeof( st_btnstat[0] ); i++ ){
+		if( st_btnstat[i].available ){
+			blitStringf(
+				params->ui.x + blitOffsetChar( 3 ),
+				params->ui.y + blitOffsetLine( 3 + i ),
+				i == ((struct cmndlg_get_buttons_tempdata *)(params->base.tempBuffer))[params->selectDataNumber].selected ? params->ui.fcTextColor : params->ui.fgTextColor,
+				params->ui.bgTextColor,
+				"%s: %s",
+				st_btnstat[i].name,
+				((struct cmndlg_get_buttons_tempdata *)(params->base.tempBuffer))[params->selectDataNumber].buttons & st_btnstat[i].button ? "ON" : "OFF"
+			);
+		}
+	}
 }
 
-int cmndlgGetButtons( unsigned int x, unsigned int y, CmndlgGetButtonsData cgb[], unsigned int count )
+static int cmndlg_get_buttons_focus_next( int current_focus )
 {
-	SceCtrlLatch pad_latch;
-	bool accept = false;
-	unsigned int i, target = 0;
-	struct cmndlg_getbuttons_savestat *savestat;
-	
-	if( ! cgb || ! count ) return CMNDLG_ERROR_INVALID_ARGUMENTS;
-	
-	savestat = (struct cmndlg_getbuttons_savestat *)memsceMalloc( sizeof( struct cmndlg_getbuttons_savestat ) * count );
-	if( ! savestat ) return CMNDLG_ERROR_FAILED_TO_MEMORY_ALLOCATE;
-	
-	/* 初期化 */
-	for( i = 0; i < count; i++ ){
-		savestat[i].selected = -1;
-		cmndlg_getbuttons_move_next( cgb[i].btnMask, &(savestat[i].selected) );
-		savestat[i].buttons = *(cgb[i].buttons);
-	}
-	
-	cmndlg_getbuttons_set_buttons( savestat[target].buttons );
-	cmndlg_getbuttons_drawdialog( x, y, fgcolor, bgcolor, cgb, target, count );
-	
-	for( ;; ){
-		int drawline;
-		
-		sceCtrlReadLatch( &pad_latch );
-		
-		if( pad_latch.uiMake & PSP_CTRL_CROSS ){
-			accept = false;
-			break;
-		} else if( pad_latch.uiMake & PSP_CTRL_CIRCLE ){
-			savestat[target].buttons = cmndlg_getbuttons_get_buttons();
-			accept = true;
-			break;
-		} else if( pad_latch.uiMake & PSP_CTRL_UP ){
-			cmndlg_getbuttons_move_prev( cgb[target].btnMask, &(savestat[target].selected) );
-		} else if( pad_latch.uiMake & PSP_CTRL_DOWN ){
-			cmndlg_getbuttons_move_next( cgb[target].btnMask, &(savestat[target].selected) );
-		} else if( pad_latch.uiMake & PSP_CTRL_LEFT || pad_latch.uiMake & PSP_CTRL_RIGHT ){
-			st_btnstat[savestat[target].selected].stat = st_btnstat[savestat[target].selected].stat ? false : true;
-		} else if( pad_latch.uiMake & PSP_CTRL_LTRIGGER && target ){
-			savestat[target].buttons = cmndlg_getbuttons_get_buttons();
-			target--;
-			cmndlg_getbuttons_set_buttons( savestat[target].buttons );
-			cmndlg_getbuttons_drawdialog( x, y, fgcolor, bgcolor, cgb, target, count );
-		} else if( pad_latch.uiMake & PSP_CTRL_RTRIGGER && target < count - 1 ){
-			savestat[target].buttons = cmndlg_getbuttons_get_buttons();
-			target++;
-			cmndlg_getbuttons_set_buttons( savestat[target].buttons );
-			cmndlg_getbuttons_drawdialog( x, y, fgcolor, bgcolor, cgb, target, count );
+	do{
+		current_focus++;
+		if( current_focus >= sizeof( st_btnstat ) / sizeof( st_btnstat[0] ) ){
+			current_focus = 0;
 		}
-		
-		for( i = 0, drawline = 0; i < CMNDLG_GETBUTTONS_ALL_AVAIL_BUTTONS; i++ ){
-			char item[32];
-			if( cgb[target].btnMask & st_btnstat[i].button ) continue;
-			
-			if     ( st_btnstat[i].button == PSP_CTRL_CIRCLE   ){ strcpy( item, "Circle       : " ); }
-			else if( st_btnstat[i].button == PSP_CTRL_CROSS    ){ strcpy( item, "Cross        : " ); }
-			else if( st_btnstat[i].button == PSP_CTRL_SQUARE   ){ strcpy( item, "Square       : " ); }
-			else if( st_btnstat[i].button == PSP_CTRL_TRIANGLE ){ strcpy( item, "Triangle     : " ); }
-			else if( st_btnstat[i].button == PSP_CTRL_UP       ){ strcpy( item, "Up           : " ); }
-			else if( st_btnstat[i].button == PSP_CTRL_RIGHT    ){ strcpy( item, "Right        : " ); }
-			else if( st_btnstat[i].button == PSP_CTRL_DOWN     ){ strcpy( item, "Down         : " ); }
-			else if( st_btnstat[i].button == PSP_CTRL_LEFT     ){ strcpy( item, "Left         : " ); }
-			else if( st_btnstat[i].button == PSP_CTRL_LTRIGGER ){ strcpy( item, "L-trig       : " ); }
-			else if( st_btnstat[i].button == PSP_CTRL_RTRIGGER ){ strcpy( item, "R-trig       : " ); }
-			else if( st_btnstat[i].button == PSP_CTRL_SELECT   ){ strcpy( item, "SELECT       : " ); }
-			else if( st_btnstat[i].button == PSP_CTRL_START    ){ strcpy( item, "START        : " ); }
-			else if( st_btnstat[i].button == PSP_CTRL_NOTE     ){ strcpy( item, "MusicNote(\x88) : " ); }
-			else if( st_btnstat[i].button == PSP_CTRL_SCREEN   ){ strcpy( item, "Blightness   : " ); }
-			else if( st_btnstat[i].button == PSP_CTRL_VOLUP    ){ strcpy( item, "VolumeUp(+)  : " ); }
-			else if( st_btnstat[i].button == PSP_CTRL_VOLDOWN  ){ strcpy( item, "VolumeDown(-): " ); }
-			
-			if( st_btnstat[i].stat ){
-				strcat( item, "ON " );
-			} else{
-				strcat( item, "OFF" );
-			}
-			
-			if( i == savestat[target].selected ){
-				blitString(
-					x + BLIT_CHAR_WIDTH,
-					y + BLIT_CHAR_HEIGHT * ( drawline + 3 ),
-					fccolor,
-					bgcolor,
-					item
-				);
-			} else{
-				blitString(
-					x + BLIT_CHAR_WIDTH,
-					y + BLIT_CHAR_HEIGHT * ( drawline + 3 ),
-					fgcolor,
-					bgcolor,
-					item
-				);
-			}
-			
-			drawline++;
-		}
-		
-		sceDisplayWaitVblankStart();
-		sceKernelDcacheWritebackAll();
-	}
+	} while( ! st_btnstat[current_focus].available );
 	
-	/* 入力値を反映 */
-	if( accept ){
-		for( i = 0; i < count; i++ ){
-			*(cgb[i].buttons) = savestat[i].buttons;
+	return current_focus;
+}
+
+static int cmndlg_get_buttons_focus_prev( int current_focus )
+{
+	do{
+		current_focus--;
+		if( current_focus < 0 ){
+			current_focus = sizeof( st_btnstat ) / sizeof( st_btnstat[0] ) - 1;
 		}
-	}
+	} while( ! st_btnstat[current_focus].available );
 	
-	memsceFree( savestat );
-	return CMNDLG_ERROR_SUCCESS;
+	return current_focus;
 }

@@ -1,8 +1,8 @@
 /*
 	Macro function
 */
-#ifndef __MACRO_H__
-#define __MACRO_H__
+#ifndef MACRO_H
+#define MACRO_H
 
 #include <pspkernel.h>
 #include <pspctrl.h>
@@ -18,28 +18,33 @@
 /*-----------------------------------------------
 	íËêî
 -----------------------------------------------*/
-#define MACRO_MENU_OFFSET           4
-#define MACRO_MENU_BASECONF         2
+#define MACRO_RUN_ONCE      0
+#define MACRO_RUN_INFINITY  1
+#define MACRO_RUN_HALT      2
+#define MACRO_RECORD_START  4
+#define MACRO_RECORD_STOP   5
+#define MACRO_ANALOG_OPTION 6
+#define MACRO_EDIT          8
+#define MACRO_CLEAR         9
+#define MACRO_LOAD          11
+#define MACRO_SAVE          12
 
-#define MACRO_NOTICE_DISPLAY_SEC    1.5
-#define MACRO_ERROR_DISPLAY_SEC     3
+#define MACRO_INFO_DISPLAY_MICROSEC  1000000
+#define MACRO_ERROR_DISPLAY_MICROSEC 3000000
 
-#define MACRO_DATA_RECORD_MAXLEN    128
-#define MACRO_DATA_RECORD_SEPARATOR "\t\x20"
 #define MACRO_DATA_SIGNATURE        "MACROFIRE-MACRO"
-#define MACRO_DATA_VERSION          1
+#define MACRO_DATA_VERSION          2
 
-#define MACRO_ACTION_DELAY          "DELAY"
-#define MACRO_ACTION_BTNPRESS       "BUTTONSPRESS"
-#define MACRO_ACTION_BTNRELEASE     "BUTTONSRELEASE"
-#define MACRO_ACTION_BTNCHANGE      "BUTTONSCHANGE"
-#define MACRO_ACTION_ALNEUTRAL      "ANALOGNUETRAL"
-#define MACRO_ACTION_ALMOVE         "ANALOGMOVE"
+#define MACRO_ACTION_DELAY          "Delay"
+#define MACRO_ACTION_BTNPRESS       "ButtonsPress"
+#define MACRO_ACTION_BTNRELEASE     "ButtonsRelease"
+#define MACRO_ACTION_BTNCHANGE      "ButtonsChange"
+#define MACRO_ACTION_ALMOVE         "AnalogMove"
 
 /*-----------------------------------------------
 	å^êÈåæ
 -----------------------------------------------*/
-typedef MfMenuReturnCode ( *MacroFunction )( SceCtrlLatch*, SceCtrlData* );
+typedef MfMenuRc ( *MacroFunction )( SceCtrlData*, void* );
 
 typedef enum {
 	MRM_NONE = 0,
@@ -50,19 +55,21 @@ typedef enum {
 /*-----------------------------------------------
 	ä÷êî
 -----------------------------------------------*/
-void macroInit( ConfmgrHandler conf[] );
+void macroInit( void );
 void macroTerm( void );
 void macroMain( MfCallMode mode, SceCtrlData *pad_data, void *argp );
-void macroIntr( const int mfengine );
+void macroIntr( const bool mfengine );
 
-MfMenuReturnCode macroMenu        ( SceCtrlLatch *pad_latch, SceCtrlData *pad_data, void *argp );
-MfMenuReturnCode macroRunInterrupt( SceCtrlLatch *pad_latch, SceCtrlData *pad_data );
-MfMenuReturnCode macroRunOnce     ( SceCtrlLatch *pad_latch, SceCtrlData *pad_data );
-MfMenuReturnCode macroRunInfinity ( SceCtrlLatch *pad_latch, SceCtrlData *pad_data );
-MfMenuReturnCode macroLoad        ( SceCtrlLatch *pad_latch, SceCtrlData *pad_data );
-MfMenuReturnCode macroEdit        ( SceCtrlLatch *pad_latch, SceCtrlData *pad_data );
-MfMenuReturnCode macroClear       ( SceCtrlLatch *pad_latch, SceCtrlData *pad_data );
-MfMenuReturnCode macroRecordStop  ( SceCtrlLatch *pad_latch, SceCtrlData *pad_data );
-MfMenuReturnCode macroRecordStart ( SceCtrlLatch *pad_latch, SceCtrlData *pad_data );
+MfMenuRc macroMenu        ( SceCtrlData *pad_data, void *arg );
+MfMenuRc macroRunInterrupt( SceCtrlData *pad_data, void *arg );
+MfMenuRc macroRunOnce     ( SceCtrlData *pad_data, void *arg );
+MfMenuRc macroRunInfinity ( SceCtrlData *pad_data, void *arg );
+MfMenuRc macroEdit        ( SceCtrlData *pad_data, void *arg );
+MfMenuRc macroClear       ( SceCtrlData *pad_data, void *arg );
+MfMenuRc macroCreate      ( SceCtrlData *pad_data, void *arg );
+MfMenuRc macroRecordStop  ( SceCtrlData *pad_data, void *arg );
+MfMenuRc macroRecordStart ( SceCtrlData *pad_data, void *arg );
+MfMenuRc macroLoad        ( SceCtrlData *pad_data, void *arg );
+MfMenuRc macroSave        ( SceCtrlData *pad_data, void *arg );
 
 #endif

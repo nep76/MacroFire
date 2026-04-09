@@ -1,10 +1,9 @@
-/*char *strutilToLowerFirst( char *str )
-
+/*
 	便利な文字列処理用関数
 */
 
-#ifndef __STRUTIL_H__
-#define __STRUTIL_H__
+#ifndef STRUTIL_H
+#define STRUTIL_H
 
 #include <ctype.h>
 #include <string.h>
@@ -70,7 +69,7 @@ char *strutilSafeCat( char *dest, const char *src, size_t max );
 	標準ライブラリのstrpbrk()に似ているが、
 	文字列srcに、文字列search中のいずれかに"含まれない"文字が最初に見つかった位置を返す。
 	
-	@param: char *src
+	@param: const char *src
 		検索対象文字列。
 	
 	@param: const char *search
@@ -79,14 +78,14 @@ char *strutilSafeCat( char *dest, const char *src, size_t max );
 	@return: char*
 		"文字列src中で、文字群searchに含まれない文字が最初に見つかった位置。
 */
-char *strutilCounterPbrk( char *src, const char *search );
+char *strutilCounterPbrk( const char *src, const char *search );
 
 /*
 	strutilCounterReversePbrk
 	
 	上記のstrutilCounterPbrk()と同じことを、文字列の末尾から検索する。
 	
-	@param: char *src
+	@param: const char *src
 		検索対象文字列。
 	
 	@param: const char *search
@@ -95,7 +94,7 @@ char *strutilCounterPbrk( char *src, const char *search );
 	@return: char*
 		"文字列src中で、文字群searchに含まれない文字が最初に見つかった位置。
 */
-char *strutilCounterReversePbrk( char *src, const char *search );
+char *strutilCounterReversePbrk( const char *src, const char *search );
 
 /*
 	strutilRemoveChar 

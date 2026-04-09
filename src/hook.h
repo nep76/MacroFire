@@ -2,8 +2,8 @@
 	Hook header
 */
 
-#ifndef __HOOK_H__
-#define __HOOK_H__
+#ifndef HOOK_H
+#define HOOK_H
 
 #include <pspkernel.h>
 #include <psputilsforkernel.h>

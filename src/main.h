@@ -2,8 +2,8 @@
 	MacroFire header
 */
 
-#ifndef __MACROFIRE__
-#define __MACROFIRE__
+#ifndef MACROFIRE
+#define MACROFIRE
 
 #include <pspkernel.h>
 #include <pspctrl.h>
@@ -20,10 +20,9 @@
 #include "mftable.h"
 #undef MFTABLE_DEFINE
 
+#include "utils/inimgr.h"
 #include "menu.h"
 #include "psp/blit.h"
-#include "utils/confmgr.h"
-#include "psp/confmgr/cmpspbtn.h"
 
 /*-----------------------------------------------
 	íËêî

@@ -2,8 +2,8 @@
 	API Hook table
 */
 
-#ifndef __HOOKTABLE_H__
-#define __HOOKTABLE_H__
+#ifndef HOOKTABLE_H
+#define HOOKTABLE_H
 
 typedef struct {
 	struct {

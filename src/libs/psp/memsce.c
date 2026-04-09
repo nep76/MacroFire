@@ -14,9 +14,6 @@ void *memsceMallocEx( SceSize boundary, SceUID partitionid, const char *name, in
 	/* MemSceRealloc()のために確保されたサイズを記録 */
 	hhead.size = size;
 	
-	/* メモリは利用中であるとマーク */
-	hhead.is_free = 0;
-	
 	/* 先頭アドレスを取得 */
 	heap_start = sceKernelGetBlockHeadAddr( hhead.block_id );
 	heap_start = (void *)MEMSCE_ALIGNOFFSET( (unsigned int)heap_start + sizeof( struct heap_header ), boundary );
@@ -30,14 +27,10 @@ void *memsceMallocEx( SceSize boundary, SceUID partitionid, const char *name, in
 int memsceFree( void *heap_start )
 {
 	struct heap_header *hhead;
-	if( ! heap_start ) return 0;
+	if( ! heap_start ) return -1;
 	
 	/* 指定アドレスから管理情報分だけ戻って管理情報取得 */
 	hhead = (struct heap_header *)((unsigned int)heap_start - sizeof( struct heap_header ));
-	if( hhead->is_free == 1 ) return -1;
-	
-	/* メモリが利用可能であるとマークして解放 */
-	hhead->is_free = 1;
 	
 	return sceKernelFreePartitionMemory( hhead->block_id );
 }
@@ -62,8 +55,6 @@ void *memsceRealloc( void *src_heap_start, SceSize resize )
 	void *new_heap_start;
 	
 	src_hhead = ( struct heap_header *)((unsigned int)src_heap_start - sizeof( struct heap_header ));
-	if( src_hhead->is_free ) return NULL;
-	
 	new_heap_start = memsceMalloc( resize );
 	if( src_hhead->size > resize ){
 		memcpy( new_heap_start, src_heap_start, resize );
@@ -81,5 +72,5 @@ void *memsceMemalign( SceSize boundary, SceSize size )
 	/* バウンダリ境界が2のべき乗かどうか調べる */
 	if( boundary <= 0 || ! MEMSCE_POWER_OF_TWO( boundary ) ) return 0;
 	
-	return memsceMallocEx( boundary, PSP_MEMPART_USER_1, "MemSceMemalign", PSP_SMEM_Low, size, 0 );
+	return memsceMallocEx( boundary, PSP_MEMPART_USER_1, "memsceMemalign", PSP_SMEM_Low, size, 0 );
 }

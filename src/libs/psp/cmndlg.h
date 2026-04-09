@@ -5,8 +5,8 @@
 	表示すると、終了まで呼び出し元に制御が戻らない。
 */
 
-#ifndef __CMNDLG_H__
-#define __CMNDLG_H__
+#ifndef CMNDLG_H
+#define CMNDLG_H
 
 #include <pspkernel.h>
 #include <pspctrl.h>
@@ -14,21 +14,44 @@
 #include <stdbool.h>
 #include "psp/cmndlg/errors.h"
 
-#ifndef __CMNDLG_FUNCTION_EXPORT__
-
-#include "psp/cmndlg/msg.h"
-#include "psp/cmndlg/getdigits.h"
-#include "psp/cmndlg/getbuttons.h"
-#include "psp/cmndlg/getfilename.h"
-	
-#endif
-
 #define CMNDLG_DEFAULT_FGCOLOR 0xffffffff
-#define CMNDLG_DEFAULT_BGCOLOR 0xff000000
+#define CMNDLG_DEFAULT_BGCOLOR 0x66000000
 #define CMNDLG_DEFAULT_FCCOLOR 0xff0000ff
 
 #ifdef __cplusplus
 extern "C" {
+#endif
+
+typedef enum {
+	CMNDLG_NONE = 0,
+	CMNDLG_INIT,
+	CMNDLG_VISIBLE,
+	CMNDLG_SHUTDOWN,
+} CmndlgState;
+
+typedef enum {
+	CMNDLG_UNKNOWN = 0,
+	CMNDLG_CANCEL,
+	CMNDLG_ACCEPT
+} CmndlgRc;
+
+typedef struct {
+	int x, y, w, h;
+	uint32_t fgTextColor, fcTextColor, bgTextColor, bgColor, borderColor;
+} CmndlgUI;
+
+typedef struct {
+	CmndlgState state;
+	void *tempBuffer;
+} CmndlgBaseParams;
+
+#ifndef CMNDLG_FUNCTION_EXPORT
+
+#include "psp/cmndlg/message.h"
+#include "psp/cmndlg/getnumbers.h"
+#include "psp/cmndlg/getbuttons.h"
+#include "psp/cmndlg/getfilename.h"
+
 #endif
 
 void cmndlgInit( void );

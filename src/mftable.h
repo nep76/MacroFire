@@ -4,8 +4,8 @@
 	MacroFireがフック時に呼び出す関数と、メニュー表示時に呼び出す関数のテーブル。
 */
 
-#ifndef __FUNCTIONTABLE_H__
-#define __FUNCTIONTABLE_H__
+#ifndef MFFUNCTIONTABLE_H
+#define MFFUNCTIONTABLE_H
 
 #ifdef MFTABLE_DEFINE
 #define EXPORT
@@ -13,41 +13,43 @@
 #define EXPORT extern
 #endif
 
-#include "utils/confmgr.h"
+#include "utils/inimgr.h"
 
 /*-----------------------------------------------
 	機能を実装したソースのヘッダ
 -----------------------------------------------*/
+#include "function/analogtune.h"
 #include "function/rapidfire.h"
 #include "function/macro.h"
 
 /*-----------------------------------------------
 	型宣言
 -----------------------------------------------*/
-typedef void ( *MfFuncInit )( ConfmgrHandler* );
-typedef void ( *MfFuncTerm )( void );
-typedef void ( *MfFuncHook )( MfCallMode, SceCtrlData*, void* );
-typedef MfMenuReturnCode ( *MfFuncMenu )( SceCtrlLatch*, SceCtrlData*, void* );
-typedef void ( *MfFuncIntr )( const int mfengine );
+typedef void     ( *MfFuncInit )( void );
+typedef void     ( *MfFuncIni  )( IniUID );
+typedef void     ( *MfFuncTerm )( void );
+typedef void     ( *MfFuncHook )( MfCallMode, SceCtrlData*, void* );
+typedef MfMenuRc ( *MfFuncMenu )( SceCtrlData*, void* );
+typedef void     ( *MfFuncIntr )( const bool mfengine );
 
 typedef struct {
 	MfFuncHook func;
 	void *arg;
-} HookEntry;
+} MfHookEntry;
 
 typedef struct {
-	char *label;
-	MfFuncMenu mainFunc;
+	MfFuncMenu func;
 	void *arg;
-} MenuEntry;
+} MfMenuEntry;
 
 typedef struct {
-	int        confCount;
-	MfFuncInit initFunc;
-	MfFuncTerm termFunc;
-	MfFuncIntr intrFunc;
-	HookEntry  hook;
-	MenuEntry  menu;
+	char         *name;
+	MfFuncInit   initFunc;
+	MfFuncTerm   termFunc;
+	MfFuncIntr   intrFunc;
+	MfFuncIni    ciFunc, liFunc;
+	MfHookEntry  hook;
+	MfMenuEntry  menu;
 } MfEntry;
 
 /*-----------------------------------------------
@@ -58,12 +60,32 @@ EXPORT MfEntry mftable[]
 = {
 	/*
 		機能を定義するテーブル
-		{ 設定項目数, 初期化関数, 終了関数, 割込関数, { フック関数, 引数 }, { メニュー文字列, メニュー関数, 引数 } }
 		
 		割込関数は、MacroFire Engineが切り替えられた次のループで呼ばれる
 	*/
-	{ 0, rapidfireInit, NULL, NULL,      { rapidfireMain, NULL }, { "Rapidfire settings", rapidfireMenu, NULL } },
-	{ 0, macroInit,     NULL, macroIntr, { macroMain,     NULL }, { "Macro settings",     macroMenu,     NULL } },
+	{
+		"Analog stick sensitivity settings",
+		NULL, NULL, NULL,
+		analogtuneCreateIni, analogtuneLoadIni,
+		{ analogtuneMain, NULL },
+		{ analogtuneMenu, NULL }
+	},
+	
+	{
+		"Rapidfire settings",
+		rapidfireInit, NULL, NULL,
+ 		NULL, NULL,
+		{ rapidfireMain, NULL },
+		{ rapidfireMenu, NULL }
+	},
+	
+	{
+		"Macro settings",
+		macroInit, NULL, macroIntr,
+		NULL, NULL,
+		{ macroMain, NULL },
+		{ macroMenu, NULL }
+	},
 }
 #endif
 ;
