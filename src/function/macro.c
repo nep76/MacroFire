@@ -4,12 +4,15 @@
 
 #include "macro.h"
 
-static int st_runLoop          = 0;
-static MacroRunMode st_runMode = MRM_NONE;
-static unsigned int st_temp_buttons = 0;
-static bool st_temp_analog_move = false;
-static u64 st_temp_analog_coord = 0;
-static u64 st_temp_tick = 0;
+/*-----------------------------------------------
+	ローカル変数と定数
+-----------------------------------------------*/
+static int          st_runLoop           = 0;
+static MacroRunMode st_runMode           = MRM_NONE;
+static unsigned int st_temp_buttons      = 0;
+static bool         st_temp_analog_move  = false;
+static u64          st_temp_analog_coord = 0;
+static u64          st_temp_tick         = 0;
 
 #define MACRO_ANALOG_OFF 0
 #define MACRO_ANALOG_ON  1
@@ -43,14 +46,19 @@ static MfMenuItem st_macroMenu[] = {
 	{ MT_ANCHOR, 0, "Save to MemoryStick",   { 0 } }
 };
 
-static MacroData *macro_append( MacroData *macro );
-static void macro_record( MfCallMode mode, SceCtrlData *pad_data, void *argp );
-static void macro_trace( MfCallMode mode, SceCtrlData *pad_data, void *argp );
-static bool macro_is_busy( void );
-static bool macro_is_avail( void );
-static bool macro_is_enabled_mf_engine( void );
+/*-----------------------------------------------
+	ローカル関数
+-----------------------------------------------*/
+static MacroData *macro_append             ( MacroData *macro );
+static void      macro_record              ( MfCallMode mode, SceCtrlData *pad_data, void *argp );
+static void      macro_trace               ( MfCallMode mode, SceCtrlData *pad_data, void *argp );
+static bool      macro_is_busy             ( void );
+static bool      macro_is_avail            ( void );
+static bool      macro_is_enabled_mf_engine( void );
 
-void macroInit( void )
+/*=============================================*/
+
+void macroInit( ConfmgrHandler conf[] )
 {
 	return;
 }
@@ -61,7 +69,7 @@ void macroTerm( void )
 }
 void macroIntr( const int mfengine )
 {
-	if( mfengine == MFENGINE_OFF && st_runMode == MRM_TRACE ){
+	if( mfengine == MF_ENGINE_OFF && st_runMode == MRM_TRACE ){
 		/* マクロ実行位置を先頭に戻すのみ */
 		macro_trace( MF_CALL_READ, NULL, NULL );
 	}
@@ -126,7 +134,7 @@ MfMenuReturnCode macroLoad( SceCtrlLatch *pad_latch, SceCtrlData *pad_data )
 	char *path;
 	
 	CmndlgGetFilenameRc cgfrc;
-	FilehUID fuid;
+	FilehUID fuid = 0;
 	MacroData *cur_macro = NULL;
 	char record[MACRO_DATA_RECORD_MAXLEN];
 	char *did, *value, *saveptr;
@@ -154,7 +162,7 @@ MfMenuReturnCode macroLoad( SceCtrlLatch *pad_latch, SceCtrlData *pad_data )
 	sprintf( path, "%s/%s", dir, name );
 	
 	fuid = filehOpen( path, PSP_O_RDONLY, 0777 );
-	if( ! fuid || filehGetLastError( fuid ) < 0){
+	if( ! fuid || filehGetLastError( fuid ) < 0 ){
 		blitStringf( blitOffsetChar( 3 ), blitOffsetLine( 2 ), MENU_FCCOLOR, MENU_BGCOLOR, "Failed to load %s: %x-%x", path, filehGetLastError( fuid ), filehGetLastSystemError( fuid ) );
 		mfWaitScreenReload( MACRO_ERROR_DISPLAY_SEC );
 		goto DESTROY;
@@ -162,7 +170,7 @@ MfMenuReturnCode macroLoad( SceCtrlLatch *pad_latch, SceCtrlData *pad_data )
 	
 	/* シグネチャを読み込み、バーションをチェック */
 	filehReadln( fuid, record, sizeof( record ) );
-	uclcToUpper( record );
+	strutilToUpper( record );
 	did   = strtok_r( record,  MACRO_DATA_RECORD_SEPARATOR, &saveptr );
 	value = strtok_r( NULL, MACRO_DATA_RECORD_SEPARATOR, &saveptr );
 	if( ! did || ! value || strcmp( did, MACRO_DATA_SIGNATURE ) != 0 ){
@@ -183,7 +191,7 @@ MfMenuReturnCode macroLoad( SceCtrlLatch *pad_latch, SceCtrlData *pad_data )
 	
 	blitStringf( blitOffsetChar( 3 ), blitOffsetLine( 2 ), MENU_FGCOLOR, MENU_BGCOLOR, "Loading from %s...", path );
 	while( filehReadln( fuid, record, sizeof( record ) ) ){
-		uclcToUpper( record );
+		strutilToUpper( record );
 		did   = strtok_r( record,  MACRO_DATA_RECORD_SEPARATOR, &saveptr );
 		value = strtok_r( NULL, MACRO_DATA_RECORD_SEPARATOR, &saveptr );
 		
@@ -210,11 +218,10 @@ MfMenuReturnCode macroLoad( SceCtrlLatch *pad_latch, SceCtrlData *pad_data )
 		cur_macro->data = strtoul( value, NULL, 16 );
 	}
 	
-	filehClose( fuid );
-	
 	goto DESTROY;
 	
 	DESTROY:
+		if( fuid ) filehClose( fuid );
 		memsceFree( path );
 		return MR_BACK;
 }
@@ -228,7 +235,7 @@ MfMenuReturnCode macroSave( SceCtrlLatch *pad_latch, SceCtrlData *pad_data )
 	char *path;
 	
 	CmndlgGetFilenameRc cgfrc;
-	FilehUID fuid;
+	FilehUID fuid = 0;
 	MacroData *cur_macro;
 	
 	if( macro_is_busy() || ! macro_is_avail() ) return MR_BACK;
@@ -254,7 +261,7 @@ MfMenuReturnCode macroSave( SceCtrlLatch *pad_latch, SceCtrlData *pad_data )
 	sprintf( path, "%s/%s", dir, name );
 	
 	fuid = filehOpen( path, PSP_O_WRONLY | PSP_O_CREAT | PSP_O_TRUNC, 0777 );
-	if( ! fuid || filehGetLastError( fuid ) < 0){
+	if( ! fuid || filehGetLastError( fuid ) < 0 ){
 		blitStringf( blitOffsetChar( 3 ), blitOffsetLine( 2 ), MENU_FCCOLOR, MENU_BGCOLOR, "Failed to save %s: %x-%x", path, filehGetLastError( fuid ), filehGetLastSystemError( fuid ) );
 		mfWaitScreenReload( MACRO_ERROR_DISPLAY_SEC );
 		goto DESTROY;
@@ -290,11 +297,10 @@ MfMenuReturnCode macroSave( SceCtrlLatch *pad_latch, SceCtrlData *pad_data )
 		filehWritef( fuid, MACRO_DATA_RECORD_MAXLEN, "%s%lx\n", MACRO_DATA_RECORD_SEPARATOR, cur_macro->data );
 	}
 	
-	filehClose( fuid );
-	
 	goto DESTROY;
 	
 	DESTROY:
+		if( fuid ) filehClose( fuid );
 		memsceFree( path );
 		return MR_BACK;
 }
@@ -396,7 +402,7 @@ MfMenuReturnCode macroMenu( SceCtrlLatch *pad_latch, SceCtrlData *pad_data, void
 	static MacroFunction function;
 	
 	if( ! function ){
-		switch( mfMenuVertical( blitOffsetChar( 5 ), blitOffsetLine( 4 ), BLIT_SCR_WIDTH, st_macroMenu, ARRAY_NUM( st_macroMenu ), &selected ) ){
+		switch( mfMenuVertical( blitOffsetChar( 5 ), blitOffsetLine( 4 ), BLIT_SCR_WIDTH, st_macroMenu, MF_ARRAY_NUM( st_macroMenu ), &selected ) ){
 			case MR_CONTINUE:
 				blitString( blitOffsetChar( 3 ), blitOffsetLine( 2 ), MENU_FGCOLOR, MENU_BGCOLOR, "Please choose a operation." );
 				if( selected != old_selected ) blitFillBox( 5, blitOffsetLine( 25 ), 480, blitMeasureLine( 5 ), MENU_BGCOLOR );

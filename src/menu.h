@@ -12,10 +12,11 @@
 #include <string.h>
 
 #include "global.h"
-#include "sstring.h"
+#include "utils/strutil.h"
 #include "psp/blit.h"
 #include "psp/memsce.h"
 #include "psp/cmndlg.h"
+#include "utils/confmgr.h"
 
 #define MENU_FGCOLOR 0xffffffff
 #define MENU_BGCOLOR 0xff000000
@@ -24,12 +25,16 @@
 #define MAX_NUMBER_OF_THREADS 64
 #define MENUITEM_LENGTH 64
 
-/*
-	sceDisplayEnable()でLCDを点灯できるようだ?
-	ただ、Stubsには追加されているがプロトタイプが無い模様。
-*/
+/*-----------------------------------------------
+	プロトタイプのないAPI
+	
+	LCDの電源を入れることができるようだ。
+-----------------------------------------------*/
 void sceDisplayEnable( void );
 
+/*-----------------------------------------------
+	型宣言
+-----------------------------------------------*/
 typedef struct _mf_menu_chain {
 	char *mid;
 	struct _mf_menu_chain *prev;
@@ -67,12 +72,15 @@ typedef struct {
 	int micount;
 } MfMenuIndex;
 
+/*-----------------------------------------------
+	関数
+-----------------------------------------------*/
 bool mfMenuInit( void );
-void mfMenu( void );
-void mfThreadsStatChange( bool stat, SceUID thlist[], int thnum );
+void mfMenu    ( void );
 
-
-/* MenuAPI */
+/*-----------------------------------------------
+	メニュー用API
+-----------------------------------------------*/
 /*
 	ユーザの入力なしに、ソフト側からメニューの終了を予約させる。
 	これをセットしたあと、ファンクションがメインメニューに戻った時に終了。

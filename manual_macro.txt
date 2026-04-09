@@ -1,4 +1,4 @@
-MacroFire - 1.1.3 Version
+MacroFire - 1.2.0 Version
 
 
 Macro settings
@@ -39,7 +39,6 @@ Macro settings
   Load from MemoryStick
     メモリースティックからマクロファイルをロードする。
     (特定の状態でこれを選択すると操作不能に陥ることがあるので、必ずreadme.txtの既知の問題を参照のこと)
-    
 
   Save to MemoryStick
     メモリースティックへ、現在保持しているマクロを保存する。

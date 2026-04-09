@@ -13,11 +13,19 @@
 #define EXPORT extern
 #endif
 
-/* 機能を実装したソース */
+#include "utils/confmgr.h"
+
+/*-----------------------------------------------
+	機能を実装したソースのヘッダ
+-----------------------------------------------*/
 #include "function/rapidfire.h"
 #include "function/macro.h"
 
-typedef void ( *MfFuncInitTerm )( void );
+/*-----------------------------------------------
+	型宣言
+-----------------------------------------------*/
+typedef void ( *MfFuncInit )( ConfmgrHandler* );
+typedef void ( *MfFuncTerm )( void );
 typedef void ( *MfFuncHook )( MfCallMode, SceCtrlData*, void* );
 typedef MfMenuReturnCode ( *MfFuncMenu )( SceCtrlLatch*, SceCtrlData*, void* );
 typedef void ( *MfFuncIntr )( const int mfengine );
@@ -34,24 +42,28 @@ typedef struct {
 } MenuEntry;
 
 typedef struct {
-	MfFuncInitTerm initFunc;
-	MfFuncInitTerm termFunc;
+	int        confCount;
+	MfFuncInit initFunc;
+	MfFuncTerm termFunc;
 	MfFuncIntr intrFunc;
-	HookEntry hook;
-	MenuEntry menu;
+	HookEntry  hook;
+	MenuEntry  menu;
 } MfEntry;
 
+/*-----------------------------------------------
+	MacroFire ファンクションエントリ
+-----------------------------------------------*/
 EXPORT MfEntry mftable[]
 #ifdef MFTABLE_DEFINE
 = {
 	/*
 		機能を定義するテーブル
-		{ 初期化関数, 終了関数, 割込関数, { フック関数, 引数 }, { メニュー文字列, メニュー関数, 引数 } }
+		{ 設定項目数, 初期化関数, 終了関数, 割込関数, { フック関数, 引数 }, { メニュー文字列, メニュー関数, 引数 } }
 		
 		割込関数は、MacroFire Engineが切り替えられた次のループで呼ばれる
 	*/
-	{ rapidfireInit, NULL, NULL,      { rapidfireMain, NULL }, { "Rapidfire settings", rapidfireMenu, NULL } },
-	{ macroInit,     NULL, macroIntr, { macroMain,     NULL }, { "Macro settings",     macroMenu,     NULL } },
+	{ 0, rapidfireInit, NULL, NULL,      { rapidfireMain, NULL }, { "Rapidfire settings", rapidfireMenu, NULL } },
+	{ 0, macroInit,     NULL, macroIntr, { macroMain,     NULL }, { "Macro settings",     macroMenu,     NULL } },
 }
 #endif
 ;

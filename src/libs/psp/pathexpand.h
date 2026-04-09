@@ -11,7 +11,7 @@
 #include <unistd.h>
 #include <stdbool.h>
 #include <ctype.h>
-#include "sstring.h"
+#include "utils/strutil.h"
 #include "psp/memsce.h"
 
 #define PE_PATH_MAX 255

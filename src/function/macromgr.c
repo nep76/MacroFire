@@ -4,8 +4,13 @@
 
 #include "macromgr.h"
 
-static MacroData *st_curMacro     = NULL;
+/*-----------------------------------------------
+	ƒ[ƒJƒ‹•Ï”
+-----------------------------------------------*/
+static MacroData    *st_curMacro  = NULL;
 static unsigned int st_macroCount = 0;
+
+/*=============================================*/
 
 MacroData *macromgrNew( void )
 {

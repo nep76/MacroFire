@@ -40,8 +40,9 @@ OBJS = exports.o \
        function/macromgr.o \
        function/macro.o \
        function/macroeditor.o \
-       $(CLASSG_LIBS)/sstring.o \
-       $(CLASSG_LIBS)/utils/uclc.o \
+       $(CLASSG_LIBS)/utils/strutil.o \
+       $(CLASSG_LIBS)/utils/confmgr.o \
+       $(CLASSG_LIBS)/psp/confmgr/cmpspbtn.o \
        $(CLASSG_LIBS)/psp/blit.o \
        $(CLASSG_LIBS)/psp/memsce.o \
        $(CLASSG_LIBS)/psp/pathexpand.o \

@@ -22,10 +22,27 @@
 
 #include "menu.h"
 #include "psp/blit.h"
+#include "utils/confmgr.h"
+#include "psp/confmgr/cmpspbtn.h"
 
+/*-----------------------------------------------
+	íËêî
+-----------------------------------------------*/
+#define MF_CONF_NUM             3
+#define MF_CONF_FILE_FULLPATH   "ms0:/seplugins/macrofire_conf.txt"
+#define MF_DEFAULT_MENU_BUTTONS ( PSP_CTRL_VOLDOWN | PSP_CTRL_VOLUP )
+#define MF_ENGINE_STARTUP_ON    "ON"
+#define MF_ENGINE_STARTUP_OFF   "OFF"
+
+/*-----------------------------------------------
+	å^êÈåæ
+-----------------------------------------------*/
 typedef int ( *MfSceCtrlDataFunc  )( SceCtrlData*, int );
 typedef int ( *MfSceCtrlLatchFunc )( SceCtrlLatch* );
 
+/*-----------------------------------------------
+	ä÷êî
+-----------------------------------------------*/
 int mfCtrlPeekBufferPositive( SceCtrlData *pad, int count );
 int mfCtrlPeekBufferNegative( SceCtrlData *pad, int count );
 int mfCtrlReadBufferPositive( SceCtrlData *pad, int count );

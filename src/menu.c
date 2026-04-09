@@ -5,14 +5,26 @@
 #include "menu.h"
 #include "mftable.h"
 
-static int  st_wait        = 0;
-static bool st_clear_vsync = false;
-static bool st_mfmenu_quit = false;
-static bool st_interrupt   = true;
-static SceCtrlData         st_pad_data;
-static SceCtrlLatch        st_pad_latch;
-static SceUID              st_thlist_first[MAX_NUMBER_OF_THREADS];
-static int                 st_thnum_first;
+/*-----------------------------------------------
+	ローカル関数
+-----------------------------------------------*/
+static void mf_menu_get_digits    ( MfMenuItem *mi );
+static void mf_menu_get_buttons   ( MfMenuItem *mi );
+static void mf_threads_stat_change( bool stat, SceUID thlist[], int thnum );
+
+/*-----------------------------------------------
+	ローカル変数
+-----------------------------------------------*/
+static int          st_wait        = 0;
+static bool         st_clear_vsync = false;
+static bool         st_mfmenu_quit = false;
+static bool         st_interrupt   = true;
+static SceCtrlData  st_pad_data;
+static SceCtrlLatch st_pad_latch;
+static SceUID       st_thlist_first[MAX_NUMBER_OF_THREADS];
+static int          st_thnum_first;
+
+/*=============================================*/
 
 static void mf_menu_get_digits( MfMenuItem *mi )
 {
@@ -34,6 +46,30 @@ static void mf_menu_get_buttons( MfMenuItem *mi )
 {
 	//使うところがいまのところないのでそのうち
 	//受け取るとき、MfMenuItemのselectedメンバがint型なのでunsigned int型にキャストする
+}
+
+static void mf_threads_stat_change( bool stat, SceUID thlist[], int thnum )
+{
+	int ( *request_stat_func )( SceUID ) = NULL;
+	int i, j;
+	SceUID selfid = sceKernelGetThreadId();
+	
+	if( stat ){
+		request_stat_func = sceKernelResumeThread;
+	} else{
+		request_stat_func = sceKernelSuspendThread;
+	}
+	
+	for( i = 0; i < thnum; i++ ){
+		bool no_target = false;
+		for( j = 0; j < st_thnum_first; j++ ){
+			if( thlist[i] == st_thlist_first[j] || selfid == thlist[i] ){
+				no_target = true;
+				break;
+			}
+		}
+		if( ! no_target ) ( *request_stat_func )( thlist[i] );
+	}
 }
 
 bool mfMenuInit( void )
@@ -69,7 +105,7 @@ void mfMenu( void )
 	bool mfengine = mfIsEnabled();
 	
 	sceKernelGetThreadmanIdList( SCE_KERNEL_TMID_Thread, thlist, MAX_NUMBER_OF_THREADS, &thnum );
-	mfThreadsStatChange( false, thlist, thnum );
+	mf_threads_stat_change( false, thlist, thnum );
 	
 	/* キーフックを解除 */
 	if( mfengine ) mfRestoreApi();
@@ -195,7 +231,7 @@ void mfMenu( void )
 		/* キーフックを戻す */
 		if( mfengine ) mfHookApi();
 
-		mfThreadsStatChange( true, thlist, thnum );
+		mf_threads_stat_change( true, thlist, thnum );
 		
 		/*
 			リジュームされたスレッドがLCDを操作する時間待つ。
@@ -289,7 +325,7 @@ MfMenuReturnCode mfMenuVertical( int x, int y, int w, MfMenuItem mi[], size_t it
 	
 	for( i = 0; i < items_num; i++ ){
 		if( mi[i].type != MT_BORDER ){
-			safe_strncpy( line, mi[i].label, MENUITEM_LENGTH );
+			strutilSafeCopy( line, mi[i].label, MENUITEM_LENGTH );
 			if( mi[i].type == MT_OPTION ){
 				snprintf( line, MENUITEM_LENGTH, "%s: %s", line, mi[i].value[(*mi[i].selected)] );
 			} else if( mi[i].type == MT_GET_DIGITS ){
@@ -305,30 +341,6 @@ MfMenuReturnCode mfMenuVertical( int x, int y, int w, MfMenuItem mi[], size_t it
 		y += BLIT_CHAR_HEIGHT;
 	}
 	return MR_CONTINUE;
-}
-
-void mfThreadsStatChange( bool stat, SceUID thlist[], int thnum )
-{
-	int ( *request_stat_func )( SceUID ) = NULL;
-	int i, j;
-	SceUID selfid = sceKernelGetThreadId();
-	
-	if( stat ){
-		request_stat_func = sceKernelResumeThread;
-	} else{
-		request_stat_func = sceKernelSuspendThread;
-	}
-	
-	for( i = 0; i < thnum; i++ ){
-		bool no_target = false;
-		for( j = 0; j < st_thnum_first; j++ ){
-			if( thlist[i] == st_thlist_first[j] || selfid == thlist[i] ){
-				no_target = true;
-				break;
-			}
-		}
-		if( ! no_target ) ( *request_stat_func )( thlist[i] );
-	}
 }
 
 void mfWaitScreenReload( int sec )

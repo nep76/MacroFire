@@ -14,7 +14,7 @@
 #include <pspdisplay.h>
 #include <stdbool.h>
 #include <string.h>
-#include "sstring.h"
+#include "utils/strutil.h"
 #include "psp/blit.h"
 #include "psp/memsce.h"
 #include "psp/cmndlg.h"

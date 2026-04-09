@@ -4,6 +4,9 @@
 
 #include "rapidfire.h"
 
+/*-----------------------------------------------
+	ローカル変数と定数
+-----------------------------------------------*/
 static RapidfireConf st_rfconf[] = {
 	{ PSP_CTRL_CIRCLE,   0 },
 	{ PSP_CTRL_CROSS,    0 },
@@ -19,18 +22,15 @@ static RapidfireConf st_rfconf[] = {
 	{ PSP_CTRL_SELECT,   0 }
 };
 
-static short st_rapid = 0;
-
+static short st_rapid       = 0;
 static int st_release_delay = 2;
 static int st_press_delay   = 2;
-
-static int st_wait_cnt = 0;
+static int st_wait_cnt      = 0;
 
 #define RAPIDFIRE_MODE_NORMAL     0
 #define RAPIDFIRE_MODE_SEMI_RAPID 1
 #define RAPIDFIRE_MODE_AUTO_RAPID 2
 #define RAPIDFIRE_MODE_AUTO_HOLD  3
-
 #define RAPIDFIRE_LOAD 19
 #define RAPIDFIRE_SAVE 20
 static MfMenuItem st_rfMenuTable[] = {
@@ -60,11 +60,19 @@ static MfMenuItem st_rfMenuTable[] = {
 
 };
 
+/*-----------------------------------------------
+	ローカル関数
+-----------------------------------------------*/
+static void rapidfire_load( void );
+static void rapidfire_save( void );
+
+/*=============================================*/
+
 static void rapidfire_load( void )
 {
 	CmndlgOpenFilename cofn;
 	CmndlgGetFilenameRc cgfrc;
-	FilehUID fuid;
+	FilehUID fuid = 0;
 	
 	char dir[256]  = { 0 };
 	char name[128] = { 0 };
@@ -102,7 +110,7 @@ static void rapidfire_load( void )
 	
 	/* シグネチャを読み込み、バーションをチェック */
 	filehReadln( fuid, record, sizeof( record ) );
-	uclcToUpper( record );
+	strutilToUpper( record );
 	did   = strtok_r( record,  RAPIDFIRE_DATA_RECORD_SEPARATOR, &saveptr );
 	value = strtok_r( NULL, RAPIDFIRE_DATA_RECORD_SEPARATOR, &saveptr );
 	if( ! did || ! value || strcmp( did, RAPIDFIRE_DATA_SIGNATURE ) != 0 ){
@@ -120,7 +128,7 @@ static void rapidfire_load( void )
 	
 	blitStringf( blitOffsetChar( 3 ), blitOffsetLine( 2 ), MENU_FGCOLOR, MENU_BGCOLOR, "Loading from %s...", path );
 	while( filehReadln( fuid, record, sizeof( record ) ) ){
-		uclcToUpper( record );
+		strutilToUpper( record );
 		did   = strtok_r( record,  RAPIDFIRE_DATA_RECORD_SEPARATOR, &saveptr );
 		value = strtok_r( NULL, RAPIDFIRE_DATA_RECORD_SEPARATOR, &saveptr );
 		
@@ -159,11 +167,10 @@ static void rapidfire_load( void )
 		}
 	}
 	
-	filehClose( fuid );
-	
 	goto DESTROY;
 	
 	DESTROY:
+		if( fuid ) filehClose( fuid );
 		memsceFree( path );
 		return;
 }
@@ -172,7 +179,7 @@ static void rapidfire_save( void )
 {
 	CmndlgOpenFilename cofn;
 	CmndlgGetFilenameRc cgfrc;
-	FilehUID fuid;
+	FilehUID fuid = 0;
 	
 	int i;
 	char dir[256]  = { 0 };
@@ -211,7 +218,7 @@ static void rapidfire_save( void )
 	/* 先頭にシグネチャを書き込む */
 	filehWritef( fuid, RAPIDFIRE_DATA_RECORD_MAXLEN, "%s%s%d\n\n", RAPIDFIRE_DATA_SIGNATURE, RAPIDFIRE_DATA_RECORD_SEPARATOR, RAPIDFIRE_DATA_VERSION );
 	
-	for( i = 0; i < ARRAY_NUM( st_rfconf ); i++ ){
+	for( i = 0; i < MF_ARRAY_NUM( st_rfconf ); i++ ){
 		switch( st_rfconf[i].button ){
 			case PSP_CTRL_CIRCLE:
 				filehWrite( fuid, RAPIDFIRE_DID_CIRCLE, strlen( RAPIDFIRE_DID_CIRCLE ) );
@@ -255,16 +262,15 @@ static void rapidfire_save( void )
 	filehWritef( fuid, RAPIDFIRE_DATA_RECORD_MAXLEN, "%s%s%d\n", RAPIDFIRE_DID_RDELAY, RAPIDFIRE_DATA_RECORD_SEPARATOR, st_release_delay );
 	filehWritef( fuid, RAPIDFIRE_DATA_RECORD_MAXLEN, "%s%s%d\n", RAPIDFIRE_DID_PDELAY, RAPIDFIRE_DATA_RECORD_SEPARATOR, st_press_delay );
 	
-	filehClose( fuid );
-	
 	goto DESTROY;
 	
 	DESTROY:
+		if( fuid ) filehClose( fuid );
 		memsceFree( path );
 		return;
 }
 
-void rapidfireInit( void )
+void rapidfireInit( ConfmgrHandler conf[] )
 {
 	st_wait_cnt = 0;
 }
@@ -275,7 +281,7 @@ void rapidfireMain( MfCallMode mode, SceCtrlData *pad_data, void *argp )
 	
 	if( st_wait_cnt && mode == MF_CALL_READ ) st_wait_cnt--;
 	
-	for( i = 0; i < ARRAY_NUM( st_rfconf ); i++ ){
+	for( i = 0; i < MF_ARRAY_NUM( st_rfconf ); i++ ){
 		if(
 			(pad_data->Buttons & st_rfconf[i].button && st_rfconf[i].mode == RAPIDFIRE_MODE_SEMI_RAPID ) ||
 			st_rfconf[i].mode == RAPIDFIRE_MODE_AUTO_RAPID
@@ -302,7 +308,7 @@ MfMenuReturnCode rapidfireMenu( SceCtrlLatch *pad_latch, SceCtrlData *pad_data, 
 {
 	static int selected = 0;
 	
-	switch( mfMenuVertical( blitOffsetChar( 5 ), blitOffsetLine( 4 ), BLIT_SCR_WIDTH, st_rfMenuTable, ARRAY_NUM( st_rfMenuTable ), &selected ) ){
+	switch( mfMenuVertical( blitOffsetChar( 5 ), blitOffsetLine( 4 ), BLIT_SCR_WIDTH, st_rfMenuTable, MF_ARRAY_NUM( st_rfMenuTable ), &selected ) ){
 		case MR_CONTINUE:
 			blitString( blitOffsetChar( 3 ), blitOffsetLine(  2 ), MENU_FGCOLOR, MENU_BGCOLOR, "Please choose a rapidfire mode per buttons." );
 			blitString( blitOffsetChar( 33 ), blitOffsetLine( 22 ), MENU_FGCOLOR, MENU_BGCOLOR, "NORMAL    : standard control mode." );
@@ -310,7 +316,7 @@ MfMenuReturnCode rapidfireMenu( SceCtrlLatch *pad_latch, SceCtrlData *pad_data, 
 			blitString( blitOffsetChar( 33 ), blitOffsetLine( 24 ), MENU_FGCOLOR, MENU_BGCOLOR, "AUTO-RAPID: always to rapidfire." );
 			blitString( blitOffsetChar( 33 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "AUTO-HOLD : always to press and hold." );
 			
-			/* 警告が目立つように警告はSave/Loadにカーソルがのった時のみ表示 */
+			/* 目立つように警告はSave/Loadにカーソルがのった時のみ表示 */
 			if( selected == RAPIDFIRE_LOAD || selected == RAPIDFIRE_SAVE ){
 				blitString( blitOffsetChar( 5 ), blitOffsetLine( 27 ), MENU_FGCOLOR, MENU_BGCOLOR, "IMPORTANT CAUTION for Save/Load\n  Verify that MemoryStick access indicator is not blinking.\n  Otherwise, will CRASH the currently running game!" );
 			} else{

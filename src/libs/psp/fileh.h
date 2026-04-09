@@ -32,13 +32,13 @@ typedef enum {
 	FW_SEEK_END
 } FilehWhence;
 
-struct fileh_params {
+typedef struct {
 	char *path;
 	SceUID fd;
 	SceIoStat stat;
 	int lError;
 	int sError;
-};
+} FilehParams;
 
 enum fileh_seek_mode {
 	FSM_32BITS,
@@ -46,7 +46,10 @@ enum fileh_seek_mode {
 };
 
 FilehUID filehOpen( const char *path, int mode, int perm );
+FilehUID filehOpen2( FilehParams *params, const char *path, int mode, int perm );
 void filehClose( FilehUID uid );
+void filehClose2( FilehUID uid );
+void filehDestroy( FilehUID uid );
 int filehRead( FilehUID uid, void *data, size_t size );
 int filehReadln( FilehUID uid, void *data, size_t size );
 void filehWrite( FilehUID uid, void *data, size_t size );

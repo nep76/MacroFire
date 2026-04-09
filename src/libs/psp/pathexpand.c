@@ -81,7 +81,7 @@ bool pathexpandFromBase( const char* basepath, const char *path, char *resolved_
 	
 	if( pathexpand_get_drive_offset( path ) ){
 		/* パスがドライブ部を含む場合は既に絶対パスなのでコピー */
-		safe_strncpy( resolved_path, path, len );
+		strutilSafeCopy( resolved_path, path, len );
 	} else{
 		/* ドライブ部が無い場合は、basepathの存在によって分岐 */
 		if( ! basepath ){
@@ -93,12 +93,12 @@ bool pathexpandFromBase( const char* basepath, const char *path, char *resolved_
 			strcpy( base, basepath );
 			if( pathexpand_get_drive_offset( base ) ){
 				/* basepathがドライブ部を含む場合は、絶対パスなのでコピー */
-				safe_strncpy( resolved_path, base, len );
+				strutilSafeCopy( resolved_path, base, len );
 			} else{
 				/* basepathがドライブ部を含まない場合は、それも相対パスなのでカレントディレクトリを取得 */
 				getcwd( resolved_path, len );
-				safe_strncat( resolved_path, "/", len );
-				safe_strncat( resolved_path, base, len );
+				strutilSafeCat( resolved_path, "/", len );
+				strutilSafeCat( resolved_path, base, len );
 			}
 			memsceFree( base );
 		}
@@ -109,8 +109,8 @@ bool pathexpandFromBase( const char* basepath, const char *path, char *resolved_
 			resolved_path[drive_offset] = '\0';
 		}
 		
-		safe_strncat( resolved_path, "/", len );
-		safe_strncat( resolved_path, path, len );
+		strutilSafeCat( resolved_path, "/", len );
+		strutilSafeCat( resolved_path, path, len );
 	}
 	
 	pathexpand_normalize_abspath( resolved_path );

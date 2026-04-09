@@ -4,8 +4,11 @@
 
 #include "macroeditor.h"
 
+/*-----------------------------------------------
+	ローカル変数と定数
+-----------------------------------------------*/
 static int st_selected_macro_num = 0;
-static int st_macro_all_lines = 0;
+static int st_macro_all_lines    = 0;
 
 #define MACROEDITOR_EDIT_DATA  0
 #define MACROEDITOR_CH_TYPE    1
@@ -35,24 +38,27 @@ char st_edit_coord_y[MACROEDITOR_COORD_DIGIT + 1];
 #define MACROEDITOR_TYPE_ANALOG_NEUTRAL  4
 #define MACROEDITOR_TYPE_ANALOG_MOVE     5
 static MfMenuItem st_edit_chtype[] = {
-	{ MT_ANCHOR, 0, "Delay", { 0 } },
-	{ MT_ANCHOR, 0, "Buttons press", { 0 } },
+	{ MT_ANCHOR, 0, "Delay",           { 0 } },
+	{ MT_ANCHOR, 0, "Buttons press",   { 0 } },
 	{ MT_ANCHOR, 0, "Buttons release", { 0 } },
-	{ MT_ANCHOR, 0, "Buttons change", { 0 } },
-	{ MT_ANCHOR, 0, "Analog neutral", { 0 } },
-	{ MT_ANCHOR, 0, "Analog move",    { 0 } }
+	{ MT_ANCHOR, 0, "Buttons change",  { 0 } },
+	{ MT_ANCHOR, 0, "Analog neutral",  { 0 } },
+	{ MT_ANCHOR, 0, "Analog move",     { 0 } }
 };
 
-static unsigned int macroeditor_count_macro_lines( MacroData *macro );
-static void macroeditor_print_button_symbol( unsigned int buttons, char *command, size_t len );
+/*-----------------------------------------------
+	ローカル関数
+-----------------------------------------------*/
+static unsigned int     macroeditor_count_macro_lines  ( MacroData *macro );
+static void             macroeditor_print_button_symbol( unsigned int buttons, char *command, size_t len );
+static MfMenuReturnCode macroeditor_menu               ( SceCtrlLatch *pad_latch, MacroData *macro, unsigned int num );
+static MfMenuReturnCode macroeditor_edit_data          ( SceCtrlLatch *pad_latch, MacroData *macro );
+static MfMenuReturnCode macroeditor_ch_type            ( SceCtrlLatch *pad_latch, MacroData *macro );
+static MfMenuReturnCode macroeditor_ins_before         ( SceCtrlLatch *pad_latch, MacroData *macro );
+static MfMenuReturnCode macroeditor_ins_after          ( SceCtrlLatch *pad_latch, MacroData *macro );
+static MfMenuReturnCode macroeditor_delete             ( SceCtrlLatch *pad_latch, MacroData *macro );
 
-static MfMenuReturnCode macroeditor_menu( SceCtrlLatch *pad_latch, MacroData *macro, unsigned int num );
-static MfMenuReturnCode macroeditor_edit_data( SceCtrlLatch *pad_latch, MacroData *macro );
-static MfMenuReturnCode macroeditor_ch_type( SceCtrlLatch *pad_latch, MacroData *macro );
-static MfMenuReturnCode macroeditor_ins_before( SceCtrlLatch *pad_latch, MacroData *macro );
-static MfMenuReturnCode macroeditor_ins_after( SceCtrlLatch *pad_latch, MacroData *macro );
-static MfMenuReturnCode macroeditor_delete( SceCtrlLatch *pad_latch, MacroData *macro );
-
+/*=============================================*/
 
 void macroeditorReset( void )
 {
@@ -192,18 +198,18 @@ static unsigned int macroeditor_count_macro_lines( MacroData *macro )
 
 static void macroeditor_print_button_symbol( unsigned int buttons, char *command, size_t len )
 {
-	if( buttons & PSP_CTRL_UP       ) safe_strncat( command, "\x80 ", len );
-	if( buttons & PSP_CTRL_RIGHT    ) safe_strncat( command, "\x81 ", len );
-	if( buttons & PSP_CTRL_DOWN     ) safe_strncat( command, "\x82 ", len );
-	if( buttons & PSP_CTRL_LEFT     ) safe_strncat( command, "\x83 ", len );
-	if( buttons & PSP_CTRL_LTRIGGER ) safe_strncat( command, "L ", len );
-	if( buttons & PSP_CTRL_RTRIGGER ) safe_strncat( command, "R ", len );
-	if( buttons & PSP_CTRL_TRIANGLE ) safe_strncat( command, "\x84 ", len );
-	if( buttons & PSP_CTRL_CIRCLE   ) safe_strncat( command, "\x85 ", len );
-	if( buttons & PSP_CTRL_CROSS    ) safe_strncat( command, "\x86 ", len );
-	if( buttons & PSP_CTRL_SQUARE   ) safe_strncat( command, "\x87 ", len );
-	if( buttons & PSP_CTRL_SELECT   ) safe_strncat( command, "SELECT ", len );
-	if( buttons & PSP_CTRL_START    ) safe_strncat( command, "START ", len );
+	if( buttons & PSP_CTRL_UP       ) strutilSafeCat( command, "\x80 ", len );
+	if( buttons & PSP_CTRL_RIGHT    ) strutilSafeCat( command, "\x81 ", len );
+	if( buttons & PSP_CTRL_DOWN     ) strutilSafeCat( command, "\x82 ", len );
+	if( buttons & PSP_CTRL_LEFT     ) strutilSafeCat( command, "\x83 ", len );
+	if( buttons & PSP_CTRL_LTRIGGER ) strutilSafeCat( command, "L ", len );
+	if( buttons & PSP_CTRL_RTRIGGER ) strutilSafeCat( command, "R ", len );
+	if( buttons & PSP_CTRL_TRIANGLE ) strutilSafeCat( command, "\x84 ", len );
+	if( buttons & PSP_CTRL_CIRCLE   ) strutilSafeCat( command, "\x85 ", len );
+	if( buttons & PSP_CTRL_CROSS    ) strutilSafeCat( command, "\x86 ", len );
+	if( buttons & PSP_CTRL_SQUARE   ) strutilSafeCat( command, "\x87 ", len );
+	if( buttons & PSP_CTRL_SELECT   ) strutilSafeCat( command, "SELECT ", len );
+	if( buttons & PSP_CTRL_START    ) strutilSafeCat( command, "START ", len );
 }
 
 static MfMenuReturnCode macroeditor_menu( SceCtrlLatch *pad_latch, MacroData *macro, unsigned int num )
@@ -221,7 +227,7 @@ static MfMenuReturnCode macroeditor_menu( SceCtrlLatch *pad_latch, MacroData *ma
 	}
 	
 	if( ! function ){
-		switch( mfMenuVertical( MACROEDITOR_MAINMENU_POS_X + BLIT_CHAR_WIDTH, MACROEDITOR_MAINMENU_POS_Y + BLIT_CHAR_HEIGHT, blitMeasureChar( 13 ), st_editmenu, ARRAY_NUM( st_editmenu ), &selected ) ){
+		switch( mfMenuVertical( MACROEDITOR_MAINMENU_POS_X + BLIT_CHAR_WIDTH, MACROEDITOR_MAINMENU_POS_Y + BLIT_CHAR_HEIGHT, blitMeasureChar( 13 ), st_editmenu, MF_ARRAY_NUM( st_editmenu ), &selected ) ){
 			case MR_CONTINUE: break;
 			case MR_ENTER:
 				switch( selected ){
@@ -334,7 +340,7 @@ static MfMenuReturnCode macroeditor_ch_type( SceCtrlLatch *pad_latch, MacroData 
 		selected = 0;
 	}
 	
-	switch( mfMenuVertical( MACROEDITOR_EDIT_TYPE_POS_X + BLIT_CHAR_WIDTH, MACROEDITOR_EDIT_TYPE_POS_Y + BLIT_CHAR_HEIGHT, blitMeasureChar( 15 ), st_edit_chtype, ARRAY_NUM( st_edit_chtype ), &selected ) ){
+	switch( mfMenuVertical( MACROEDITOR_EDIT_TYPE_POS_X + BLIT_CHAR_WIDTH, MACROEDITOR_EDIT_TYPE_POS_Y + BLIT_CHAR_HEIGHT, blitMeasureChar( 15 ), st_edit_chtype, MF_ARRAY_NUM( st_edit_chtype ), &selected ) ){
 		case MR_CONTINUE: return MR_CONTINUE;
 		case MR_ENTER:
 			switch( selected ){

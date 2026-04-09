@@ -12,8 +12,6 @@
 #include <stdbool.h>
 #include <string.h>
 
-#include "psp/blit.h"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

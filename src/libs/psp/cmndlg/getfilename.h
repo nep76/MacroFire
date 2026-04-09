@@ -8,7 +8,6 @@
 #include <pspkernel.h>
 #include <pspctrl.h>
 #include <pspdisplay.h>
-#include "sstring.h"
 #include "psp/blit.h"
 #include "psp/dirh.h"
 #define __CMNDLG_FUNCTION_EXPORT__

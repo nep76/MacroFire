@@ -140,7 +140,7 @@ SoskRc soskRun(
 		
 		if( update_result ){
 			char name[SOSK_RESULT_WIDTH + 1];
-			safe_strncpy( name, input + result_offset, sizeof( name ) );
+			strutilSafeCopy( name, input + result_offset, sizeof( name ) );
 			
 			blitFillRect( SOSK_X( x, 1 ), SOSK_Y( y, 1 ), SOSK_X( x, sizeof( name ) ), SOSK_Y( y, 2 ), bgcolor );
 			blitString( SOSK_X( x, 1 ), SOSK_Y( y, 1 ), fgcolor, bgcolor, name );

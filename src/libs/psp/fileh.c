@@ -4,7 +4,7 @@
 
 #include "fileh.h"
 
-static void fileh_seek( enum fileh_seek_mode mode, struct fileh_params *params, void *offset, FilehWhence whence, void *result )
+static void fileh_seek( enum fileh_seek_mode mode, FilehParams *params, void *offset, FilehWhence whence, void *result )
 {
 	int seek_whence = 0;
 	
@@ -32,11 +32,27 @@ static void fileh_seek( enum fileh_seek_mode mode, struct fileh_params *params, 
 	}
 }
 
+static void file_params_init( FilehParams *params, const char *path, int mode, int perm )
+{
+	strcpy( params->path, path );
+	params->fd     = 0;
+	params->lError = 0;
+	params->sError = 0;
+	
+	if( ! ( mode & PSP_O_CREAT ) && ! filehUpdateStat( (FilehUID)params ) ) return;
+	
+	params->fd = sceIoOpen( path, mode, perm );
+	if( params->fd < 0 ){
+		params->lError = FILEH_ERROR_OPEN_FAILED;
+		params->sError = params->fd;
+	}
+}
+
 FilehUID filehOpen( const char *path, int mode, int perm )
 {
-	struct fileh_params *params;
+	FilehParams *params;
 	
-	params = (struct fileh_params *)memsceMalloc( sizeof( struct fileh_params ) );
+	params = (FilehParams *)memsceMalloc( sizeof( FilehParams ) );
 	if( ! params ) return 0;
 	
 	params->path   = (char *)memsceMalloc( strlen( path ) + 1 );
@@ -44,33 +60,41 @@ FilehUID filehOpen( const char *path, int mode, int perm )
 		memsceFree( params );
 		return 0;
 	}
-	strcpy( params->path, path );
-	params->fd     = 0;
-	params->lError = 0;
-	params->sError = 0;
 	
-	params->fd = sceIoOpen( path, mode, perm );
-	if( params->fd < 0 ){
-		params->lError = FILEH_ERROR_OPEN_FAILED;
-		params->sError = params->fd;
-	}
+	file_params_init( params, path, mode, perm );
 	
-	if( ! filehUpdateStat( (FilehUID)params ) ) return (FilehUID)params;
-	
+	return (FilehUID)params;
+}
+
+FilehUID filehOpen2( FilehParams *params, const char *path, int mode, int perm )
+{
+	file_params_init( params, path, mode, perm );
 	return (FilehUID)params;
 }
 
 void filehClose( FilehUID uid )
 {
-	struct fileh_params *params = (struct fileh_params *)uid;
+	FilehParams *params = (FilehParams *)uid;
 	sceIoClose( params->fd );
+	filehDestroy( uid );
+}
+
+void filehClose2( FilehUID uid )
+{
+	FilehParams *params = (FilehParams *)uid;
+	sceIoClose( params->fd );
+}
+
+void filehDestroy( FilehUID uid )
+{
+	FilehParams *params = (FilehParams *)uid;
 	memsceFree( params->path );
 	memsceFree( params );
 }
 
 int filehRead( FilehUID uid, void *data, size_t size )
 {
-	struct fileh_params *params = (struct fileh_params *)uid;
+	FilehParams *params = (FilehParams *)uid;
 	int readsize = sceIoRead( params->fd, data, size );
 	
 	if( readsize < 0 ){
@@ -83,7 +107,7 @@ int filehRead( FilehUID uid, void *data, size_t size )
 
 int filehReadln( FilehUID uid, void *data, size_t size )
 {
-	struct fileh_params *params = (struct fileh_params *)uid;
+	FilehParams *params = (FilehParams *)uid;
 	int readsize = 0;
 	int offset   = 0;
 	
@@ -94,9 +118,15 @@ int filehReadln( FilehUID uid, void *data, size_t size )
 	while( size-- ){
 		readsize = sceIoRead( params->fd, &(((char *)data)[offset]), 1 );
 		if( readsize <= 0 ){
+			((char *)data)[offset] = '\0';
 			break;
 		} else if( ((char *)data)[offset] == '\n' ){
-			((char *)data)[offset++] = '\0';
+			if( ((char *)data)[offset - 1] == '\r' ){
+				((char *)data)[offset - 1] = '\0';
+			} else{
+				((char *)data)[offset] = '\0';
+			}
+			offset++;
 			break;
 		}
 		offset++;
@@ -112,7 +142,7 @@ int filehReadln( FilehUID uid, void *data, size_t size )
 
 void filehWrite( FilehUID uid, void *data, size_t size )
 {
-	struct fileh_params *params = (struct fileh_params *)uid;
+	FilehParams *params = (FilehParams *)uid;
 	int ret = sceIoWrite( params->fd, data, size );
 	
 	if( ret < 0 ){
@@ -123,7 +153,7 @@ void filehWrite( FilehUID uid, void *data, size_t size )
 
 void filehWritef( FilehUID uid, size_t bufsize, char *format, ... )
 {
-	struct fileh_params *params = (struct fileh_params *)uid;
+	FilehParams *params = (FilehParams *)uid;
 	char *buf = (char *)memsceMalloc( bufsize );
 	va_list ap;
 	
@@ -144,7 +174,7 @@ int filehSeek32( FilehUID uid, int offset, FilehWhence whence )
 {
 	int pos;
 	
-	fileh_seek( FSM_32BITS, (struct fileh_params *)uid, &offset, whence, &pos );
+	fileh_seek( FSM_32BITS, (FilehParams *)uid, &offset, whence, &pos );
 	
 	return pos;
 }
@@ -153,7 +183,7 @@ long long filehSeek64( FilehUID uid, long long offset, FilehWhence whence )
 {
 	long long pos;
 	
-	fileh_seek( FSM_32BITS, (struct fileh_params *)uid, &offset, whence, &pos );
+	fileh_seek( FSM_32BITS, (FilehParams *)uid, &offset, whence, &pos );
 	
 	return pos;
 }
@@ -184,7 +214,7 @@ bool filehEof( FilehUID uid )
 
 bool filehUpdateStat( FilehUID uid )
 {
-	struct fileh_params *params = (struct fileh_params *)uid;
+	FilehParams *params = (FilehParams *)uid;
 	int ret;
 	memset( &(params->stat), 0, sizeof( SceIoStat ) );
 	
@@ -204,16 +234,16 @@ bool filehUpdateStat( FilehUID uid )
 
 SceIoStat *filehGetStat( FilehUID uid )
 {
-	return &(((struct fileh_params *)uid)->stat);
+	return &(((FilehParams *)uid)->stat);
 }
 
 int filehGetLastError( FilehUID uid )
 {
-	return ((struct fileh_params *)uid)->lError;
+	return ((FilehParams *)uid)->lError;
 }
 
 int filehGetLastSystemError( FilehUID uid )
 {
-	return ((struct fileh_params *)uid)->sError;
+	return ((FilehParams *)uid)->sError;
 }
 

@@ -7,16 +7,27 @@
 
 PSP_MODULE_INFO( "MacroFire", PSP_MODULE_KERNEL, 0, 0 );
 
-static SceCtrlData  st_pad_data;
+/*-----------------------------------------------
+	ローカル関数
+-----------------------------------------------*/
+static void mf_find_hookaddr  ( void );
+static void mf_call_intr      ( const int mfengine );
+static int  mf_read_pad_buffer( MfSceCtrlDataFunc func, SceCtrlData *pad, int count, MfCallMode mode );
 
-static bool st_apihooked = false;
+/*-----------------------------------------------
+	ローカル変数
+-----------------------------------------------*/
+static bool         st_apihooked = false;
+static SceCtrlData  st_pad_data;
 static unsigned int st_prev_pad_buttons;
+
+/*=============================================*/
 
 static void mf_find_hookaddr( void )
 {
 	int i;
 	
-	for( i = 0; i < ARRAY_NUM( Hooktable ); i++ ){
+	for( i = 0; i < MF_ARRAY_NUM( Hooktable ); i++ ){
 		Hooktable[i].exported.entrypoint = hookFindExportedAddr(
 			Hooktable[i].modname,
 			Hooktable[i].library,
@@ -142,7 +153,7 @@ void mfHookApi( void )
 	
 	if( st_apihooked ) return;
 	
-	for( i = 0; i < ARRAY_NUM( Hooktable ); i++ ){
+	for( i = 0; i < MF_ARRAY_NUM( Hooktable ); i++ ){
 		if( ! Hooktable[i].exported.addr || ! Hooktable[i].hookfunc ) continue;
 		hookUpdateExportedAddr( Hooktable[i].exported.addr, Hooktable[i].hookfunc );
 	}
@@ -156,7 +167,7 @@ void mfRestoreApi( void )
 	
 	if( ! st_apihooked ) return;
 	
-	for( i = 0; i < ARRAY_NUM( Hooktable ); i++ ){
+	for( i = 0; i < MF_ARRAY_NUM( Hooktable ); i++ ){
 		if( ! Hooktable[i].exported.addr || ! Hooktable[i].exported.entrypoint ) continue;
 		hookUpdateExportedAddr( Hooktable[i].exported.addr, Hooktable[i].exported.entrypoint );
 	}
@@ -166,6 +177,9 @@ void mfRestoreApi( void )
 
 int main_thread( SceSize arglen, void *argp )
 {
+	/* 必ず0で初期化 */
+	unsigned int mf_menu_buttons = 0;
+	
 	bool wait_toggle_button_release = false;
 	
 	/* フックアドレスを取得 */
@@ -174,13 +188,74 @@ int main_thread( SceSize arglen, void *argp )
 	/* メニューを初期化 */
 	mfMenuInit();
 	
+	/* カレントディレクトリ設定 */
+	chdir( "ms0:" );
+	
 	{
-		chdir( "ms0:" );
-		
-		/* 初期化関数呼び出し */
 		int i;
+		int  conf_num = MF_CONF_NUM;
+		
+		/* 設定項目数を取得 */
 		for( i = 0; i < mftableEntry; i++ ){
-			if( mftable[i].initFunc ) ( mftable[i].initFunc )();
+			conf_num += mftable[i].confCount;
+		}
+		
+		{
+			ConfmgrHandler conf[conf_num];
+			int load_cnt;
+			int conf_offset = MF_CONF_NUM;
+			char mf_engine_startup[16] = { 0 };
+			size_t buflen = sizeof( mf_engine_startup );
+			
+			/* cmpspbtnLoad/Storeのために使用しないボタンをマスク */
+			cmpspbtnSetMask( PSP_CTRL_HOME | PSP_CTRL_HOLD | PSP_CTRL_WLAN_UP | PSP_CTRL_REMOTE | PSP_CTRL_DISC | PSP_CTRL_MS );
+			
+			/* メインの設定項目を設定 */
+			conf[0].label        = "MAIN_STARTUP";
+			conf[0].type         = CH_STRING;
+			conf[0].mparam       = mf_engine_startup;
+			conf[0].sparam       = &buflen;
+			conf[0].handlerLoad  = NULL;
+			conf[0].handlerStore = NULL;
+			
+			conf[1].label        = "MAIN_MENU_BUTTONS";
+			conf[1].type         = CH_CALLBACK;
+			conf[1].mparam       = &mf_menu_buttons;
+			conf[1].sparam       = NULL;
+			conf[1].handlerLoad  = cmpspbtnLoad;
+			conf[1].handlerStore = cmpspbtnStore;
+			
+			conf[2].label        = "MAIN_TOGGLE_BUTTONS";
+			conf[2].type         = CH_CALLBACK;
+			conf[2].mparam       = &gMfToggle;
+			conf[2].sparam       = NULL;
+			conf[2].handlerLoad  = cmpspbtnLoad;
+			conf[2].handlerStore = cmpspbtnStore;
+			
+			/* 初期化関数呼び出し */
+			for( i = 0; i < mftableEntry; i++ ){
+				if( mftable[i].initFunc ) ( mftable[i].initFunc )( conf + conf_offset );
+				conf_offset += mftable[i].confCount;
+			}
+			
+			/* 設定をファイルから読み出し */
+			load_cnt = confmgrLoad( conf, MF_ARRAY_NUM( conf ), MF_CONF_FILE_FULLPATH );
+			
+			if( ! mf_menu_buttons ){
+				mf_menu_buttons =  MF_DEFAULT_MENU_BUTTONS;
+			}
+			
+			strutilToUpper( mf_engine_startup );
+			if( strcmp( mf_engine_startup, MF_ENGINE_STARTUP_ON ) == 0 ){
+				gMfEngine = MF_ENGINE_ON;
+			} else{
+				strcpy( mf_engine_startup, MF_ENGINE_STARTUP_OFF );
+			}
+			
+			if( ! load_cnt ){
+				/* 設定を一つも読み出せなかった場合は再作成 */
+				confmgrStore( conf, MF_ARRAY_NUM( conf ), MF_CONF_FILE_FULLPATH );
+			}
 		}
 	}
 	
@@ -200,7 +275,7 @@ int main_thread( SceSize arglen, void *argp )
 		if( gMfToggle ){
 			if( ( st_pad_data.Buttons & (~( ~0 ^ gMfToggle )) ) == gMfToggle ){
 				if( ! wait_toggle_button_release ){
-					gMfEngine = ( gMfEngine == MFENGINE_ON ? MFENGINE_OFF : MFENGINE_ON );
+					gMfEngine = ( gMfEngine == MF_ENGINE_ON ? MF_ENGINE_OFF : MF_ENGINE_ON );
 					wait_toggle_button_release = true;
 				}
 			} else if( wait_toggle_button_release ){
@@ -218,8 +293,10 @@ int main_thread( SceSize arglen, void *argp )
 			mf_call_intr( gMfEngine );
 		}
 		
-		if( st_pad_data.Buttons & PSP_CTRL_VOLUP && st_pad_data.Buttons & PSP_CTRL_VOLDOWN ) mfMenu();
+		if( ( st_pad_data.Buttons & (~( ~0 ^ mf_menu_buttons )) ) == mf_menu_buttons ) mfMenu();
 	}
+	
+	/* module_stop()が呼ばれないので、以下は実行されていない */
 	
 	/* メニュー終了処理 */
 	//mfMenuTerm();
@@ -242,12 +319,12 @@ bool mfIsApiHooked( void )
 
 void mfEnable( void )
 {
-	gMfEngine = MFENGINE_ON;
+	gMfEngine = MF_ENGINE_ON;
 }
 
 void mfDisable( void )
 {
-	gMfEngine = MFENGINE_OFF;
+	gMfEngine = MF_ENGINE_OFF;
 }
 
 bool mfIsEnabled( void )
@@ -264,7 +341,7 @@ int module_start( SceSize arglen, void *argp )
 {
 	SceUID thid;
 	
-	thid = sceKernelCreateThread( "MacroFire", main_thread, 32, 0x1500, PSP_THREAD_ATTR_NO_FILLSTACK, 0 );
+	thid = sceKernelCreateThread( "MacroFire", main_thread, 32, 0x1800, 0, 0 );
 	if( thid ) sceKernelStartThread( thid, arglen, argp );
 	
 	return 0;
