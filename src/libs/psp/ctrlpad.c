@@ -12,28 +12,32 @@
 	ローカル変数
 -----------------------------------------------*/
 struct ctrlpad_button st_button_names[] = {
-	{ PSP_CTRL_SELECT,   "SELECT"   },
-	{ PSP_CTRL_START,    "START"    },
-	{ PSP_CTRL_UP,       "UP"       },
-	{ PSP_CTRL_RIGHT,    "RIGHT"    },
-	{ PSP_CTRL_DOWN,     "DOWN"     },
-	{ PSP_CTRL_LEFT,     "LEFT"     },
-	{ PSP_CTRL_LTRIGGER, "LTRIGGER" },
-	{ PSP_CTRL_RTRIGGER, "RTRIGGER" },
-	{ PSP_CTRL_TRIANGLE, "TRIANGLE" },
-	{ PSP_CTRL_CIRCLE,   "CIRCLE"   },
-	{ PSP_CTRL_CROSS,    "CROSS"    },
-	{ PSP_CTRL_SQUARE,   "SQUARE"   },
-	{ PSP_CTRL_HOME,     "HOME"     },
-	{ PSP_CTRL_HOLD,     "HOLD"     },
-	{ PSP_CTRL_NOTE,     "NOTE"     },
-	{ PSP_CTRL_SCREEN,   "SCREEN"   },
-	{ PSP_CTRL_VOLUP,    "VOLUP"    },
-	{ PSP_CTRL_VOLDOWN,  "VOLDOWN"  },
-	{ PSP_CTRL_WLAN_UP,  "WLANUP"   },
-	{ PSP_CTRL_REMOTE,   "REMOTE"   },
-	{ PSP_CTRL_DISC,     "DISC"     },
-	{ PSP_CTRL_MS,       "MS"       }
+	{ PSP_CTRL_SELECT,           "SELECT"      },
+	{ PSP_CTRL_START,            "START"       },
+	{ PSP_CTRL_UP,               "UP"          },
+	{ PSP_CTRL_RIGHT,            "RIGHT"       },
+	{ PSP_CTRL_DOWN,             "DOWN"        },
+	{ PSP_CTRL_LEFT,             "LEFT"        },
+	{ PSP_CTRL_LTRIGGER,         "LTRIGGER"    },
+	{ PSP_CTRL_RTRIGGER,         "RTRIGGER"    },
+	{ PSP_CTRL_TRIANGLE,         "TRIANGLE"    },
+	{ PSP_CTRL_CIRCLE,           "CIRCLE"      },
+	{ PSP_CTRL_CROSS,            "CROSS"       },
+	{ PSP_CTRL_SQUARE,           "SQUARE"      },
+	{ PSP_CTRL_HOME,             "HOME"        },
+	{ PSP_CTRL_HOLD,             "HOLD"        },
+	{ PSP_CTRL_NOTE,             "NOTE"        },
+	{ PSP_CTRL_SCREEN,           "SCREEN"      },
+	{ PSP_CTRL_VOLUP,            "VOLUP"       },
+	{ PSP_CTRL_VOLDOWN,          "VOLDOWN"     },
+	{ PSP_CTRL_WLAN_UP,          "WLANUP"      },
+	{ PSP_CTRL_REMOTE,           "REMOTE"      },
+	{ PSP_CTRL_DISC,             "DISC"        },
+	{ PSP_CTRL_MS,               "MS"          },
+	{ CTRLPAD_CTRL_ANALOG_UP,    "ANALOGUP"    },
+	{ CTRLPAD_CTRL_ANALOG_RIGHT, "ANALOGRIGHT" },
+	{ CTRLPAD_CTRL_ANALOG_DOWN,  "ANALOGDOWN"  },
+	{ CTRLPAD_CTRL_ANALOG_LEFT,  "ANALOGLEFT"  }
 };
 /*=============================================*/
 
@@ -82,6 +86,12 @@ unsigned int ctrlpadUtilStringToButtons( char *str )
 	return buttons;
 }
 
+unsigned int ctrlpadUtilGetAnalogDirection( int x, int y )
+{
+	/* 次のバージョンで実装 */
+	return 0;
+}
+
 void ctrlpadDataClear( SceCtrlData *pad_data )
 {
 	pad_data->Buttons = 0;
@@ -95,7 +105,7 @@ void ctrlpadInit( CtrlpadParams *params )
 	
 	params->tickRepeatDelayLow  = 250000;
 	params->tickRepeatDelayHigh = 100000;
-	params->countLowToHigh      = 3;
+	params->countLowToHigh      = 1;
 	params->maskRepeatButtons   = 0;
 	
 	ctrlpadUpdateData( params );

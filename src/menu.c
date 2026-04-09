@@ -13,7 +13,7 @@ static void mf_threads_stat_change( enum mf_thread_chstat stat, SceUID thlist[],
 static void mf_menu_create_item_name( char line[], size_t max, MfMenuItem *item );
 static void mf_not_enough_mem_error( void );
 static MfMenuRc mf_menu_control( SceCtrlData *pad_data, MfMenuItem *item );
-static void mf_menu_create_base_menu( MfMenuItem *menu, int menu_num, MfMenuCallback *mf_menu );
+static void mf_menu_create_home_menu( MfMenuItem *menu, int menu_num, MfMenuCallback *mf_menu );
 
 /*-----------------------------------------------
 	ローカル変数
@@ -67,17 +67,6 @@ static void mf_threads_stat_change( enum mf_thread_chstat stat, SceUID thids[], 
 	}
 }
 
-void *mfKernelVolatileMemAlloc( size_t size )
-{
-	if( ! size ) return NULL;
-	return memsceMallocEx( 16, PSP_MEMPART_KERNEL_4, "Heap for MacroFire", PSP_SMEM_Low, size, NULL ); 
-}
-
-void mfKernelVolatileMemFree( void *addr )
-{
-	if( addr ) memsceFree( addr );
-}
-
 bool mfMenuInit( void )
 {
 	sceKernelGetThreadmanIdList( SCE_KERNEL_TMID_Thread, st_thids_first, MFM_MAX_NUMBER_OF_THREADS, &st_thnum_first );
@@ -85,13 +74,8 @@ bool mfMenuInit( void )
 	return true;
 }
 
-void mfDebug( void )
+void mfDebug( FbmgrDisplayStat *fb )
 {
-	static int idx = 0;
-	static char work_indicator[] = { '|', '/', '-', '\\' };
-	
-	char cwd[255];
-	
 	static int fps = 0;
 	static int st_fps = 0;
 	static uint64_t st_fps_tick_now = 0;
@@ -105,13 +89,16 @@ void mfDebug( void )
 		st_fps = 0;
 	}
 	
-	if( idx > 3 ) idx = 0;
-	
-	sceIoGetThreadCwd( sceKernelGetThreadId(), cwd, sizeof( cwd ) );
-	
-	blitChar( blitOffsetChar( 1 ), blitOffsetLine( 1 ), MFM_TITLE_TEXT_COLOR, MFM_TRANSPARENT, work_indicator[idx++] );
-	
-	blitStringf( blitOffsetChar( 1 ), blitOffsetLine( 0 ), MFM_TITLE_TEXT_COLOR, MFM_TRANSPARENT, "%x %d %d", ini, sceKernelTotalFreeMemSize(), fps );
+	blitStringf( blitOffsetChar( 1 ), blitOffsetLine( 0 ), MFM_TITLE_TEXT_COLOR, MFM_TRANSPARENT,
+		"%d 1:%d 2:%d 3:%d 4:%d 5:%d 6:%d",
+		fps,
+		sceKernelPartitionTotalFreeMemSize( 1 ),
+		sceKernelPartitionTotalFreeMemSize( 2 ),
+		sceKernelPartitionTotalFreeMemSize( 3 ),
+		sceKernelPartitionTotalFreeMemSize( 4 ),
+		sceKernelPartitionTotalFreeMemSize( 5 ),
+		sceKernelPartitionTotalFreeMemSize( 6 )
+	);
 }
 
 void mfMenu( void )
@@ -128,8 +115,8 @@ void mfMenu( void )
 	bool out_of_memory = false;
 	
 	FbmgrDisplayStat backup_fb;
-	size_t           frame_buf_size;
-	void             *clear_raw_image, *return_raw_image, *internal_frame_buf;
+	size_t           frame_buf_size, backup_vram_size;
+	void             *clear_raw_image, *vram_restore;
 	
 	/* スレッドリストを取得 */
 	sceKernelGetThreadmanIdList( SCE_KERNEL_TMID_Thread, thlist, MFM_MAX_NUMBER_OF_THREADS, &thnum );
@@ -150,32 +137,14 @@ void mfMenu( void )
 	/* フレームバッファのサイズを取得 */
 	frame_buf_size = blitGetFrameBufPixelLength() * backup_fb.bufferWidth * backup_fb.height;
 	
-	/*
-		0x88400000から開始される4MBのカーネルメモリのアクセス権を変更。
-		
-		sceKernelVolatileMemLock()だかscePowerVolatileMemLock()だかを使う方が正しそうだけど、
-		なぜかこれらを使うとスレッド復帰時にフリーズしてしまう。
-		
-		第一引数にアクセス権を変更する先頭アドレス、第二引数に変更するサイズ。
-		第三引数がアクセス権の設定で以下のフラグの論理和で渡すようだ。
-		
-		0x1 ユーザ読み込み許可
-		0x2 ユーザ書き込み許可
-		0x4 カーネル読み込み許可
-		0x8 カーネル書き込み許可
-		
-		ここでは念のため0xFを渡して全フラグを許可した。
-	*/
-	sceKernelSetDdrMemoryProtection( (void *)0x88400000, 0x400000, 0xF );
-	
 	/* 拡張メモリから領域を確保 */
-	internal_frame_buf = mfKernelVolatileMemAlloc( frame_buf_size );
-	clear_raw_image    = mfKernelVolatileMemAlloc( frame_buf_size );
-	return_raw_image   = mfKernelVolatileMemAlloc( frame_buf_size ); //贅沢に!!
+	backup_vram_size = frame_buf_size * 3;
 	
-	/* 終了時用背景をメモリの確保に成功していれば保存 */
-	if( return_raw_image ){
-		memcpy( return_raw_image, backup_fb.frameBuffer, frame_buf_size );
+	if( scePowerVolatileMemTryLock( 0, &vram_restore, (int *)&backup_vram_size ) == 0 ){
+		/* 終了時用メモリの確保に成功していればVRAM全体を保存 */
+		sceDmacMemcpy( vram_restore, (void *)MFM_VRAM_TOP, backup_vram_size );
+	} else{
+		vram_restore = NULL;
 	}
 	
 	/* 表示バッファにMFM_BG_COLORをのせる */
@@ -184,20 +153,9 @@ void mfMenu( void )
 	blitFillRect( 0, SCR_HEIGHT - blitOffsetLine( 3 ), SCR_WIDTH, SCR_HEIGHT, MFM_INFO_BAR_COLOR );
 	blitString( blitOffsetChar( 3 ), blitOffsetLine( 1 ), MFM_TITLE_TEXT_COLOR, MFM_TRANSPARENT, MFM_TOP_MESSAGE );
 	
-	/* 拡張メモリを確保できていたかをチェック */
-	if( ! clear_raw_image || ! internal_frame_buf ){
-		out_of_memory = true;
-		goto DESTROY;
-	}
-	
-	/* クリア用背景を保存 */
-	memcpy( clear_raw_image, backup_fb.frameBuffer, frame_buf_size );
-	
-	/* フレームバッファマネージャをinternal_frame_bufを二枚目のフレームとして初期化 */
-	fbmgrInit( internal_frame_buf );
-	
-	/* blitterの描画アドレスを描画バッファへ */
-	blitSetFrameBufAddrTop( internal_frame_buf );
+	/* クリア用背景をVRAMの3枚目に保存 */
+	clear_raw_image = (void *)( MFM_VRAM_TOP + ( frame_buf_size * 2 ) );
+	sceDmacMemcpy( clear_raw_image, backup_fb.frameBuffer, frame_buf_size );
 	
 	/* 基本メニューを作成する */
 	menu_num = mftableEntry + MFM_MAIN_MENU_COUNT;
@@ -206,7 +164,14 @@ void mfMenu( void )
 		out_of_memory = true;
 		goto DESTROY;
 	}
-	mf_menu_create_base_menu( menu, menu_num, &mf_menu );
+	mf_menu_create_home_menu( menu, menu_num, &mf_menu );
+	
+	/*
+		フレームバッファマネージャの初期化とバッファの設定。
+		VRAMの1枚目と2枚目を使ってダブルバッファリング。
+	*/
+	fbmgrInit();
+	blitSetFrameBufAddrTop( fbmgrSetBuffers( (void *)MFM_VRAM_TOP, (void *)( MFM_VRAM_TOP + frame_buf_size ) ) );
 	
 	/* パッドのキーリピート計算機を初期化 */
 	ctrlpadInit( &st_cp_params );
@@ -217,21 +182,18 @@ void mfMenu( void )
 	while( gRunning ){
 		st_pad_data.Buttons = ctrlpadGetData( &st_cp_params, &st_pad_data );
 		
-		if( st_interrupt && st_pad_data.Buttons & ( PSP_CTRL_START | PSP_CTRL_HOME ) ){
-			st_menu_quit = true;
-		}
-		
-		if( st_menu_quit ){
-			
+		if( ( st_interrupt && st_pad_data.Buttons & ( PSP_CTRL_START | PSP_CTRL_HOME ) ) || st_menu_quit ){
 			st_menu_quit = false;
 			break;
 		}
 		
 		/* 背景を描画 */
-		memcpy( fbmgrGetCurrentDrawBuf(), clear_raw_image, frame_buf_size );
+		sceDmacMemcpy( fbmgrGetCurrentDrawBuf(), clear_raw_image, frame_buf_size );
 		
 		/* インジケータを描画 */
 		mf_indicator( &indicator );
+		
+		mfDebug( &backup_fb );
 		
 		if( rc == MR_BACK ){
 			mfMenuQuit();
@@ -255,48 +217,41 @@ void mfMenu( void )
 	goto DESTROY;
 	
 	DESTROY:
-		/* メモリ不足だった場合は緊急用の切り替えボタンをチェック */
+		/* ホームメニュー用のメモリすら不足した場合は緊急用の切り替えボタンをチェック */
 		if( out_of_memory ){
 			blitSetFrameBufAddrTop( backup_fb.frameBuffer );
 			mf_not_enough_mem_error();
 		} else{
-			if( clear_raw_image ){
-				memcpy( fbmgrGetCurrentDrawBuf(), clear_raw_image, frame_buf_size );
-				mfKernelVolatileMemFree( clear_raw_image );
-				clear_raw_image = NULL;
-			} else{
-				memset( fbmgrGetCurrentDrawBuf(), 0, frame_buf_size );
-			}
+			sceDmacMemcpy( fbmgrGetCurrentDrawBuf(), clear_raw_image, frame_buf_size );
+			
 			blitString( blitOffsetChar( 30 ), blitOffsetLine( 17 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Returning to the game..." );
 			fbmgrSwapBuffers();
 			sceKernelDelayThread( 300000 );
 			
-			if( return_raw_image ){
-				memcpy( backup_fb.frameBuffer, return_raw_image, frame_buf_size );
-				mfKernelVolatileMemFree( return_raw_image );
-				return_raw_image = NULL;
+			/* フレームバッファマネージャを破棄し、表示バッファを元の位置に戻す */
+			fbmgrDestroy();
+			
+			if( vram_restore ){
+				/* VRAMのバックアップがあれば書き戻す */
+				sceDmacMemcpy( (void *)MFM_VRAM_TOP, vram_restore, backup_vram_size );
+				scePowerVolatileMemUnlock( 0 );
 			} else{
-				memset( backup_fb.frameBuffer, 0, frame_buf_size );
+				/*
+					VRAMのバックアップがなければ全体をゼロクリア
+					(これはまずい。VRAM上にゲームが置いたテクスチャなどを消してしまうかもしれない。
+					メモリが足りない場合は、運良く消えないことを祈る!)
+				*/
+				//memset( (void *)MFM_VRAM_TOP, 0, backup_vram_size );
 			}
 		}
 		
 		/* メニューリストを解放 */
-		if( menu ){
-			memsceFree( menu );
-		}
-		
-		/* 内部フレームバッファを解放 */
-		if( internal_frame_buf ){
-			/* フレームバッファマネージャを破棄し、表示バッファを元の位置に戻す */
-			fbmgrDestroy();
-			
-			mfKernelVolatileMemFree( internal_frame_buf );
-			internal_frame_buf = NULL;
-		}
-		
+		if( menu ) memsceFree( menu );
 		
 		/* APIがフックされていたのならば再度フック */
 		if( mf_api_hooked ) mfHookApi();
+		
+		sceDisplayWaitVblankStart();
 		
 		/* 他のスレッドをリジューム */
 		mf_threads_stat_change( MFM_THREADS_RESUME, thlist, thnum );
@@ -546,7 +501,7 @@ static void mf_not_enough_mem_error( void )
 		blitStringf( blitOffsetChar( 5 ), blitOffsetLine( 16 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Quit." );
 	} else if( st_pad_data.Buttons & PSP_CTRL_SELECT ){
 		if( mfIsEnabled() ){
-			 mfDisable();
+			mfDisable();
 		} else{
 			mfEnable();
 		}
@@ -556,7 +511,7 @@ static void mf_not_enough_mem_error( void )
 	sceKernelDelayThread( 2000000 );
 }
 
-static void mf_menu_create_base_menu( MfMenuItem *menu, int menu_num, MfMenuCallback *mf_menu )
+static void mf_menu_create_home_menu( MfMenuItem *menu, int menu_num, MfMenuCallback *mf_menu )
 {
 	int mftable_index;
 	
@@ -779,9 +734,10 @@ bool mfMenuGetFilenameIsReady( void )
 	}
 }
 
-MfMenuRc mfMenuGetFilenameInit( const char *title, unsigned int flags, const char *initpath, char *path, size_t pathmax, char *name, size_t namemax )
+MfMenuRc mfMenuGetFilenameInit( const char *title, unsigned int flags, const char *initpath )
 {
 	CmndlgGetFilenameParams *params;
+	char *buf;
 	
 	mfMenuDisableInterrupt();
 	
@@ -796,6 +752,13 @@ MfMenuRc mfMenuGetFilenameInit( const char *title, unsigned int flags, const cha
 	if( ! params->data ){
 		memsceFree( params );
 		mfMenuEnableInterrupt();
+		return MR_BACK;
+	}
+	
+	buf = (char *)memsceMalloc( 256 );
+	if( ! buf ){
+		memsceFree( params->data );
+		memsceFree( params );
 		return MR_BACK;
 	}
 	
@@ -815,15 +778,16 @@ MfMenuRc mfMenuGetFilenameInit( const char *title, unsigned int flags, const cha
 	params->data->title          = title;
 	params->data->flags          = flags;
 	params->data->initPath       = initpath;
-	params->data->path           = path;
-	params->data->pathMax        = pathmax;
-	params->data->name           = name;
-	params->data->nameMax        = namemax;
+	params->data->path           = buf;
+	params->data->pathMax        = 128;
+	params->data->name           = buf + 128;
+	params->data->nameMax        = 128;
 	params->data->path[0]        = '\0';
 	params->data->name[0]        = '\0';
 	
 	if( cmndlgGetFilenameStart( params ) ){
 		cmndlgGetFilenameShutdownStart();
+		memsceFree( params->data->path );
 		memsceFree( params->data );
 		memsceFree( params );
 		mfMenuEnableInterrupt();
@@ -841,27 +805,35 @@ MfMenuRc mfMenuGetFilename( char **path, char **name )
 	}
 	state = cmndlgGetFilenameGetStatus();
 	if( state == CMNDLG_SHUTDOWN ){
-		CmndlgRc rc;
 		CmndlgGetFilenameParams *params = cmndlgGetFilenameGetParams();
 		
-		rc = params->rc;
-		
-		cmndlgGetFilenameShutdownStart();
-		
-		if( path ){
-			*path = params->data->path;
-		}
-		if( name ){
-			*name = params->data->name;
-		}
-		
-		memsceFree( params->data );
-		memsceFree( params );
 		mfMenuKeyRepeatReset();
 		mfMenuEnableInterrupt();
-		return rc == CMNDLG_ACCEPT ? MR_ENTER : MR_BACK;
+		
+		if( params->rc == CMNDLG_ACCEPT ){
+			if( path ){
+				*path = params->data->path;
+			}
+			if( name ){
+				*name = params->data->name;
+			}
+			return MR_ENTER;
+		} else{
+			mfMenuGetFilenameFree();
+			return MR_BACK;
+		}
 	}
 	
 	return MR_CONTINUE;
 }
 
+void mfMenuGetFilenameFree( void )
+{
+	CmndlgGetFilenameParams *params = cmndlgGetFilenameGetParams();
+	
+	cmndlgGetFilenameShutdownStart();
+	
+	memsceFree( params->data->path );
+	memsceFree( params->data );
+	memsceFree( params );
+}

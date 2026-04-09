@@ -183,6 +183,7 @@ int main_thread( SceSize arglen, void *argp )
 	mf_find_hookaddr();
 	
 	{
+		IniUID ini;
 		int i;
 		
 		/* 初期化関数呼び出し */
@@ -308,7 +309,7 @@ int module_start( SceSize arglen, void *argp )
 {
 	SceUID thid;
 	
-	thid = sceKernelCreateThread( "MacroFire", main_thread, 32, 0x2000, 0, 0 );
+	thid = sceKernelCreateThread( "MacroFire", main_thread, 32, 0x1200, 0, 0 );
 	if( thid ) sceKernelStartThread( thid, arglen, argp );
 	
 	/* MacroFireへカレントディレクトリ設定 */

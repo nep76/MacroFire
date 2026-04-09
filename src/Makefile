@@ -30,9 +30,10 @@ LDFLAGS =
 # newlibを使う場合、libpspuserをリンクしないとsceKernelFreeMemSizeのリンクに失敗する。
 # libpspuserより先にlibpspkernelをリンクしないと、システムコントロール系のシンボルに
 # ユーザモードの方をリンクしてしまい、カーネルモードスレッドを生成できない模様？
-LIBS = -lpsprtc -lpspkernel -lc -lpspuser
+LIBS = -lpsppower_driver -lpsprtc -lpspkernel -lc -lpspuser
 
 OBJS = exports.o \
+       sceDmac.o \
        main.o \
        menu.o \
        hook.o \

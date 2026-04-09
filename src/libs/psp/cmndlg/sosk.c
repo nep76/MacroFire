@@ -293,9 +293,6 @@ static void cmndlg_sosk_draw_ui( CmndlgSoskParams *params )
 			);
 		}
 	}
-	
-	
-	
 }
 
 static int cmndlg_sosk_move_focus( int cp, int mv, int max )

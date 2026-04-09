@@ -135,11 +135,7 @@ MfMenuRc macroLoad( SceCtrlData *pad_data, void *arg )
 		MfMenuRc rc = mfMenuGetFilenameInit(
 			"Open macro",
 			CGF_OPEN | CGF_FILEMUSTEXIST,
-			"ms0:",
-			(char *)memsceMalloc( 128 ),
-			128,
-			(char *)memsceMalloc( 128 ),
-			128
+			"ms0:"
 		);
 		if( rc != MR_ENTER ) return MR_BACK;
 		
@@ -151,15 +147,13 @@ MfMenuRc macroLoad( SceCtrlData *pad_data, void *arg )
 		
 		if( rc != MR_ENTER ) return rc;
 		
-		inipath = (char *)memsceMalloc( strlen( path ) + strlen( name ) + 2 );
+		inipath = (char *)memsceMalloc( 256 );
 		if( ! inipath ){
-			memsceFree( path );
-			memsceFree( name );
+			mfMenuGetFilenameFree();
 			return MR_BACK;
 		} else{
 			sprintf( inipath, "%s/%s", path, name );
-			memsceFree( path );
-			memsceFree( name );
+			mfMenuGetFilenameFree();
 		}
 		
 		ini = inimgrNew();
@@ -181,100 +175,6 @@ MfMenuRc macroLoad( SceCtrlData *pad_data, void *arg )
 		
 		return MR_BACK;
 	}
-/*
-	CmndlgOpenFilename cofn;
-	
-	char dir[256]  = { 0 };
-	char name[128] = { 0 };
-	char *path;
-	
-	CmndlgGetFilenameRc cgfrc;
-	FilehUID fuid = 0;
-	MacroData *cur_macro = NULL;
-	char record[MACRO_DATA_RECORD_MAXLEN];
-	char *did, *value, *saveptr;
-	
-	if( macro_is_busy() ) return MR_BACK;
-	
-	cofn.dirPath     = dir;
-	cofn.dirPathMax  = sizeof( dir );
-	cofn.fileName    = name;
-	cofn.fileNameMax = sizeof( name );
-	
-	cgfrc = cmndlgGetOpenFilename( "Open a macro.", "ms0:", &cofn );
-	
-	mfClearColor( MFM_TEXT_BGCOLOR );
-	mfDrawMainFrame();
-	
-	if( cgfrc == CMNDLG_GETFILENAME_CANCEL ) return MR_BACK;
-	
-	path = (char *)memsceMalloc( strlen( dir ) + strlen( name ) + 1 );
-	if( ! path ){
-		blitString( blitOffsetChar( 3 ), blitOffsetLine( 6 ), MFM_TEXT_FCCOLOR, MFM_TEXT_BGCOLOR, "Failed to create loading path." );
-		mfMenuWait( 1000000 );
-		return MR_BACK;
-	}
-	sprintf( path, "%s/%s", dir, name );
-	
-	fuid = filehOpen( path, PSP_O_RDONLY, 0777 );
-	if( ! fuid || filehGetLastError( fuid ) < 0 ){
-		blitStringf( blitOffsetChar( 3 ), blitOffsetLine( 6 ), MFM_TEXT_FCCOLOR, MFM_TEXT_BGCOLOR, "Failed to load %s: %x-%x", path, filehGetLastError( fuid ), filehGetLastSystemError( fuid ) );
-		mfMenuWait( 1000000 );
-		goto DESTROY;
-	}
-	
-	filehReadln( fuid, record, sizeof( record ) );
-	strutilToUpper( record );
-	did   = strtok_r( record,  MACRO_DATA_RECORD_SEPARATOR, &saveptr );
-	value = strtok_r( NULL, MACRO_DATA_RECORD_SEPARATOR, &saveptr );
-	if( ! did || ! value || strcmp( did, MACRO_DATA_SIGNATURE ) != 0 ){
-		blitStringf( blitOffsetChar( 3 ), blitOffsetLine( 6 ), MFM_TEXT_FCCOLOR, MFM_TEXT_BGCOLOR, "The file's signature is invalid." );
-		mfMenuWait( 1000000 );
-		goto DESTROY;
-	} else{
-		int ver = strtol( value, NULL, 10 );
-		if( ver > MACRO_DATA_VERSION ){
-			blitString( blitOffsetChar( 3 ), blitOffsetLine( 6 ), MFM_TEXT_FCCOLOR, MFM_TEXT_BGCOLOR, "The file's version is not supported." );
-		mfMenuWait( 1000000 );
-			goto DESTROY;
-		}
-	}
-	
-	if( macromgrGetCount() ) macromgrDestroy();
-	
-	blitStringf( blitOffsetChar( 3 ), blitOffsetLine( 6 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Loading from %s...", path );
-	while( filehReadln( fuid, record, sizeof( record ) ) ){
-		strutilToUpper( record );
-		did   = strtok_r( record,  MACRO_DATA_RECORD_SEPARATOR, &saveptr );
-		value = strtok_r( NULL, MACRO_DATA_RECORD_SEPARATOR, &saveptr );
-		
-		if( ! did || ! value ) continue;
-		
-		cur_macro = macro_append( cur_macro );
-		
-		if( strcmp( did, MACRO_ACTION_DELAY ) == 0 ){
-			cur_macro->action = MA_DELAY;
-		} else if( strcmp( did, MACRO_ACTION_BTNPRESS ) == 0 ){
-			cur_macro->action = MA_BUTTONS_PRESS;
-		} else if( strcmp( did, MACRO_ACTION_BTNRELEASE ) == 0 ){
-			cur_macro->action = MA_BUTTONS_RELEASE;
-		} else if( strcmp( did, MACRO_ACTION_BTNCHANGE ) == 0 ){
-			cur_macro->action = MA_BUTTONS_CHANGE;
-		} else if( strcmp( did, MACRO_ACTION_ALMOVE ) == 0 ){
-			cur_macro->action = MA_ANALOG_MOVE;
-		} else{
-			continue;
-		}
-		
-		cur_macro->data = strtoul( value, NULL, 16 );
-	}
-	
-	goto DESTROY;
-	
-	DESTROY:
-		if( fuid ) filehClose( fuid );
-		memsceFree( path );*/
-		return MR_BACK;
 }
 
 MfMenuRc macroSave( SceCtrlData *pad_data, void *arg )
@@ -285,11 +185,7 @@ MfMenuRc macroSave( SceCtrlData *pad_data, void *arg )
 		MfMenuRc rc = mfMenuGetFilenameInit(
 			"Save macro",
 			CGF_SAVE | CGF_FILEMUSTEXIST,
-			"ms0:",
-			(char *)memsceMalloc( 128 ),
-			128,
-			(char *)memsceMalloc( 128 ),
-			128
+			"ms0:"
 		);
 		if( rc != MR_ENTER ) return MR_BACK;
 		
@@ -301,15 +197,13 @@ MfMenuRc macroSave( SceCtrlData *pad_data, void *arg )
 		
 		if( rc != MR_ENTER ) return rc;
 		
-		inipath = (char *)memsceMalloc( strlen( path ) + strlen( name ) + 2 );
+		inipath = (char *)memsceMalloc( 256 );
 		if( ! inipath ){
-			memsceFree( path );
-			memsceFree( name );
+			mfMenuGetFilenameFree();
 			return MR_BACK;
 		} else{
 			sprintf( inipath, "%s/%s", path, name );
-			memsceFree( path );
-			memsceFree( name );
+			mfMenuGetFilenameFree();
 		}
 		
 		ini = inimgrNew();

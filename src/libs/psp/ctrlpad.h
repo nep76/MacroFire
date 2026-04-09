@@ -18,6 +18,18 @@ extern "C" {
 /*-----------------------------------------------
 	型宣言
 -----------------------------------------------*/
+
+/*
+	アナログパッドの方向を格納。
+	ボタンコードとして使用し、enum PspCtrlButtonsが使用していない空きビットを使用。
+*/
+enum ctrlpad_analog_direction {
+	CTRLPAD_CTRL_ANALOG_UP    = 0x00000002,
+	CTRLPAD_CTRL_ANALOG_RIGHT = 0x00000004,
+	CTRLPAD_CTRL_ANALOG_DOWN  = 0x00000200,
+	CTRLPAD_CTRL_ANALOG_LEFT  = 0x00000400
+};
+
 struct ctrlpad_button {
 	unsigned int button;
 	char *label;

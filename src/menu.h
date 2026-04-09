@@ -8,6 +8,7 @@
 #include <pspkernel.h>
 #include <pspdisplay.h>
 #include <pspsysmem_kernel.h>
+#include <pspsuspend.h>
 
 #include "global.h"
 #include "utils/strutil.h"
@@ -17,6 +18,8 @@
 #include "psp/cmndlg.h"
 #include "utils/inimgr.h"
 #include "psp/ctrlpad.h"
+
+#define MFM_VRAM_TOP         0x44000000
 
 #define MFM_TRANSPARENT      BLIT_TRANSPARENT
 #define MFM_BG_COLOR         0xbb000000
@@ -38,6 +41,27 @@
 	プロトタイプのないAPI
 -----------------------------------------------*/
 void sceDisplayEnable( void );
+
+/*
+	背景のような大きなメモリブロックの転送にはDMAコントローラを使用。
+	細切れのデータに対しては逆に遅くなるとの情報があったので背景転送にのみ使う。
+	本当に遅いのかどうかは調べていない。
+*/
+
+// 同期版？
+// とりあえずmemcpy()と単純置換しても問題は起きず高速化した。
+int  sceDmacMemcpy( void *dest, const void *src, SceSize size );
+
+// 連続で行うとなにか変。
+// 多分、非同期版。
+//int  sceDmacTryMemcpy( void *dest, const void *src, SceSize size );
+
+/*
+	カーネルメモリのロック/アンロック
+*/
+//int scePowerVolatileMemLock( int unk, void **ptr, int *size );    /* 同期 */
+int scePowerVolatileMemTryLock( int unk, void **ptr, int *size ); /* 非同期 */
+int scePowerVolatileMemUnlock( int unk );
 
 /*-----------------------------------------------
 	型宣言
@@ -91,40 +115,10 @@ typedef struct {
 -----------------------------------------------*/
 bool mfMenuInit( void );
 void mfMenu( void );
-void mfMenuDrawBase( void );
 
 /*-----------------------------------------------
 	メニュー用API
 -----------------------------------------------*/
-
-/*
-	カーネルメモリからメモリを確保する。
-	最大でも空きが約3MBしかないので注意する。
-	
-	また、このメモリ空間はPSPのシステムがセーブ/ロードダイアログなどで使用する。
-	そのため、メニュー終了時には完全にメモリを解放した状態でなければ、
-	通常使用に影響が出る可能性が高い。
-	
-	一時保存用のメモリとして使用すること。
-	
-	@param: size_t size
-		確保する容量。
-	
-	@return void*
-		確保したメモリの先頭アドレス。
-*/
-void *mfKernelVolatileMemAlloc( size_t size );
-
-/*
-	確保したカーネルメモリを解放する。
-	このメモリはソニーのセーブ/ロードダイアログなど、システムに使用されるため、
-	解放を忘れると後々フリーズする危険性が高い。
-	
-	@param: void *addr
-		mfKernelVolatileMemAlloc()で得たメモリの先頭アドレス。
-*/
-void mfKernelVolatileMemFree( void *addr );
-
 /*
 	メニュー終了フラグをセットする。
 */
@@ -190,8 +184,9 @@ MfMenuRc mfMenuGetButtonsInit( const char *title, unsigned int *buttons, unsigne
 MfMenuRc mfMenuGetButtons( unsigned int *buttons );
 
 bool mfMenuGetFilenameIsReady( void );
-MfMenuRc mfMenuGetFilenameInit( const char *title, unsigned int flags, const char *initpath, char *path, size_t pathmax, char *name, size_t namemax );
+MfMenuRc mfMenuGetFilenameInit( const char *title, unsigned int flags, const char *initpath );
 MfMenuRc mfMenuGetFilename( char **path, char **name );
+void mfMenuGetFilenameFree( void );
 
 
 #endif

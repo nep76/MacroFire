@@ -53,8 +53,6 @@ typedef struct {
 /*
 	フレームバッファマネージャの初期化。
 	ダブルバッファの準備を行う。
-	1枚目のフレームバッファには、現在の表示バッファを再利用する。
-	2枚目のフレームバッファは引数でメモリアドレスを指定する。
 	
 	@param void *fbp
 		2枚目のフレームバッファとなるメモリアドレスを渡す。
@@ -63,7 +61,9 @@ typedef struct {
 	@return void*
 		次のフレームバッファ(描画バッファ)のアドレス。
 */
-void *fbmgrInit( void *fbp );
+void fbmgrInit( void );
+
+void *fbmgrSetBuffers( void *disp_buf, void *draw_buf );
 
 /*
 	フレームバッファマネージャの破棄と後片付け。
@@ -107,16 +107,6 @@ void *fbmgrGetCurrentDispBuf( void );
 	これはデータキャッシュを無効化するフラグ。
 */
 void *fbmgrGetCurrentDrawBuf( void );
-
-/*
-	内部フレームバッファのアドレスを返す。
-	fbmgrInit()の引数にNULLを渡した場合に、自動確保されるメモリアドレスを返す。
-	fbmgrInit()に引数を渡していた場合は常にNULLが返る。
-	
-	@return void*
-		内部で確保したフレームバッファのアドレス。
-*/
-void *fbmgrGetInternalFrameBufAddr( void );
 
 /*
 	現在のディスプレイモードとフレームバッファ情報を取得する。

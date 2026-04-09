@@ -97,11 +97,7 @@ static MfMenuRc rapidfire_load( void )
 		MfMenuRc rc = mfMenuGetFilenameInit(
 			"Open rapidfire preference",
 			CGF_OPEN | CGF_FILEMUSTEXIST,
-			"ms0:",
-			(char *)memsceMalloc( 128 ),
-			128,
-			(char *)memsceMalloc( 128 ),
-			128
+			"ms0:"
 		);
 		if( rc != MR_ENTER ) return MR_BACK;
 		
@@ -113,15 +109,13 @@ static MfMenuRc rapidfire_load( void )
 		
 		if( rc != MR_ENTER ) return rc;
 		
-		inipath = (char *)memsceMalloc( strlen( path ) + strlen( name ) + 2 );
+		inipath = (char *)memsceMalloc( 256 );
 		if( ! inipath ){
-			memsceFree( path );
-			memsceFree( name );
+			mfMenuGetFilenameFree();
 			return MR_BACK;
 		} else{
 			sprintf( inipath, "%s/%s", path, name );
-			memsceFree( path );
-			memsceFree( name );
+			mfMenuGetFilenameFree();
 		}
 		
 		ini = inimgrNew();
@@ -180,11 +174,7 @@ static MfMenuRc rapidfire_save( void )
 		MfMenuRc rc = mfMenuGetFilenameInit(
 			"Save rapidfire preference",
 			CGF_SAVE | CGF_OVERWRITEPROMPT,
-			"ms0:",
-			(char *)memsceMalloc( 128 ),
-			128,
-			(char *)memsceMalloc( 128 ),
-			128
+			"ms0:"
 		);
 		if( rc != MR_ENTER ) return MR_BACK;
 		
@@ -196,15 +186,13 @@ static MfMenuRc rapidfire_save( void )
 		
 		if( rc != MR_ENTER ) return rc;
 		
-		inipath = (char *)memsceMalloc( strlen( path ) + strlen( name ) + 2 );
+		inipath = (char *)memsceMalloc( 256 );
 		if( ! inipath ){
-			memsceFree( path );
-			memsceFree( name );
+			mfMenuGetFilenameFree();
 			return MR_BACK;
 		} else{
 			sprintf( inipath, "%s/%s", path, name );
-			memsceFree( path );
-			memsceFree( name );
+			mfMenuGetFilenameFree();
 		}
 		
 		ini = inimgrNew();

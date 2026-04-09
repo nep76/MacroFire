@@ -49,8 +49,6 @@ GLOBAL bool         gRunning  INIT_VALUE( true );
 GLOBAL bool         gMfEngine INIT_VALUE( false );
 GLOBAL unsigned int gMfToggle INIT_VALUE( 0 );
 
-GLOBAL int ini;
-
 #undef GLOBAL
 #undef VALUE
 
