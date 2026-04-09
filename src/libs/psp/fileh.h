@@ -10,15 +10,7 @@
 #include <stdbool.h>
 #include <stdarg.h>
 #include "psp/memsce.h"
-
-#define FILEH_ERROR_SUCCESS 0
-#define FILEH_ERROR_GETSTAT_FAILED      0xe0000001
-#define FILEH_ERROR_PATH_IS_NOT_REGFILE 0xe0000002
-#define FILEH_ERROR_OPEN_FAILED         0xe0000003
-#define FILEH_ERROR_READ_FAILED         0xe0000004
-#define FILEH_ERROR_WRITE_FAILED        0xe0000005
-#define FILEH_ERROR_NOT_ENOUGH_MEMORY   0xe0000006
-#define FILEH_ERROR_SEEK_FAILED         0xe0000007
+#include "cgerrs.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -36,8 +28,8 @@ typedef struct {
 	char *path;
 	SceUID fd;
 	SceIoStat stat;
-	int lError;
-	int sError;
+	unsigned int lError;
+	unsigned int sError;
 } FilehParams;
 
 enum fileh_seek_mode {

@@ -10,18 +10,9 @@
 #include "psp/memsce.h"
 #include "psp/pathexpand.h"
 #include "psp/blit.h"
+#include "cgerrs.h"
 
 #define DIRH_MAXPATH 256
-
-/* ÉGÉâÅ[ */
-#define DIRH_ERROR_SUCCESS            0
-#define DIRH_ERROR_PATH_DETECT_FAILED 0xe0000001
-#define DIRH_ERROR_GETSTAT_FAILED     0xe0000002
-#define DIRH_ERROR_PATH_IS_NOT_DIR    0xe0000003
-#define DIRH_ERROR_INVAILD_ARGUMENTS  0xe0000004
-
-#define DIRH_ERROR_DOPEN_FAILED       0xe0000010
-#define DIRH_ERROR_DREAD_FAILED       0xe0000011
 
 #ifdef __cplusplus
 extern "C" {

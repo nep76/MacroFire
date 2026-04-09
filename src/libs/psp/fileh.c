@@ -15,7 +15,7 @@ static void file_params_init( FilehParams *params, const char *path, int mode, i
 	
 	params->fd = sceIoOpen( path, mode, perm );
 	if( params->fd < 0 ){
-		params->lError = FILEH_ERROR_OPEN_FAILED;
+		params->lError = CG_ERROR_FAILED_TO_OPEN;
 		params->sError = params->fd;
 	}
 }
@@ -58,7 +58,7 @@ int filehRead( FilehUID uid, void *data, size_t size )
 	int readsize = sceIoRead( params->fd, data, size );
 	
 	if( readsize < 0 ){
-		params->lError = FILEH_ERROR_READ_FAILED;
+		params->lError = CG_ERROR_FAILED_TO_READ;
 		params->sError = readsize;
 	}
 	
@@ -93,7 +93,7 @@ int filehReadln( FilehUID uid, void *data, size_t size )
 	}
 	
 	if( readsize < 0 ){
-		params->lError = FILEH_ERROR_READ_FAILED;
+		params->lError = CG_ERROR_FAILED_TO_READ;
 		params->sError = readsize;
 	}
 	
@@ -106,7 +106,7 @@ int filehWrite( FilehUID uid, void *data, size_t size )
 	int ret = sceIoWrite( params->fd, data, size );
 	
 	if( ret < 0 ){
-		params->lError = FILEH_ERROR_WRITE_FAILED;
+		params->lError = CG_ERROR_FAILED_TO_WRITE;
 		params->sError = ret;
 	}
 	return ret;
@@ -118,7 +118,7 @@ int filehWritef( FilehUID uid, char *buf, size_t bufsize, char *format, ... )
 	va_list ap;
 	
 	if( ! buf ){
-		params->lError = FILEH_ERROR_NOT_ENOUGH_MEMORY;
+		params->lError = CG_ERROR_NOT_ENOUGH_MEMORY;
 		params->sError = 0;
 		return -1;
 	}
@@ -138,7 +138,7 @@ int filehSeek32( FilehUID uid, int offset, FilehWhence whence )
 	pos = sceIoLseek32( params->fd, offset, whence );
 	
 	if( pos < 0 ){
-		params->lError = FILEH_ERROR_SEEK_FAILED;
+		params->lError = CG_ERROR_FAILED_TO_SEEK;
 		params->sError = pos;
 	}
 	
@@ -153,7 +153,7 @@ SceOff filehSeek( FilehUID uid, SceOff offset, FilehWhence whence )
 	pos = sceIoLseek( params->fd, offset, whence );
 	
 	if( pos < 0 ){
-		params->lError = FILEH_ERROR_SEEK_FAILED;
+		params->lError = CG_ERROR_FAILED_TO_SEEK;
 		params->sError = pos;
 	}
 	
@@ -192,11 +192,11 @@ bool filehUpdateStat( FilehUID uid )
 	
 	ret = sceIoGetstat( params->path, &(params->stat) );
 	if( ret < 0 ){
-		params->lError = FILEH_ERROR_GETSTAT_FAILED;
+		params->lError = CG_ERROR_FAILED_TO_GETSTAT;
 		params->sError = ret;
 		return false;
 	} else if( ! FIO_S_ISREG( params->stat.st_mode ) ){
-		params->lError = FILEH_ERROR_PATH_IS_NOT_REGFILE;
+		params->lError = CG_ERROR_PATH_IS_NOT_REGFILE;
 		params->sError = 0;
 		return false;
 	}

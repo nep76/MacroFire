@@ -99,7 +99,7 @@ static MfMenuRc rapidfire_load( void )
 		MfMenuRc rc = mfMenuGetFilenameInit(
 			"Open rapidfire preference",
 			CGF_OPEN | CGF_FILEMUSTEXIST,
-			"ms0:"
+			"ms0:/"
 		);
 		if( rc != MR_ENTER ) return MR_BACK;
 		
@@ -116,18 +116,19 @@ static MfMenuRc rapidfire_load( void )
 			mfMenuGetFilenameFree();
 			return MR_BACK;
 		} else{
-			sprintf( inipath, "%s/%s", path, name );
+			sprintf( inipath, "%s%s", path, name );
 			mfMenuGetFilenameFree();
 		}
 		
 		ini = inimgrNew();
 		if( ini > 0 ){
-			if( inimgrLoad( ini, inipath ) == 0 ){
+			unsigned int err;
+			if( ( err = inimgrLoad( ini, inipath ) ) == 0 ){
 				char mode[16];
 				int version = inimgrGetInt( ini, "default", RAPIDFIRE_DATA_SIGNATURE, 0 );
 				if( version <= 1 ){
 					blitString( blitOffsetChar( 3 ), blitOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FCCOLOR, "Initialization file is invalid or too lower version." );
-					mfMenuWait( RAPIDFIRE_ERROR_DISPLAY_MICROSEC );
+					mfMenuWait( MFM_DISPLAY_MICROSEC_ERROR );
 				} else{
 					inimgrGetString( ini, "Mode", RAPIDFIRE_DID_CIRCLE, RAPIDFIRE_DID_MODENORMAL, mode, sizeof( mode ) );
 					st_rfconf[RAPIDFIRE_BUTTON_CIRCLE].mode = rapidfire_string_to_mode( mode );
@@ -158,8 +159,11 @@ static MfMenuRc rapidfire_load( void )
 					st_press_delay   = inimgrGetInt( ini, "Delay", RAPIDFIRE_DID_PDELAY, RAPIDFIRE_DEFAULT_PRESS_DELAY );
 					
 					blitStringf( blitOffsetChar( 3 ), blitOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FGCOLOR, "Loaded from %s.", inipath );
-					mfMenuWait( RAPIDFIRE_INFO_DISPLAY_MICROSEC );
+					mfMenuWait( MFM_DISPLAY_MICROSEC_INFO );
 				}
+			} else{
+				blitStringf( blitOffsetChar( 3 ), blitOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FCCOLOR, "Failed to load from %s: 0x%X", inipath, err );
+				mfMenuWait( MFM_DISPLAY_MICROSEC_ERROR );
 			}
 			inimgrDestroy( ini );
 		}
@@ -176,7 +180,7 @@ static MfMenuRc rapidfire_save( void )
 		MfMenuRc rc = mfMenuGetFilenameInit(
 			"Save rapidfire preference",
 			CGF_SAVE | CGF_OVERWRITEPROMPT,
-			"ms0:"
+			"ms0:/"
 		);
 		if( rc != MR_ENTER ) return MR_BACK;
 		
@@ -193,12 +197,13 @@ static MfMenuRc rapidfire_save( void )
 			mfMenuGetFilenameFree();
 			return MR_BACK;
 		} else{
-			sprintf( inipath, "%s/%s", path, name );
+			sprintf( inipath, "%s%s", path, name );
 			mfMenuGetFilenameFree();
 		}
 		
 		ini = inimgrNew();
 		if( ini > 0 ){
+			unsigned int err;
 			inimgrSetInt( ini, "default", RAPIDFIRE_DATA_SIGNATURE, RAPIDFIRE_DATA_VERSION );
 			inimgrSetString( ini, "Mode",  RAPIDFIRE_DID_CIRCLE,   rapidire_mode_to_string( st_rfconf[RAPIDFIRE_BUTTON_CIRCLE].mode ) );
 			inimgrSetString( ini, "Mode",  RAPIDFIRE_DID_CROSS,    rapidire_mode_to_string( st_rfconf[RAPIDFIRE_BUTTON_CROSS].mode ) );
@@ -214,11 +219,16 @@ static MfMenuRc rapidfire_save( void )
 			inimgrSetString( ini, "Mode",  RAPIDFIRE_DID_SELECT,   rapidire_mode_to_string( st_rfconf[RAPIDFIRE_BUTTON_SELECT].mode ) );
 			inimgrSetInt( ini, "Delay", RAPIDFIRE_DID_RDELAY,   st_release_delay );
 			inimgrSetInt( ini, "Delay", RAPIDFIRE_DID_PDELAY,   st_press_delay );
-			inimgrSave( ini, inipath );
-			inimgrDestroy( ini );
 			
-			blitStringf( blitOffsetChar( 3 ), blitOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FGCOLOR, "Saved to %s.", inipath );
-			mfMenuWait( RAPIDFIRE_INFO_DISPLAY_MICROSEC );
+			if( ( err = inimgrSave( ini, inipath ) ) == 0 ){
+				blitStringf( blitOffsetChar( 3 ), blitOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FGCOLOR, "Saved to %s.", inipath );
+				mfMenuWait( MFM_DISPLAY_MICROSEC_INFO );
+			} else{
+				blitStringf( blitOffsetChar( 3 ), blitOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FCCOLOR, "Failed to save to %s: 0x%X", inipath, err );
+				mfMenuWait( MFM_DISPLAY_MICROSEC_ERROR );
+			}
+			
+			inimgrDestroy( ini );
 		}
 		
 		memsceFree( inipath );

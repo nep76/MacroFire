@@ -1,4 +1,4 @@
-MacroFire 2.2.1
+MacroFire 2.2.2
 
 
 Macro settings

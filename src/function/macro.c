@@ -144,7 +144,7 @@ MfMenuRc macroLoad( SceCtrlData *pad_data, void *arg )
 		MfMenuRc rc = mfMenuGetFilenameInit(
 			"Open macro",
 			CGF_OPEN | CGF_FILEMUSTEXIST,
-			"ms0:"
+			"ms0:/"
 		);
 		if( rc != MR_ENTER ) return MR_BACK;
 		
@@ -161,22 +161,26 @@ MfMenuRc macroLoad( SceCtrlData *pad_data, void *arg )
 			mfMenuGetFilenameFree();
 			return MR_BACK;
 		} else{
-			sprintf( inipath, "%s/%s", path, name );
+			sprintf( inipath, "%s%s", path, name );
 			mfMenuGetFilenameFree();
 		}
 		
 		ini = inimgrNew();
 		if( ini > 0 ){
+			unsigned int err;
 			inimgrSetCallback( ini, "CommandSequence", macro_load, NULL );
-			if( inimgrLoad( ini, inipath ) == 0 ){
+			if( ( err = inimgrLoad( ini, inipath ) ) == 0 ){
 				int version = inimgrGetInt( ini, "default", MACRO_DATA_SIGNATURE, 0 );
 				if( version <= 1 ){
 					blitString( blitOffsetChar( 3 ), blitOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FCCOLOR, "Macro file is invalid or too lower version." );
-					mfMenuWait( MACRO_ERROR_DISPLAY_MICROSEC );
+					mfMenuWait( MFM_DISPLAY_MICROSEC_ERROR );
 				} else{
 					blitStringf( blitOffsetChar( 3 ), blitOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FGCOLOR, "Loaded from %s.", inipath );
-					mfMenuWait( MACRO_INFO_DISPLAY_MICROSEC );
+					mfMenuWait( MFM_DISPLAY_MICROSEC_INFO );
 				}
+			} else{
+				blitStringf( blitOffsetChar( 3 ), blitOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FCCOLOR, "Failed to load from %s: 0x%X", inipath, err );
+				mfMenuWait( MFM_DISPLAY_MICROSEC_ERROR );
 			}
 			inimgrDestroy( ini );
 		}
@@ -194,7 +198,7 @@ MfMenuRc macroSave( SceCtrlData *pad_data, void *arg )
 		MfMenuRc rc = mfMenuGetFilenameInit(
 			"Save macro",
 			CGF_SAVE | CGF_FILEMUSTEXIST,
-			"ms0:"
+			"ms0:/"
 		);
 		if( rc != MR_ENTER ) return MR_BACK;
 		
@@ -211,20 +215,24 @@ MfMenuRc macroSave( SceCtrlData *pad_data, void *arg )
 			mfMenuGetFilenameFree();
 			return MR_BACK;
 		} else{
-			sprintf( inipath, "%s/%s", path, name );
+			sprintf( inipath, "%s%s", path, name );
 			mfMenuGetFilenameFree();
 		}
 		
 		ini = inimgrNew();
 		if( ini > 0 ){
+			unsigned int err;
 			inimgrSetInt( ini, "default", MACRO_DATA_SIGNATURE, MACRO_DATA_VERSION );
 			inimgrAddSection(  ini, "CommandSequence" );
 			inimgrSetCallback( ini, "CommandSequence", NULL, macro_save );
-			inimgrSave( ini, inipath );
+			if( ( err = inimgrSave( ini, inipath ) ) == 0 ){
+				blitStringf( blitOffsetChar( 3 ), blitOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FGCOLOR, "Saved to %s.", inipath );
+				mfMenuWait( MFM_DISPLAY_MICROSEC_INFO );
+			} else{
+				blitStringf( blitOffsetChar( 3 ), blitOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FCCOLOR, "Failed to save to %s: 0x%X", inipath, err );
+				mfMenuWait( MFM_DISPLAY_MICROSEC_ERROR );
+			}
 			inimgrDestroy( ini );
-			
-			blitStringf( blitOffsetChar( 3 ), blitOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FGCOLOR, "Saved to %s.", inipath );
-			mfMenuWait( MACRO_INFO_DISPLAY_MICROSEC );
 		}
 		memsceFree( inipath );
 		

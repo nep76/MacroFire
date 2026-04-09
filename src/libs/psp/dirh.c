@@ -21,7 +21,7 @@ static int dirh_get_dirent( const char *dirpath, struct dirh_select_filename *sf
 	
 	/* エントリ数を数える */
 	dfd = sceIoDopen( dirpath );
-	if( dfd < 0 ) return dirh_error( sf, DIRH_ERROR_DOPEN_FAILED, dfd );
+	if( dfd < 0 ) return dirh_error( sf, CG_ERROR_FAILED_TO_DOPEN, dfd );
 	
 	memset( &dir, 0, sizeof( SceIoDirent ) );
 	
@@ -37,7 +37,7 @@ static int dirh_get_dirent( const char *dirpath, struct dirh_select_filename *sf
 	sceIoDclose( dfd );
 	
 	/* sceIoDread()がエラーを返していればfalse */
-	if( ret < 0 ) return dirh_error( sf, DIRH_ERROR_DREAD_FAILED, ret );
+	if( ret < 0 ) return dirh_error( sf, CG_ERROR_FAILED_TO_DREAD, ret );
 	
 	/* 読み込む準備 */
 	sf->entry.dirList = (char **)memsceMalloc( sizeof( char* ) * cnt_dir );
@@ -50,7 +50,7 @@ static int dirh_get_dirent( const char *dirpath, struct dirh_select_filename *sf
 	/* 読み込む */
 	dfd = sceIoDopen( dirpath );
 	if( dfd < 0 ){
-		dirh_error( sf, DIRH_ERROR_DOPEN_FAILED, dfd );
+		dirh_error( sf, CG_ERROR_FAILED_TO_DOPEN, dfd );
 		goto DESTROY;
 	}
 	
@@ -153,20 +153,20 @@ int dirhChdir( DirhUID uid, const char *dirpath )
 	SceIoStat stat;
 	struct dirh_select_filename *sf = (struct dirh_select_filename *)uid;
 	
-	dirh_error( sf, DIRH_ERROR_SUCCESS, 0 );
+	dirh_error( sf, CG_ERROR_OK, 0 );
 	
 	if( ! pathexpandFromCwd( dirpath, sf->curDirFullpath, DIRH_MAXPATH ) )
-		return dirh_error( sf, DIRH_ERROR_PATH_DETECT_FAILED, 0 );
+		return dirh_error( sf, CG_ERROR_NO_FILE_ENTRY, 0 );
 	
 	memset( &stat, 0, sizeof( SceIoStat ) );
 	
 	if( sf->curDirFullpath[strlen( sf->curDirFullpath ) - 1] != ':' ){
 		/* 末尾が:じゃなければドライブではないのでGetstat実行 */
 		if( ( ret = sceIoGetstat( sf->curDirFullpath, &stat ) ) < 0 )
-			return dirh_error( sf, DIRH_ERROR_GETSTAT_FAILED, ret );
+			return dirh_error( sf, CG_ERROR_FAILED_TO_GETSTAT, ret );
 		
 		if( ! FIO_S_ISDIR( stat.st_mode ) )
-			return dirh_error( sf, DIRH_ERROR_PATH_IS_NOT_DIR, 0 );
+			return dirh_error( sf, CG_ERROR_PATH_IS_NOT_DIR, 0 );
 	}
 	
 	dirh_destroy_dirent( &(sf->entry) );
