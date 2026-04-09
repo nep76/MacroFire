@@ -84,17 +84,19 @@ void macromgrRemove( MacroData *macro )
 			/* 先頭なので前のコマンドはなしに */
 			macro->prev = NULL;
 			
-			/* 最後に解放するためにアドレスを代入 */
-			macro = rm_macro;
+			/* 次のコマンドは削除されるコマンドを指しているので自分を指す */
+			macro->next->prev = macro;
+			
+			/* メモリ解放 */
+			memsceFree( rm_macro );
 		}
 	} else{
 		macro->prev->next = macro->next;
 		if( macro->next ){
 			macro->next->prev = macro->prev;
 		}
+		memsceFree( macro );
 	}
-	
-	memsceFree( macro );
 	
 	if( st_macroCount > 1 ) st_macroCount--;
 }

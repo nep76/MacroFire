@@ -8,7 +8,7 @@
 #include <pspdebug.h>
 #include <stdbool.h>
 
-#define MF_MENU_TOP_MESSAGE "MacroFire v1.0.0 In-game menu [ClassG: http://classg.sytes.net]"
+#define MF_MENU_TOP_MESSAGE "MacroFire v1.1.0 In-game menu [ClassG: http://classg.sytes.net]"
 
 #ifdef GLOBAL_VARIABLES_DEFINE
 #define GLOBAL
@@ -25,6 +25,12 @@
 
 typedef int ( *SCE_CTRL_DATA_FUNC )( SceCtrlData*, int );
 typedef int ( *SCE_CTRL_LATCH_FUNC )( SceCtrlLatch* );
+
+/* ファンクションの呼び出しモード */
+typedef enum {
+	MF_CALL_READ,
+	MF_CALL_LATCH
+} MfCallMode;
 
 /* グローバル関数 */
 bool mfIsApiHooked( void );

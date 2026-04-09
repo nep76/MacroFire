@@ -23,6 +23,17 @@
 #include "menu.h"
 #include "psp/blit.h"
 
+/*
+	フックされたsceCtrlPeekBufferPositive()を内部で呼ぶフラグ。
+	sceCtrlPeekBufferPositiveのシステムコールが発生し、その例外ハンドラとして呼ばれないと、
+	オリジナルのAPI (本来のsceCtrlPeekBufferPositive) は0x80000023を返すっぽい。
+	例外が発生していないのでCPUが特権モードになっていないから？
+	PSP_MODULE_INFOのPSP_MODULE_KERNELは関係ないのだろうか？
+	
+	それを回避する力業として、普通はあり得ない値として第二引数に0となるMF_INTERNAL_CALLをセットする。
+*/
+#define MF_INTERNAL_CALL 0
+
 int mfCtrlPeekBufferPositive( SceCtrlData *pad, int count );
 int mfCtrlPeekBufferNegative( SceCtrlData *pad, int count );
 int mfCtrlReadBufferPositive( SceCtrlData *pad, int count );

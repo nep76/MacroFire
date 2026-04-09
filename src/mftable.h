@@ -18,7 +18,7 @@
 #include "function/macro.h"
 
 typedef void ( *MfFuncInitTerm )( void );
-typedef void ( *MfFuncHook )( HookCaller, SceCtrlData*, void* );
+typedef void ( *MfFuncHook )( MfCallMode, SceCtrlData*, void* );
 typedef MfMenuReturnCode ( *MfFuncMenu )( SceCtrlLatch*, SceCtrlData*, void* );
 typedef void ( *MfFuncIntr )( const int mfengine );
 

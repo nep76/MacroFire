@@ -44,8 +44,8 @@ static MfMenuItem st_macroMenu[] = {
 };
 
 static MacroData *macro_append( MacroData *macro );
-static void macro_record( HookCaller caller, SceCtrlData *pad_data, void *argp );
-static void macro_trace( HookCaller caller, SceCtrlData *pad_data, void *argp );
+static void macro_record( MfCallMode mode, SceCtrlData *pad_data, void *argp );
+static void macro_trace( MfCallMode mode, SceCtrlData *pad_data, void *argp );
 static bool macro_is_busy( void );
 static bool macro_is_avail( void );
 static bool macro_is_enabled_mf_engine( void );
@@ -63,7 +63,7 @@ void macroIntr( const int mfengine )
 {
 	if( mfengine == MFENGINE_OFF && st_runMode == MRM_TRACE ){
 		/* マクロ実行位置を先頭に戻すのみ */
-		macro_trace( CALL_PEEK_BUFFER_POSITIVE, NULL, NULL );
+		macro_trace( MF_CALL_READ, NULL, NULL );
 	}
 }
 
@@ -74,7 +74,7 @@ MfMenuReturnCode macroRunInterrupt( SceCtrlLatch *pad_latch, SceCtrlData *pad_da
 	} else{
 		st_runMode = MRM_NONE;
 		blitString( blitOffsetChar( 3 ), blitOffsetLine( 2 ), MENU_FGCOLOR, MENU_BGCOLOR, "Macro halted." );
-		macro_trace( CALL_PEEK_BUFFER_POSITIVE, NULL, NULL );
+		macro_trace( MF_CALL_READ, NULL, NULL );
 	}
 	mfWaitScreenReload( MACRO_NOTICE_DISPLAY_SEC );
 	return MR_BACK;
@@ -108,12 +108,12 @@ MfMenuReturnCode macroRunInfinity( SceCtrlLatch *pad_latch, SceCtrlData *pad_dat
 	return MR_BACK;
 }
 
-void macroMain( HookCaller caller, SceCtrlData *pad_data, void *argp )
+void macroMain( MfCallMode mode, SceCtrlData *pad_data, void *argp )
 {
 	switch( st_runMode ){
 		case MRM_NONE: break;
-		case MRM_TRACE:  macro_trace( caller, pad_data, argp );  break;
-		case MRM_RECORD: macro_record( caller, pad_data, argp ); break;
+		case MRM_TRACE:  macro_trace( mode, pad_data, argp );  break;
+		case MRM_RECORD: macro_record( mode, pad_data, argp ); break;
 	}
 }
 
@@ -128,8 +128,8 @@ MfMenuReturnCode macroLoad( SceCtrlLatch *pad_latch, SceCtrlData *pad_data )
 	CmndlgGetFilenameRc cgfrc;
 	FilehUID fuid;
 	MacroData *cur_macro = NULL;
-	char action[128] = { 0 };
-	char *value;
+	char record[MACRO_DATA_RECORD_MAXLEN];
+	char *did, *value, *saveptr;
 	
 	if( macro_is_busy() ) return MR_BACK;
 	
@@ -139,14 +139,11 @@ MfMenuReturnCode macroLoad( SceCtrlLatch *pad_latch, SceCtrlData *pad_data )
 	cofn.fileNameMax = sizeof( name );
 	
 	cgfrc = cmndlgGetOpenFilename( "Open a macro.", "ms0:", &cofn );
-	if( cgfrc == CMNDLG_GETFILENAME_CANCEL ) return MR_BACK;
 	
-	/*
-		ダイアログによってメニューの枠が上書きされているので、
-		ダイアログをクリアして、さらに枠を描画。
-	*/
 	mfClearColor( MENU_BGCOLOR );
 	mfDrawMainFrame();
+	
+	if( cgfrc == CMNDLG_GETFILENAME_CANCEL ) return MR_BACK;
 	
 	path = (char *)memsceMalloc( strlen( dir ) + strlen( name ) + 1 );
 	if( ! path ){
@@ -163,37 +160,51 @@ MfMenuReturnCode macroLoad( SceCtrlLatch *pad_latch, SceCtrlData *pad_data )
 		goto DESTROY;
 	}
 	
+	/* シグネチャを読み込み、バーションをチェック */
+	filehReadln( fuid, record, sizeof( record ) );
+	uclcToUpper( record );
+	did   = strtok_r( record,  MACRO_DATA_RECORD_SEPARATOR, &saveptr );
+	value = strtok_r( NULL, MACRO_DATA_RECORD_SEPARATOR, &saveptr );
+	if( ! did || ! value || strcmp( did, MACRO_DATA_SIGNATURE ) != 0 ){
+		blitStringf( blitOffsetChar( 3 ), blitOffsetLine( 2 ), MENU_FCCOLOR, MENU_BGCOLOR, "The file's signature is invalid." );
+		mfWaitScreenReload( MACRO_ERROR_DISPLAY_SEC );
+		goto DESTROY;
+	} else{
+		int ver = strtol( value, NULL, 10 );
+		if( ver > MACRO_DATA_VERSION ){
+			blitString( blitOffsetChar( 3 ), blitOffsetLine( 2 ), MENU_FCCOLOR, MENU_BGCOLOR, "The file's version is not supported." );
+			mfWaitScreenReload( MACRO_ERROR_DISPLAY_SEC );
+			goto DESTROY;
+		}
+	}
+	
 	/* 既にマクロがあればクリア */
 	if( macromgrGetCount() ) macromgrDestroy();
 	
 	blitStringf( blitOffsetChar( 3 ), blitOffsetLine( 2 ), MENU_FGCOLOR, MENU_BGCOLOR, "Loading from %s...", path );
-	
-	while( filehReadln( fuid, action, sizeof( action ) ) ){
-		value = strchr( action, MACRO_FILE_RECORD_SEPARATOR );
-		if( ! value ){
-			macromgrDestroy();
-			break;
-		}
-		*value = '\0';
-		value++;
+	while( filehReadln( fuid, record, sizeof( record ) ) ){
+		uclcToUpper( record );
+		did   = strtok_r( record,  MACRO_DATA_RECORD_SEPARATOR, &saveptr );
+		value = strtok_r( NULL, MACRO_DATA_RECORD_SEPARATOR, &saveptr );
+		
+		if( ! did || ! value ) continue;
 		
 		cur_macro = macro_append( cur_macro );
 		
-		if( strcmp( action, MACRO_ACTION_DELAY ) == 0 ){
+		if( strcmp( did, MACRO_ACTION_DELAY ) == 0 ){
 			cur_macro->action = MA_DELAY;
-		} else if( strcmp( action, MACRO_ACTION_BTNPRESS ) == 0 ){
+		} else if( strcmp( did, MACRO_ACTION_BTNPRESS ) == 0 ){
 			cur_macro->action = MA_BUTTONS_PRESS;
-		} else if( strcmp( action, MACRO_ACTION_BTNRELEASE ) == 0 ){
+		} else if( strcmp( did, MACRO_ACTION_BTNRELEASE ) == 0 ){
 			cur_macro->action = MA_BUTTONS_RELEASE;
-		} else if( strcmp( action, MACRO_ACTION_BTNCHANGE ) == 0 ){
+		} else if( strcmp( did, MACRO_ACTION_BTNCHANGE ) == 0 ){
 			cur_macro->action = MA_BUTTONS_CHANGE;
-		} else if( strcmp( action, MACRO_ACTION_ALNEUTRAL ) == 0 ){
+		} else if( strcmp( did, MACRO_ACTION_ALNEUTRAL ) == 0 ){
 			cur_macro->action = MA_ANALOG_NEUTRAL;
-		} else if( strcmp( action, MACRO_ACTION_ALMOVE ) == 0 ){
+		} else if( strcmp( did, MACRO_ACTION_ALMOVE ) == 0 ){
 			cur_macro->action = MA_ANALOG_MOVE;
 		} else{
-			macromgrDestroy();
-			break;
+			continue;
 		}
 		
 		cur_macro->data = strtoul( value, NULL, 16 );
@@ -228,14 +239,11 @@ MfMenuReturnCode macroSave( SceCtrlLatch *pad_latch, SceCtrlData *pad_data )
 	cofn.fileNameMax = sizeof( name );
 	
 	cgfrc = cmndlgGetSaveFilename( "Save the macro as ...", "ms0:", &cofn );
-	if( cgfrc == CMNDLG_GETFILENAME_CANCEL ) return MR_BACK;
 	
-	/*
-		ダイアログによってメニューの枠が上書きされているので、
-		ダイアログをクリアして、さらに枠を描画。
-	*/
 	mfClearColor( MENU_BGCOLOR );
 	mfDrawMainFrame();
+	
+	if( cgfrc == CMNDLG_GETFILENAME_CANCEL ) return MR_BACK;
 	
 	path = (char *)memsceMalloc( strlen( dir ) + strlen( name ) + 1 );
 	if( ! path ){
@@ -253,6 +261,9 @@ MfMenuReturnCode macroSave( SceCtrlLatch *pad_latch, SceCtrlData *pad_data )
 	}
 	
 	blitStringf( blitOffsetChar( 3 ), blitOffsetLine( 2 ), MENU_FGCOLOR, MENU_BGCOLOR, "Saving to %s...", path );
+	
+	/* 先頭にシグネチャを書き込む */
+	filehWritef( fuid, MACRO_DATA_RECORD_MAXLEN, "%s%s%d\n\n", MACRO_DATA_SIGNATURE, MACRO_DATA_RECORD_SEPARATOR, MACRO_DATA_VERSION );
 	
 	cur_macro = macromgrGetFirst();
 	for( ; cur_macro; cur_macro = cur_macro->next ){
@@ -276,7 +287,7 @@ MfMenuReturnCode macroSave( SceCtrlLatch *pad_latch, SceCtrlData *pad_data )
 				filehWrite( fuid, MACRO_ACTION_ALMOVE, strlen( MACRO_ACTION_ALMOVE ) );
 				break;
 		}
-		filehWritef( fuid, 64, "%c%lx\n", MACRO_FILE_RECORD_SEPARATOR, cur_macro->data );
+		filehWritef( fuid, MACRO_DATA_RECORD_MAXLEN, "%s%lx\n", MACRO_DATA_RECORD_SEPARATOR, cur_macro->data );
 	}
 	
 	filehClose( fuid );
@@ -454,26 +465,17 @@ static MacroData *macro_append( MacroData *macro )
 	return new_macro;
 }
 
-static void macro_record( HookCaller caller, SceCtrlData *pad_data, void *argp )
+static void macro_record( MfCallMode mode, SceCtrlData *pad_data, void *argp )
 {
 	unsigned int cur_buttons;
 	static bool cur_analog_move = false;
 	u64 cur_analog_coord = 0;
 	static MacroData *cur_macro;
 	
-	if( ! pad_data ) return;
+	if( mode == MF_CALL_LATCH || ! pad_data ) return;
 	
-	switch( caller ){
-		case CALL_PEEK_BUFFER_NEGATIVE:
-		case CALL_READ_BUFFER_NEGATIVE:
-			cur_buttons = ~(pad_data->Buttons);
-			break;
-		case CALL_PEEK_BUFFER_POSITIVE:
-		case CALL_READ_BUFFER_POSITIVE:
-		default:
-			cur_buttons = pad_data->Buttons;
-			break;
-	}
+	cur_buttons = pad_data->Buttons;
+	
 	/* チェックしないボタンをマスク */
 	cur_buttons &= 0x0000FFFF;
 	
@@ -546,13 +548,16 @@ static void macro_record( HookCaller caller, SceCtrlData *pad_data, void *argp )
 	st_temp_analog_coord = cur_analog_coord;
 }
 
-static void macro_trace( HookCaller caller, SceCtrlData *pad_data, void *argp )
+static void macro_trace( MfCallMode mode, SceCtrlData *pad_data, void *argp )
 {
 	static MacroData *cur_macro = NULL;
 	bool forward = true;
 	
 	if( ! macromgrGetCount() || ! pad_data || st_runMode != MRM_TRACE ){
 		cur_macro = NULL;
+		return;
+	} else if( mode == MF_CALL_LATCH ){
+		pad_data->Buttons |= st_temp_buttons;
 		return;
 	}
 	
@@ -595,23 +600,10 @@ static void macro_trace( HookCaller caller, SceCtrlData *pad_data, void *argp )
 			break;
 	}
 	
-	switch( caller ){
-		case CALL_PEEK_BUFFER_NEGATIVE:
-		case CALL_READ_BUFFER_NEGATIVE:
-			pad_data->Buttons = ~( ~(pad_data->Buttons) | st_temp_buttons );
-			if( st_temp_analog_move ){
-				pad_data->Lx = MACRO_GET_ANALOG_X( st_temp_analog_coord );
-				pad_data->Ly = MACRO_GET_ANALOG_Y( st_temp_analog_coord );
-			}
-			break;
-		case CALL_PEEK_BUFFER_POSITIVE:
-		case CALL_READ_BUFFER_POSITIVE:
-			pad_data->Buttons |= st_temp_buttons;
-			if( st_temp_analog_move ){
-				pad_data->Lx = MACRO_GET_ANALOG_X( st_temp_analog_coord );
-				pad_data->Ly = MACRO_GET_ANALOG_Y( st_temp_analog_coord );
-			}
-			break;
+	pad_data->Buttons |= st_temp_buttons;
+	if( st_temp_analog_move ){
+		pad_data->Lx = MACRO_GET_ANALOG_X( st_temp_analog_coord );
+		pad_data->Ly = MACRO_GET_ANALOG_Y( st_temp_analog_coord );
 	}
 	
 	if( ! forward ) return;

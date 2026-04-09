@@ -30,13 +30,6 @@
 */
 void sceDisplayEnable( void );
 
-typedef enum {
-	CALL_PEEK_BUFFER_POSITIVE,
-	CALL_PEEK_BUFFER_NEGATIVE,
-	CALL_READ_BUFFER_POSITIVE,
-	CALL_READ_BUFFER_NEGATIVE,
-} HookCaller;
-
 typedef struct _mf_menu_chain {
 	char *mid;
 	struct _mf_menu_chain *prev;

@@ -93,7 +93,12 @@ int filehReadln( FilehUID uid, void *data, size_t size )
 	
 	while( size-- ){
 		readsize = sceIoRead( params->fd, &(((char *)data)[offset]), 1 );
-		if( ! readsize || ((char *)data)[offset] == '\n' ) break;
+		if( readsize <= 0 ){
+			break;
+		} else if( ((char *)data)[offset] == '\n' ){
+			((char *)data)[offset++] = '\0';
+			break;
+		}
 		offset++;
 	}
 	
@@ -101,8 +106,6 @@ int filehReadln( FilehUID uid, void *data, size_t size )
 		params->lError = FILEH_ERROR_READ_FAILED;
 		params->sError = readsize;
 	}
-	
-	((char *)data)[offset] = '\0';
 	
 	return offset;
 }

@@ -22,7 +22,7 @@ static void *hookApiAddr( SysApi *syscall, unsigned int *addr, void *func );
 
 static void *hookFindSyscallAddr(unsigned int addr)
 {
-	/* ここは何をしているのはさっぱりなのでPSPLinkのソースそのまま */
+	/* SYSCALL例外発生時に呼ばれる例外ハンドラの位置を特定する？ */
 	
 	struct SyscallHeader *head;
 	unsigned int *syscalls;
@@ -177,8 +177,7 @@ unsigned int hookApiByNid( SysApi *syscall, const char *modname, const char *lib
 	
 	if( addr ){
 		/*
-			hookFindSyscallAddr()に関しては全然わかりません。
-			これによって実際のAPIのエントリポイントの保存場所を見つけているようだけど……。
+			MIPSのSYSCALL例外発生時に呼ばれる例外ハンドラの位置を特定する？
 		*/
 		if( ! hookApiAddr( syscall, hookFindSyscallAddr( addr ), func ) ){
 			addr = 0;

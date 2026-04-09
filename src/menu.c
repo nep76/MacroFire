@@ -66,9 +66,13 @@ void mfMenu( void )
 	MfFuncMenu function = NULL;
 	MfMenuItem *miList;
 	int miCount, i;
+	bool mfengine = mfIsEnabled();
 	
 	sceKernelGetThreadmanIdList( SCE_KERNEL_TMID_Thread, thlist, MAX_NUMBER_OF_THREADS, &thnum );
 	mfThreadsStatChange( false, thlist, thnum );
+	
+	/* キーフックを解除 */
+	if( mfengine ) mfRestoreApi();
 	
 	/* blitの8bitASCIIテーブルをPSPボタンシンボルへ */
 	blit8BitCharTableSwitch( B8_BUTTON_SYMBOL );
@@ -188,6 +192,9 @@ void mfMenu( void )
 	goto QUIT;
 	
 	QUIT:
+		/* キーフックを戻す */
+		if( mfengine ) mfHookApi();
+
 		mfThreadsStatChange( true, thlist, thnum );
 		
 		/*

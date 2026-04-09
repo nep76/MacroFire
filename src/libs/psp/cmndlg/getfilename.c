@@ -234,8 +234,8 @@ static enum getfilename_rc getfilename( char *title, CmndlgOpenFilename *cofn, e
 		if( redraw_list && drawline ) blitFillRect( CMNDLG_GETFILENAME_SX( 2 ), CMNDLG_GETFILENAME_SY( 5 + cnt ), CMNDLG_GETFILENAME_EX( 2 ), CMNDLG_GETFILENAME_SY( 5 + cnt + drawline ), bgcolor );
 		
 		/* ƒtƒ@ƒCƒ‹–¼˜g‚ð•`‰æ */
+		if( redraw_name ) blitFillRect( CMNDLG_GETFILENAME_SX( 1 ), CMNDLG_GETFILENAME_SY( 4 + CMNDLG_GETFILENAME_ITEMS_PER_PAGE + 3 ), CMNDLG_GETFILENAME_EX( 1 ), CMNDLG_GETFILENAME_SY( 4 + CMNDLG_GETFILENAME_ITEMS_PER_PAGE + 3 + 3 ), bgcolor );
 		blitLineRect( CMNDLG_GETFILENAME_SX( 1 ), CMNDLG_GETFILENAME_SY( 4 + CMNDLG_GETFILENAME_ITEMS_PER_PAGE + 3 ), CMNDLG_GETFILENAME_EX( 1 ), CMNDLG_GETFILENAME_SY( 4 + CMNDLG_GETFILENAME_ITEMS_PER_PAGE + 3 + 3 ), *name_frame_color );
-		if( redraw_name ) blitFillRect( CMNDLG_GETFILENAME_SX( 1 ), CMNDLG_GETFILENAME_SY( CMNDLG_GETFILENAME_ITEMS_PER_PAGE + 4 ), CMNDLG_GETFILENAME_EX( 1 ), CMNDLG_GETFILENAME_SY( CMNDLG_GETFILENAME_ITEMS_PER_PAGE + 7 ), bgcolor );
 		blitStringf( CMNDLG_GETFILENAME_SX( 2 ), CMNDLG_GETFILENAME_SY( 4 + CMNDLG_GETFILENAME_ITEMS_PER_PAGE + 4 ), fgcolor, bgcolor, "File Name: %s", cofn->fileName );
 		
 		redraw_list = false;
