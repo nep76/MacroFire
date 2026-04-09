@@ -10,6 +10,8 @@
 #include "macromgr.h"
 #include "macroeditor.h"
 
+#define MACRO_MENU_OFFSET 4
+#define MACRO_MENU_BASECONF 2
 #define MACRO_NOTICE_DISPLAY_SEC 1.5
 
 typedef MfMenuReturnCode ( *MacroFunction )( SceCtrlLatch*, SceCtrlData* );

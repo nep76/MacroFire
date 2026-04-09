@@ -15,6 +15,7 @@
 #include "sstring.h"
 #include "../menu.h"
 
+#include "psp/cmndlg.h"
 #include "macromgr.h"
 
 #define MACROEDITOR_LINES_PER_PAGE 28

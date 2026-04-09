@@ -1,0 +1,12 @@
+/*
+	errors.h
+*/
+
+#ifndef __CMNDLG_ERRORS_H__
+#define __CMNDLG_ERRORS_H__
+
+#define CMNDLG_ERROR_SUCCESS                   0
+#define CMNDLG_ERROR_FAILED_TO_MEMORY_ALLOCATE 0xE0000000
+#define CMNDLG_ERROR_INVALID_ARGUMENTS         0xE0000001
+
+#endif

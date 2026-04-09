@@ -5,15 +5,15 @@
 #include "main.h"
 #include "hooktable.h"
 
-#define RUN_IN_KERNEL_MODE
 PSP_MODULE_INFO( "MacroFire", PSP_MODULE_KERNEL, 0, 0 );
 
-static SceCtrlLatch pad_latch;
-static SceCtrlData  pad_data;
+static SceCtrlLatch st_pad_latch;
+static SceCtrlData  st_pad_data;
 static SCE_CTRL_LATCH_FUNC ctrlGetPadLatch = sceCtrlReadLatch;
 static SCE_CTRL_DATA_FUNC  ctrlGetPadData  = sceCtrlPeekBufferPositive;
 
 static bool st_apihooked = false;
+static bool st_toggled = false;
 static unsigned int st_prev_pad_buttons;
 
 static void mfKeyHook( HookCaller caller, SceCtrlData *pad )
@@ -93,11 +93,6 @@ int mfCtrlReadLatch( SceCtrlLatch *latch )
 	return ret;
 }
 
-bool mfIsApiHooked( void )
-{
-	return st_apihooked;
-}
-
 void mfHookApi( void )
 {
 	int i;
@@ -132,7 +127,7 @@ int main_thread( SceSize arglen, void *argp )
 {	
 	/* メニューを初期化 */
 	mfMenuInit();
-	mfMenuSetup( ctrlGetPadLatch, ctrlGetPadData, &pad_latch, &pad_data );
+	mfMenuSetup( ctrlGetPadLatch, ctrlGetPadData, &st_pad_latch, &st_pad_data );
 	
 	{
 		chdir( "ms0:" );
@@ -148,16 +143,30 @@ int main_thread( SceSize arglen, void *argp )
 		sceKernelDelayThread( 50000 );
 		
 		if( ! st_apihooked && gMfEngine ){
-			// APIをフック
+			/* APIをフック */
 			mfHookApi();
 		} else if( st_apihooked && ! gMfEngine ){
+			/* APIをリストア */
 			mfRestoreApi();
 		}
 		
-		( ctrlGetPadData )( &pad_data, 1 );
-		( ctrlGetPadLatch )( &pad_latch );
+		( ctrlGetPadData )( &st_pad_data, 1 );
 		
-		if( pad_data.Buttons & PSP_CTRL_VOLUP && pad_data.Buttons & PSP_CTRL_VOLDOWN ) mfMenu();
+		if( gMfToggle ){
+			/* 検出する必要のないボタンフラグを消す */
+			st_pad_data.Buttons ^= ( st_pad_data.Buttons & ( PSP_CTRL_WLAN_UP | PSP_CTRL_REMOTE | PSP_CTRL_DISC | PSP_CTRL_MS ) );
+			
+			if( st_pad_data.Buttons == gMfToggle ){
+				if( ! st_toggled ){
+					gMfEngine = gMfEngine == MFENGINE_ON ? MFENGINE_OFF : MFENGINE_ON;
+					st_toggled = true;
+				}
+			} else if( st_toggled ){
+				st_toggled = false;
+			}
+		}
+		
+		if( st_pad_data.Buttons & PSP_CTRL_VOLUP && st_pad_data.Buttons & PSP_CTRL_VOLDOWN ) mfMenu();
 	}
 	
 	/* メニュー終了処理 */
@@ -174,7 +183,6 @@ int main_thread( SceSize arglen, void *argp )
 	return sceKernelExitDeleteThread( 0 );
 }
 
-
 int module_start( SceSize arglen, void *argp )
 {
 	SceUID thid;
@@ -190,9 +198,36 @@ int module_stop( void )
 	int i;
 	gRunning = false;
 	
+	if( ! mfIsApiHooked() ) return 0;
+	
 	for( i = 0; i < ARRAY_NUM( Hooktable ); i++ ){
 		hookRestoreAddr( &(Hooktable[i].syscall) );
 	}
 	
 	return 0;
+}
+
+bool mfIsApiHooked( void )
+{
+	return st_apihooked;
+}
+
+void mfEnable( void )
+{
+	gMfEngine = MFENGINE_ON;
+}
+
+void mfDisable( void )
+{
+	gMfEngine = MFENGINE_OFF;
+}
+
+bool mfIsEnabled( void )
+{
+	return ( gMfEngine == 0 ? false : true );
+}
+
+bool mfIsDisabled( void )
+{
+	return ( gMfEngine == 0 ? true : false );
 }

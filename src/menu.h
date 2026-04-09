@@ -117,12 +117,6 @@ void mfWaitScreenReload( int sec );
 /* VSYNC時に画面をクリアすることを予約 */
 void mfClearScreenWhenVsync( void );
 
-/* MacroFireエンジンが有効ならTRUE */
-bool mfIsEnabled( void );
-
-/* MacroFireエンジンが無効ならTRUE */
-bool mfIsDisabled( void );
-
 /* メニューの中断を有効にする */
 void mfMenuEnableInterrupt( void );
 

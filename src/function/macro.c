@@ -6,18 +6,25 @@
 
 static int st_runLoop          = 0;
 static MacroRunMode st_runMode = MRM_NONE;
-static unsigned int st_temp_buttons;
-static u64 st_temp_tick;
+static unsigned int st_temp_buttons = 0;
+static bool st_temp_analog_move = false;
+static u64 st_temp_analog_coord = 0;
+static u64 st_temp_tick = 0;
 
-#define MACRO_RUN_ONCE     0
-#define MACRO_RUN_INFINITY 1
-#define MACRO_RUN_HALT     2
-#define MACRO_RECORD_START 4
-#define MACRO_RECORD_STOP  5
-#define MACRO_EDIT         7
-#define MACRO_CLEAR        8
-#define MACRO_LOAD         10
-#define MACRO_SAVE         11
+#define MACRO_ANALOG_OFF 0
+#define MACRO_ANALOG_ON  1
+static int st_availAnalog = MACRO_ANALOG_OFF;
+
+#define MACRO_RUN_ONCE      0
+#define MACRO_RUN_INFINITY  1
+#define MACRO_RUN_HALT      2
+#define MACRO_RECORD_START  4
+#define MACRO_RECORD_STOP   5
+#define MACRO_ANALOG_OPTION 6
+#define MACRO_EDIT          8
+#define MACRO_CLEAR         9
+#define MACRO_LOAD          11
+#define MACRO_SAVE          12
 static MfMenuItem st_macroMenu[] = {
 	{ MT_ANCHOR, 0, "Run once",     { 0 } },
 	{ MT_ANCHOR, 0, "Run infinity", { 0 } },
@@ -25,6 +32,7 @@ static MfMenuItem st_macroMenu[] = {
 	{ MT_BORDER, 0, 0, { 0 } },
 	{ MT_ANCHOR, 0, "Start recording", { 0 } },
 	{ MT_ANCHOR, 0, "Stop recording",  { 0 } },
+	{ MT_OPTION, &(st_availAnalog), "Recording analog stick", { "OFF", "ON", 0 } },
 	{ MT_BORDER, 0, 0, { 0 } },
 	{ MT_ANCHOR, 0, "Edit macro", { 0 } },
 	{ MT_ANCHOR, 0, "Clear macro",  { 0 } },
@@ -198,17 +206,18 @@ MfMenuReturnCode macroMenu( SceCtrlLatch *pad_latch, SceCtrlData *pad_data, void
 				blitString( blitOffsetChar( 3 ), blitOffsetLine( 2 ), MENU_FGCOLOR, MENU_BGCOLOR, "Please choose a operation." );
 				if( selected != old_selected ) blitFillBox( 5, blitOffsetLine( 25 ), 480, blitMeasureLine( 5 ), MENU_BGCOLOR );
 				switch( selected ){
-					case MACRO_RUN_ONCE    : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "Run current macro for once." ); break;
-					case MACRO_RUN_INFINITY: blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "Run current macro for endless." ); break;
-					case MACRO_RUN_HALT    : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "Stop current running macro." ); break;
-					case MACRO_RECORD_START: blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "Starting recording macro." ); break;
-					case MACRO_RECORD_STOP : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "Stopping recording macro." ); break;
-					case MACRO_EDIT        : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "Edit current macro." ); break;
-					case MACRO_CLEAR       : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "Clear current macro." ); break;
-					case MACRO_LOAD        : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "Loading a macro from MemoryStick.\n\nIMPORTANT NOTICE:\n  Verify that MemoryStick access indicator is not blinking.\n  Otherwise, your current running game will CRASH!" ); break;
-					case MACRO_SAVE        : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "Saving a macro to MemoryStick.\n\nIMPORTANT NOTICE:\n  Verify that MemoryStick access indicator is not blinking.\n  Otherwise, your current running game will CRASH!" ); break;
+					case MACRO_RUN_ONCE     : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "Run current macro for once." ); break;
+					case MACRO_RUN_INFINITY : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "Run current macro for endless." ); break;
+					case MACRO_RUN_HALT     : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "Stop current running macro." ); break;
+					case MACRO_RECORD_START : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "Starting recording macro." ); break;
+					case MACRO_RECORD_STOP  : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "Stopping recording macro." ); break;
+					case MACRO_ANALOG_OPTION: blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "Recording the analog stick movement to macro." ); break;
+					case MACRO_EDIT         : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "Edit current macro." ); break;
+					case MACRO_CLEAR        : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "Clear current macro." ); break;
+					case MACRO_LOAD         : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "Loading a macro from MemoryStick.\n\nIMPORTANT NOTICE:\n  Verify that MemoryStick access indicator is not blinking.\n  Otherwise, your current running game will CRASH!" ); break;
+					case MACRO_SAVE         : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "Saving a macro to MemoryStick.\n\nIMPORTANT NOTICE:\n  Verify that MemoryStick access indicator is not blinking.\n  Otherwise, your current running game will CRASH!" ); break;
 				}
-				blitString( blitOffsetChar( 3 ), blitOffsetLine( 31 ), MENU_FGCOLOR, MENU_BGCOLOR, "\x80 = MoveUp, \x82 = MoveDown, \x85 = Enter, \x86 = Back, START = Exit" );
+				blitString( blitOffsetChar( 3 ), blitOffsetLine( 31 ), MENU_FGCOLOR, MENU_BGCOLOR, "\x80\x82 = Move, \x81\x83 = Change toggle, \x85 = Enter, \x86 = Back, START = Exit" );
 				old_selected = selected;
 				break;
 			case MR_ENTER:
@@ -224,8 +233,10 @@ MfMenuReturnCode macroMenu( SceCtrlLatch *pad_latch, SceCtrlData *pad_data, void
 					case MACRO_SAVE        : function = macroSave;        break;
 				}
 				/* 最後のボタン情報をリセット */
-				st_temp_buttons = 0;
-				st_temp_tick    = 0;
+				st_temp_buttons      = 0;
+				st_temp_analog_move  = false;
+				st_temp_analog_coord = 0;
+				st_temp_tick         = 0;
 				
 				mfClearColor( MENU_BGCOLOR );
 				break;
@@ -261,6 +272,8 @@ static MacroData *macro_append( MacroData *macro )
 static void macro_record( HookCaller caller, SceCtrlData *pad_data, void *argp )
 {
 	unsigned int cur_buttons;
+	static bool cur_analog_move = false;
+	u64 cur_analog_coord = 0;
 	static MacroData *cur_macro;
 	
 	if( ! pad_data ) return;
@@ -279,13 +292,22 @@ static void macro_record( HookCaller caller, SceCtrlData *pad_data, void *argp )
 			cur_buttons = pad_data->Buttons;
 			break;
 	}
-	
 	/* チェックしないボタンをマスク */
 	cur_buttons &= 0x0000FFFF;
 	
+	if( st_availAnalog == MACRO_ANALOG_ON ){
+		if( MACRO_ANALOG_THRESHOLD( 128, 128, 50, pad_data->Lx, pad_data->Ly ) ){
+			cur_analog_move  = true;
+			cur_analog_coord = MACRO_SET_ANALOG_XY( pad_data->Lx, pad_data->Ly );
+		} else{
+			cur_analog_move = false;
+			cur_analog_coord = MACRO_SET_ANALOG_XY( 128, 128 );
+		}
+	}
+	
 	if( ! macromgrGetCount() ) cur_macro = NULL;
 	
-	if( st_temp_buttons == cur_buttons ){
+	if( st_temp_buttons == cur_buttons && ( cur_analog_move == st_temp_analog_move && cur_analog_coord == st_temp_analog_coord ) ){
 		u64 tick;
 		sceRtcGetCurrentTick( &tick );
 		
@@ -305,22 +327,39 @@ static void macro_record( HookCaller caller, SceCtrlData *pad_data, void *argp )
 		unsigned int press_buttons   = ( st_temp_buttons ^ cur_buttons ) & cur_buttons;
 		unsigned int release_buttons = ( st_temp_buttons ^ cur_buttons ) & st_temp_buttons;
 		
-		cur_macro = macro_append( cur_macro );
-		if( ! cur_macro ) return;
+		if( press_buttons || release_buttons ){
+			cur_macro = macro_append( cur_macro );
+			if( ! cur_macro ) return;
+			
+			if( press_buttons && release_buttons ){
+				cur_macro->action = MA_BUTTONS_CHANGE;
+				cur_macro->data   = cur_buttons;
+			} else if( press_buttons ){
+				cur_macro->action = MA_BUTTONS_PRESS;
+				cur_macro->data   = press_buttons;
+			} else if( release_buttons ){
+				cur_macro->action = MA_BUTTONS_RELEASE;
+				cur_macro->data   = release_buttons;
+			}
+		}
 		
-		if( press_buttons && release_buttons ){
-			cur_macro->action = MA_BUTTONS_CHANGE;
-			cur_macro->data   = cur_buttons;
-		} else if( press_buttons ){
-			cur_macro->action = MA_BUTTONS_PRESS;
-			cur_macro->data   = press_buttons;
-		} else if( release_buttons ){
-			cur_macro->action = MA_BUTTONS_RELEASE;
-			cur_macro->data   = release_buttons;
+		if( ( st_temp_analog_move || cur_analog_move ) && cur_analog_coord != st_temp_analog_coord ){
+			cur_macro = macro_append( cur_macro );
+			if( ! cur_macro ) return;
+			
+			if( st_temp_analog_move && ! cur_analog_move ){
+				cur_macro->action = MA_ANALOG_NEUTRAL;
+				cur_macro->data   = 0;
+			} else{
+				cur_macro->action = MA_ANALOG_MOVE;
+				cur_macro->data   = cur_analog_coord;
+			}
 		}
 	}
 	
-	st_temp_buttons = cur_buttons;
+	st_temp_buttons      = cur_buttons;
+	st_temp_analog_move  = cur_analog_move;
+	st_temp_analog_coord = cur_analog_coord;
 }
 
 static void macro_trace( HookCaller caller, SceCtrlData *pad_data, void *argp )
@@ -367,16 +406,32 @@ static void macro_trace( HookCaller caller, SceCtrlData *pad_data, void *argp )
 		case MA_BUTTONS_CHANGE:
 			st_temp_buttons = cur_macro->data;
 			break;
+		case MA_ANALOG_NEUTRAL:
+			st_temp_analog_move  = false;
+			st_temp_analog_coord = MACRO_SET_ANALOG_XY( 128, 128 );
+			break;
+		case MA_ANALOG_MOVE:
+			st_temp_analog_move  = true;
+			st_temp_analog_coord = cur_macro->data;
+			break;
 	}
 	
 	switch( caller ){
 		case CALL_PEEK_BUFFER_NEGATIVE:
 		case CALL_READ_BUFFER_NEGATIVE:
 			pad_data->Buttons = ~( ~(pad_data->Buttons) | st_temp_buttons );
+			if( st_temp_analog_move ){
+				pad_data->Lx = MACRO_GET_ANALOG_X( st_temp_analog_coord );
+				pad_data->Ly = MACRO_GET_ANALOG_Y( st_temp_analog_coord );
+			}
 			break;
 		case CALL_PEEK_BUFFER_POSITIVE:
 		case CALL_READ_BUFFER_POSITIVE:
 			pad_data->Buttons |= st_temp_buttons;
+			if( st_temp_analog_move ){
+				pad_data->Lx = MACRO_GET_ANALOG_X( st_temp_analog_coord );
+				pad_data->Ly = MACRO_GET_ANALOG_Y( st_temp_analog_coord );
+			}
 			break;
 		case CALL_PEEK_LATCH:
 		case CALL_READ_LATCH:

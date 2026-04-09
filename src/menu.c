@@ -60,9 +60,9 @@ void mfMenu( void )
 	/* blitの8bitASCIIテーブルをPSPボタンシンボルへ */
 	blit8BitCharTableSwitch( B8_BUTTON_SYMBOL );
 	
-	/* "+ 2"は、先頭の"MacroFire Engine"のオプションとその次のMT_BORDERの分 */
-	miCount = mftableEntry + 2;
-	miList  = (MfMenuItem *)memsceMallocEx( 16, PSP_MEMPART_KERNEL_1, "miList", PSP_SMEM_Low, sizeof( MfMenuItem ) * miCount, 0 );
+	/* MACRO_MENU_OFFSETは、先頭の"MacroFire Engine"のオプションとその次のMT_BORDERの分 */
+	miCount = mftableEntry + MACRO_MENU_OFFSET;
+	miList  = (MfMenuItem *)memsceMalloc( sizeof( MfMenuItem ) * miCount );
 	if( ! miList ) goto QUIT;
 	
 	/* MacroFire Engine */
@@ -77,14 +77,26 @@ void mfMenu( void )
 	miList[1].label    = NULL;
 	miList[1].value[0] = NULL;
 	
-	for( i = 2; i < miCount; i++ ){
+	miList[2].type     = MT_ANCHOR;
+	miList[2].selected = NULL;
+	miList[2].label    = "MacroFire toggle buttons";
+	miList[2].value[0] = NULL;
+	miList[3].type     = MT_BORDER;
+	miList[3].selected = NULL;
+	miList[3].label    = NULL;
+	miList[3].value[0] = NULL;
+	
+	for( i = MACRO_MENU_OFFSET; i < miCount; i++ ){
 		miList[i].type     = MT_ANCHOR;
 		miList[i].selected = NULL;
-		miList[i].label    = mftable[i - 2].menu.label;
+		miList[i].label    = mftable[i - MACRO_MENU_OFFSET].menu.label;
 		miList[i].value[0] = NULL;
 	}
 	
 	mfClearColor( MENU_BGCOLOR );
+	
+	/* わざと一度無駄に取得してゲーム側からの入力を捨てる */
+	( st_f_ctrlReadLatch )( st_pad_latch );
 	
 	while( gRunning ){
 		( st_f_ctrlReadLatch )( st_pad_latch );
@@ -119,13 +131,22 @@ void mfMenu( void )
 						blitOffsetLine( 31 ),
 						MENU_FGCOLOR,
 						MENU_BGCOLOR,
-						"\x80 = MoveUp, \x82 = MoveDown, \x85 = Enter or Change toggle\n\x86 or START = Exit"
+						"\x80\x82 = Move, \x83\x81 = Change toggle, \x85 = Enter, \x86 or START = Exit"
 					);
 				case MR_BACK:
 					break;
 				case MR_ENTER:
-					mfClearColor( MENU_BGCOLOR );
-					function = mftable[selected - 2].menu.mainFunc;
+					if( selected == MACRO_MENU_BASECONF ){
+						CmndlgGetButtons cgb[1];
+						cgb[0].title   = "Set MacroFire toggle buttons";
+						cgb[0].buttons = &gMfToggle;
+						cgb[0].btnMask = 0;
+						cmndlgGetButtons( blitOffsetChar( 40 ), blitOffsetLine( 2 ), cgb, 1 );
+						mfClearColor( MENU_BGCOLOR );
+					} else{
+						mfClearColor( MENU_BGCOLOR );
+						function = mftable[selected - MACRO_MENU_OFFSET].menu.mainFunc;
+					}
 					break;
 			}
 		} else{
@@ -202,17 +223,19 @@ MfMenuReturnCode mfMenuVertical( int x, int y, int w, MfMenuItem mi[], size_t it
 		mfMenuMoveFocus( MM_PREV, mi, items_num, selected );
 	} else if( st_pad_latch->uiMake & PSP_CTRL_DOWN ){
 		mfMenuMoveFocus( MM_NEXT, mi, items_num, selected );
-	} else if( st_pad_latch->uiMake & PSP_CTRL_CIRCLE ){
-		if( mi[*selected].type == MT_OPTION ){
-			if( mi[*selected].value[(*mi[*selected].selected) + 1] != 0 ){
-				(*mi[*selected].selected) += 1;
-			} else{
-				(*mi[*selected].selected) = 0;
-			}
-			blitFillBox( x, y + ( *selected * BLIT_CHAR_HEIGHT ), w, BLIT_CHAR_HEIGHT, MENU_BGCOLOR );
+	} else if( st_pad_latch->uiMake & PSP_CTRL_LEFT && mi[*selected].type == MT_OPTION ){
+		if( (*mi[*selected].selected) == 0 ){
+			for( ; mi[*selected].value[(*mi[*selected].selected) + 1]; (*mi[*selected].selected)++ );
 		} else{
-			return MR_ENTER;
+			(*mi[*selected].selected)--;
 		}
+		blitFillBox( x, y + ( *selected * BLIT_CHAR_HEIGHT ), w, BLIT_CHAR_HEIGHT, MENU_BGCOLOR );
+	} else if( st_pad_latch->uiMake & PSP_CTRL_RIGHT && mi[*selected].type == MT_OPTION ){
+		(*mi[*selected].selected)++;
+		if( mi[*selected].value[(*mi[*selected].selected)] == NULL ) (*mi[*selected].selected) = 0;
+		blitFillBox( x, y + ( *selected * BLIT_CHAR_HEIGHT ), w, BLIT_CHAR_HEIGHT, MENU_BGCOLOR );
+	} else if( st_pad_latch->uiMake & PSP_CTRL_CIRCLE && mi[*selected].type == MT_ANCHOR ){
+		return MR_ENTER;
 	} else if( st_pad_latch->uiMake & PSP_CTRL_CROSS ){
 		return MR_BACK;
 	}
@@ -266,16 +289,6 @@ void mfWaitScreenReload( int sec )
 void mfClearScreenWhenVsync( void )
 {
 	st_clear_vsync = true;
-}
-
-bool mfIsEnabled( void )
-{
-	return ( gMfEngine == 0 ? false : true );
-}
-
-bool mfIsDisabled( void )
-{
-	return ( gMfEngine == 0 ? true : false );
 }
 
 void mfMenuEnableInterrupt( void )

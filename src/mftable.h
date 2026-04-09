@@ -48,8 +48,8 @@ EXPORT MfEntry mftable[]
 		機能を定義するテーブル
 		{ 初期化関数, 終了関数, { フック関数, 引数 }, { メニュー文字列, メニュー関数, メニュー中断関数, 引数 } }
 	*/
-	{ NULL,      NULL,      { rapidfireMain, NULL }, { "Rapidfire settings", rapidfireMenu, NULL, NULL } },
-	{ macroInit, macroTerm, { macroMain,     NULL }, { "Macro settings",     macroMenu,     NULL, NULL } },
+	{ NULL,       NULL,      { rapidfireMain, NULL }, { "Rapidfire settings", rapidfireMenu, NULL, NULL } },
+	{ macroInit,  macroTerm, { macroMain,     NULL }, { "Macro settings",     macroMenu,     NULL, NULL } },
 }
 #endif
 ;
