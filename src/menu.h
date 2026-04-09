@@ -15,6 +15,7 @@
 #include "sstring.h"
 #include "psp/blit.h"
 #include "psp/memsce.h"
+#include "psp/cmndlg.h"
 
 #define MENU_FGCOLOR 0xffffffff
 #define MENU_BGCOLOR 0xff000000
@@ -34,8 +35,6 @@ typedef enum {
 	CALL_PEEK_BUFFER_NEGATIVE,
 	CALL_READ_BUFFER_POSITIVE,
 	CALL_READ_BUFFER_NEGATIVE,
-	CALL_PEEK_LATCH,
-	CALL_READ_LATCH
 } HookCaller;
 
 typedef struct _mf_menu_chain {
@@ -58,7 +57,8 @@ typedef enum {
 	MT_ANCHOR,
 	MT_OPTION,
 	MT_BORDER,
-	MT_CALL,
+	MT_GET_DIGITS,
+	MT_GET_BUTTONS,
 } MfMenuItemType;
 
 typedef struct {
@@ -74,15 +74,7 @@ typedef struct {
 	int micount;
 } MfMenuIndex;
 
-void mfMenuSetup(
-	SCE_CTRL_LATCH_FUNC ctrlReadLatch,
-	SCE_CTRL_DATA_FUNC ctrlPeekBufferPositive,
-	SceCtrlLatch *pad_latch,
-	SceCtrlData *pad_data
-);
-
 bool mfMenuInit( void );
-void mfMenuTerm( void );
 void mfMenu( void );
 void mfThreadsStatChange( bool stat, SceUID thlist[], int thnum );
 
@@ -110,6 +102,9 @@ MfMenuReturnCode mfMenuVertical( int x, int y, int w, MfMenuItem mi[], size_t it
 
 /* スクリーンをクリア */
 void mfClearColor( u32 color );
+
+/* スクリーンに最上段の名前やバージョン部と上部下部の横線を描画 */
+void mfDrawMainFrame( void );
 
 /* メニュー実行の一時停止を予約 */
 void mfWaitScreenReload( int sec );

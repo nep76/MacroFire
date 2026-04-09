@@ -39,8 +39,8 @@ static MfMenuItem st_macroMenu[] = {
 	{ MT_ANCHOR, 0, "Clear macro",  { 0 } },
 	{ MT_ANCHOR, 0, "Create macro", { 0 } },
 	{ MT_BORDER, 0, 0, { 0 } },
-	{ MT_ANCHOR, 0, "Load from MS (not implemented yet)", { 0 } },
-	{ MT_ANCHOR, 0, "Save to MS (not implemented yet)",   { 0 } }
+	{ MT_ANCHOR, 0, "Load from MemoryStick", { 0 } },
+	{ MT_ANCHOR, 0, "Save to MemoryStick",   { 0 } }
 };
 
 static MacroData *macro_append( MacroData *macro );
@@ -106,7 +106,6 @@ MfMenuReturnCode macroRunInfinity( SceCtrlLatch *pad_latch, SceCtrlData *pad_dat
 	mfMenuQuit();
 	
 	return MR_BACK;
-
 }
 
 void macroMain( HookCaller caller, SceCtrlData *pad_data, void *argp )
@@ -120,22 +119,173 @@ void macroMain( HookCaller caller, SceCtrlData *pad_data, void *argp )
 
 MfMenuReturnCode macroLoad( SceCtrlLatch *pad_latch, SceCtrlData *pad_data )
 {
+	CmndlgOpenFilename cofn;
+	
+	char dir[256]  = { 0 };
+	char name[128] = { 0 };
+	char *path;
+	
+	CmndlgGetFilenameRc cgfrc;
+	FilehUID fuid;
+	MacroData *cur_macro = NULL;
+	char action[128] = { 0 };
+	char *value;
+	
 	if( macro_is_busy() ) return MR_BACK;
 	
-	blitString( blitOffsetChar( 3 ), blitOffsetLine( 2 ), MENU_FGCOLOR, MENU_BGCOLOR, "Not implemented yet." );
-	mfWaitScreenReload( MACRO_NOTICE_DISPLAY_SEC );
+	cofn.dirPath     = dir;
+	cofn.dirPathMax  = sizeof( dir );
+	cofn.fileName    = name;
+	cofn.fileNameMax = sizeof( name );
 	
-	return MR_BACK;
+	cgfrc = cmndlgGetOpenFilename( "Open a macro.", "ms0:", &cofn );
+	if( cgfrc == CMNDLG_GETFILENAME_CANCEL ) return MR_BACK;
+	
+	/*
+		ダイアログによってメニューの枠が上書きされているので、
+		ダイアログをクリアして、さらに枠を描画。
+	*/
+	mfClearColor( MENU_BGCOLOR );
+	mfDrawMainFrame();
+	
+	path = (char *)memsceMalloc( strlen( dir ) + strlen( name ) + 1 );
+	if( ! path ){
+		blitString( blitOffsetChar( 3 ), blitOffsetLine( 2 ), MENU_FCCOLOR, MENU_BGCOLOR, "Failed to create loading path." );
+		mfWaitScreenReload( MACRO_ERROR_DISPLAY_SEC );
+		return MR_BACK;
+	}
+	sprintf( path, "%s/%s", dir, name );
+	
+	fuid = filehOpen( path, PSP_O_RDONLY, 0777 );
+	if( ! fuid || filehGetLastError( fuid ) < 0){
+		blitStringf( blitOffsetChar( 3 ), blitOffsetLine( 2 ), MENU_FCCOLOR, MENU_BGCOLOR, "Failed to load %s: %x-%x", path, filehGetLastError( fuid ), filehGetLastSystemError( fuid ) );
+		mfWaitScreenReload( MACRO_ERROR_DISPLAY_SEC );
+		goto DESTROY;
+	}
+	
+	/* 既にマクロがあればクリア */
+	if( macromgrGetCount() ) macromgrDestroy();
+	
+	blitStringf( blitOffsetChar( 3 ), blitOffsetLine( 2 ), MENU_FGCOLOR, MENU_BGCOLOR, "Loading from %s...", path );
+	
+	while( filehReadln( fuid, action, sizeof( action ) ) ){
+		value = strchr( action, MACRO_FILE_RECORD_SEPARATOR );
+		if( ! value ){
+			macromgrDestroy();
+			break;
+		}
+		*value = '\0';
+		value++;
+		
+		cur_macro = macro_append( cur_macro );
+		
+		if( strcmp( action, MACRO_ACTION_DELAY ) == 0 ){
+			cur_macro->action = MA_DELAY;
+		} else if( strcmp( action, MACRO_ACTION_BTNPRESS ) == 0 ){
+			cur_macro->action = MA_BUTTONS_PRESS;
+		} else if( strcmp( action, MACRO_ACTION_BTNRELEASE ) == 0 ){
+			cur_macro->action = MA_BUTTONS_RELEASE;
+		} else if( strcmp( action, MACRO_ACTION_BTNCHANGE ) == 0 ){
+			cur_macro->action = MA_BUTTONS_CHANGE;
+		} else if( strcmp( action, MACRO_ACTION_ALNEUTRAL ) == 0 ){
+			cur_macro->action = MA_ANALOG_NEUTRAL;
+		} else if( strcmp( action, MACRO_ACTION_ALMOVE ) == 0 ){
+			cur_macro->action = MA_ANALOG_MOVE;
+		} else{
+			macromgrDestroy();
+			break;
+		}
+		
+		cur_macro->data = strtoul( value, NULL, 16 );
+	}
+	
+	filehClose( fuid );
+	
+	goto DESTROY;
+	
+	DESTROY:
+		memsceFree( path );
+		return MR_BACK;
 }
 
 MfMenuReturnCode macroSave( SceCtrlLatch *pad_latch, SceCtrlData *pad_data )
 {
-	if( macro_is_busy() ) return MR_BACK;
+	CmndlgOpenFilename cofn;
 	
-	blitString( blitOffsetChar( 3 ), blitOffsetLine( 2 ), MENU_FGCOLOR, MENU_BGCOLOR, "Not implemented yet." );
-	mfWaitScreenReload( MACRO_NOTICE_DISPLAY_SEC );
+	char dir[256]  = { 0 };
+	char name[128] = { 0 };
+	char *path;
 	
-	return MR_BACK;
+	CmndlgGetFilenameRc cgfrc;
+	FilehUID fuid;
+	MacroData *cur_macro;
+	
+	if( macro_is_busy() || ! macro_is_avail() ) return MR_BACK;
+	
+	cofn.dirPath     = dir;
+	cofn.dirPathMax  = sizeof( dir );
+	cofn.fileName    = name;
+	cofn.fileNameMax = sizeof( name );
+	
+	cgfrc = cmndlgGetSaveFilename( "Save the macro as ...", "ms0:", &cofn );
+	if( cgfrc == CMNDLG_GETFILENAME_CANCEL ) return MR_BACK;
+	
+	/*
+		ダイアログによってメニューの枠が上書きされているので、
+		ダイアログをクリアして、さらに枠を描画。
+	*/
+	mfClearColor( MENU_BGCOLOR );
+	mfDrawMainFrame();
+	
+	path = (char *)memsceMalloc( strlen( dir ) + strlen( name ) + 1 );
+	if( ! path ){
+		blitString( blitOffsetChar( 3 ), blitOffsetLine( 2 ), MENU_FCCOLOR, MENU_BGCOLOR, "Failed to create saving path." );
+		mfWaitScreenReload( MACRO_ERROR_DISPLAY_SEC );
+		return MR_BACK;
+	}
+	sprintf( path, "%s/%s", dir, name );
+	
+	fuid = filehOpen( path, PSP_O_WRONLY | PSP_O_CREAT | PSP_O_TRUNC, 0777 );
+	if( ! fuid || filehGetLastError( fuid ) < 0){
+		blitStringf( blitOffsetChar( 3 ), blitOffsetLine( 2 ), MENU_FCCOLOR, MENU_BGCOLOR, "Failed to save %s: %x-%x", path, filehGetLastError( fuid ), filehGetLastSystemError( fuid ) );
+		mfWaitScreenReload( MACRO_ERROR_DISPLAY_SEC );
+		goto DESTROY;
+	}
+	
+	blitStringf( blitOffsetChar( 3 ), blitOffsetLine( 2 ), MENU_FGCOLOR, MENU_BGCOLOR, "Saving to %s...", path );
+	
+	cur_macro = macromgrGetFirst();
+	for( ; cur_macro; cur_macro = cur_macro->next ){
+		switch( cur_macro->action ){
+			case MA_DELAY:
+				filehWrite( fuid, MACRO_ACTION_DELAY, strlen( MACRO_ACTION_DELAY ) );
+				break;
+			case MA_BUTTONS_PRESS:
+				filehWrite( fuid, MACRO_ACTION_BTNPRESS, strlen( MACRO_ACTION_BTNPRESS ) );
+				break;
+			case MA_BUTTONS_RELEASE:
+				filehWrite( fuid, MACRO_ACTION_BTNRELEASE, strlen( MACRO_ACTION_BTNRELEASE ) );
+				break;
+			case MA_BUTTONS_CHANGE:
+				filehWrite( fuid, MACRO_ACTION_BTNCHANGE, strlen( MACRO_ACTION_BTNCHANGE ) );
+				break;
+			case MA_ANALOG_NEUTRAL:
+				filehWrite( fuid, MACRO_ACTION_ALNEUTRAL, strlen( MACRO_ACTION_ALNEUTRAL ) );
+				break;
+			case MA_ANALOG_MOVE:
+				filehWrite( fuid, MACRO_ACTION_ALMOVE, strlen( MACRO_ACTION_ALMOVE ) );
+				break;
+		}
+		filehWritef( fuid, 64, "%c%lx\n", MACRO_FILE_RECORD_SEPARATOR, cur_macro->data );
+	}
+	
+	filehClose( fuid );
+	
+	goto DESTROY;
+	
+	DESTROY:
+		memsceFree( path );
+		return MR_BACK;
 }
 
 MfMenuReturnCode macroEdit( SceCtrlLatch *pad_latch, SceCtrlData *pad_data )
@@ -151,7 +301,7 @@ MfMenuReturnCode macroClear( SceCtrlLatch *pad_latch, SceCtrlData *pad_data )
 	
 	macromgrDestroy();
 	
-	blitString( blitOffsetChar( 3 ), blitOffsetLine( 2 ), MENU_FGCOLOR, MENU_BGCOLOR, "Clearing current macro..." );
+	blitString( blitOffsetChar( 3 ), blitOffsetLine( 2 ), MENU_FGCOLOR, MENU_BGCOLOR, "Clearing currently macro..." );
 	mfWaitScreenReload( MACRO_NOTICE_DISPLAY_SEC );
 	
 	return MR_BACK;
@@ -169,7 +319,7 @@ MfMenuReturnCode macroCreate( SceCtrlLatch *pad_latch, SceCtrlData *pad_data )
 	macro = macromgrNew();
 	if( ! macro ){
 		blitString( blitOffsetChar( 3 ), blitOffsetLine( 2 ), MENU_FGCOLOR, MENU_BGCOLOR, "Failed to create." );
-		mfWaitScreenReload( MACRO_NOTICE_DISPLAY_SEC );
+		mfWaitScreenReload( MACRO_ERROR_DISPLAY_SEC );
 		return MR_BACK;
 	}
 	
@@ -240,17 +390,17 @@ MfMenuReturnCode macroMenu( SceCtrlLatch *pad_latch, SceCtrlData *pad_data, void
 				blitString( blitOffsetChar( 3 ), blitOffsetLine( 2 ), MENU_FGCOLOR, MENU_BGCOLOR, "Please choose a operation." );
 				if( selected != old_selected ) blitFillBox( 5, blitOffsetLine( 25 ), 480, blitMeasureLine( 5 ), MENU_BGCOLOR );
 				switch( selected ){
-					case MACRO_RUN_ONCE     : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "Run current macro for once." ); break;
-					case MACRO_RUN_INFINITY : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "Run current macro for endless." ); break;
-					case MACRO_RUN_HALT     : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "Stop current running macro." ); break;
-					case MACRO_RECORD_START : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "Starting recording macro." ); break;
-					case MACRO_RECORD_STOP  : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "Stopping recording macro." ); break;
-					case MACRO_ANALOG_OPTION: blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "Recording the analog stick movement to macro." ); break;
-					case MACRO_EDIT         : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "Edit current macro." ); break;
-					case MACRO_CLEAR        : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "Clear current macro." ); break;
-					case MACRO_CREATE       : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "Create new macro." ); break;
-					case MACRO_LOAD         : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "Loading a macro from MemoryStick.\n\nIMPORTANT NOTICE:\n  Verify that MemoryStick access indicator is not blinking.\n  Otherwise, your current running game will CRASH!" ); break;
-					case MACRO_SAVE         : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "Saving a macro to MemoryStick.\n\nIMPORTANT NOTICE:\n  Verify that MemoryStick access indicator is not blinking.\n  Otherwise, your current running game will CRASH!" ); break;
+					case MACRO_RUN_ONCE     : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "Running currently macro for once." ); break;
+					case MACRO_RUN_INFINITY : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "Running currently macro for endless." ); break;
+					case MACRO_RUN_HALT     : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "Stopping currently running macro." ); break;
+					case MACRO_RECORD_START : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "Starting to record a macro." ); break;
+					case MACRO_RECORD_STOP  : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "Stopping to record a macro." ); break;
+					case MACRO_ANALOG_OPTION: blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "Recording the analog stick movement." ); break;
+					case MACRO_EDIT         : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "Editing currently macro." ); break;
+					case MACRO_CLEAR        : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "Clearing currently macro." ); break;
+					case MACRO_CREATE       : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "Creating new macro." ); break;
+					case MACRO_LOAD         : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "Loading a macro from MemoryStick.\n\nIMPORTANT NOTICE:\n  Verify that MemoryStick access indicator is not blinking.\n  Otherwise, will CRASH the currently running game!" ); break;
+					case MACRO_SAVE         : blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "Saving currently macro to MemoryStick.\n\nIMPORTANT NOTICE:\n  Verify that MemoryStick access indicator is not blinking.\n  Otherwise, will CRASH the currently running game!" ); break;
 				}
 				blitString( blitOffsetChar( 3 ), blitOffsetLine( 31 ), MENU_FGCOLOR, MENU_BGCOLOR, "\x80\x82 = Move, \x83\x81 = Change toggle, \x85 = Enter, \x86 = Back, START = Exit" );
 				old_selected = selected;
@@ -277,7 +427,6 @@ MfMenuReturnCode macroMenu( SceCtrlLatch *pad_latch, SceCtrlData *pad_data, void
 				mfClearColor( MENU_BGCOLOR );
 				break;
 			case MR_BACK:
-				selected = 0;
 				return MR_BACK;
 		}
 	} else{
@@ -315,9 +464,6 @@ static void macro_record( HookCaller caller, SceCtrlData *pad_data, void *argp )
 	if( ! pad_data ) return;
 	
 	switch( caller ){
-		case CALL_PEEK_LATCH:
-		case CALL_READ_LATCH:
-			return;
 		case CALL_PEEK_BUFFER_NEGATIVE:
 		case CALL_READ_BUFFER_NEGATIVE:
 			cur_buttons = ~(pad_data->Buttons);
@@ -364,8 +510,10 @@ static void macro_record( HookCaller caller, SceCtrlData *pad_data, void *argp )
 		unsigned int release_buttons = ( st_temp_buttons ^ cur_buttons ) & st_temp_buttons;
 		
 		if( press_buttons || release_buttons ){
-			cur_macro = macro_append( cur_macro );
-			if( ! cur_macro ) return;
+			if( ! ( cur_macro->action == MA_DELAY && cur_macro->data == 0 ) ){
+				cur_macro = macro_append( cur_macro );
+				if( ! cur_macro ) return;
+			}
 			
 			if( press_buttons && release_buttons ){
 				cur_macro->action = MA_BUTTONS_CHANGE;
@@ -409,11 +557,6 @@ static void macro_trace( HookCaller caller, SceCtrlData *pad_data, void *argp )
 	}
 	
 	if( ! cur_macro ) cur_macro = macromgrGetFirst();
-	
-	if( caller == CALL_PEEK_LATCH || caller == CALL_READ_LATCH ){
-		pad_data->Buttons |= st_temp_buttons;
-		return;
-	}
 	
 	switch( cur_macro->action ){
 		case MA_DELAY:
@@ -469,9 +612,6 @@ static void macro_trace( HookCaller caller, SceCtrlData *pad_data, void *argp )
 				pad_data->Ly = MACRO_GET_ANALOG_Y( st_temp_analog_coord );
 			}
 			break;
-		case CALL_PEEK_LATCH:
-		case CALL_READ_LATCH:
-			break; /* 警告抑止 */
 	}
 	
 	if( ! forward ) return;

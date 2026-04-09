@@ -63,6 +63,7 @@ void macroeditorReset( void )
 MfMenuReturnCode macroeditorMain( SceCtrlLatch *pad_latch, SceCtrlData *pad_data, MacroData *macro )
 {
 	static bool run_menu = false;
+	static int prev_start_line = -1;
 	
 	int y = 2, line = 1, rest;
 	bool redraw = false;
@@ -92,7 +93,7 @@ MfMenuReturnCode macroeditorMain( SceCtrlLatch *pad_latch, SceCtrlData *pad_data
 		macroeditorReset();
 		return MR_BACK;
 	} else if( pad_latch->uiMake & PSP_CTRL_CIRCLE ){
-		/* 0にリセットして、編集後に再取得するよう促す */
+		/* 0にリセットして、編集後に再取得させる */
 		st_macro_all_lines = 0;
 		
 		run_menu = true;
@@ -100,35 +101,49 @@ MfMenuReturnCode macroeditorMain( SceCtrlLatch *pad_latch, SceCtrlData *pad_data
 		
 		return MR_CONTINUE;
 	} else if( pad_latch->uiMake & PSP_CTRL_UP ){
-		if( st_selected_macro_num > MACROEDITOR_LINES_PER_PAGE >> 1 ) redraw = true;
 		st_selected_macro_num--;
 	} else if( pad_latch->uiMake & PSP_CTRL_DOWN ){
 		st_selected_macro_num++;
-		if( st_selected_macro_num > MACROEDITOR_LINES_PER_PAGE >> 1 ) redraw = true;
 	} else if( pad_latch->uiMake & PSP_CTRL_LEFT ){
-		if( st_selected_macro_num > MACROEDITOR_LINES_PER_PAGE >> 1 ) redraw = true;
 		st_selected_macro_num -= MACROEDITOR_LINES_PER_PAGE;
 	} else if( pad_latch->uiMake & PSP_CTRL_RIGHT ){
 		st_selected_macro_num += MACROEDITOR_LINES_PER_PAGE;
-		if( st_selected_macro_num > MACROEDITOR_LINES_PER_PAGE >> 1 ) redraw = true;
 	}
 	
+	/* 負数の場合は先頭で上を押されていたら末尾へ */
 	if( st_selected_macro_num < 0 ){
-		st_selected_macro_num = 0;
+		if( pad_latch->uiMake & PSP_CTRL_UP ){
+			st_selected_macro_num = st_macro_all_lines;
+		} else{
+			st_selected_macro_num = 0;
+		}
 	}
+	/* 最大数を超えている場合は末尾で下を押されているので先頭へ */
 	if( st_selected_macro_num > st_macro_all_lines ){
-		st_selected_macro_num = st_macro_all_lines;
+		if( pad_latch->uiMake & PSP_CTRL_DOWN ){
+			st_selected_macro_num = 0;
+		} else{
+			st_selected_macro_num = st_macro_all_lines;
+		}
 	}
 	
 	/* スクロール */
-	for( rest = st_selected_macro_num - ( MACROEDITOR_LINES_PER_PAGE >> 1 ); rest > 0 && macro; ( macro = macro->next ), line++, rest-- ) continue;
+	for( rest = st_selected_macro_num - ( MACROEDITOR_LINES_PER_PAGE >> 1 ); rest > 0 && macro; ( macro = macro->next ), line++, rest-- ){
+		if( st_macro_all_lines - ( line - 1 ) < MACROEDITOR_LINES_PER_PAGE ){ break; }
+		continue;
+	}
+	
+	if( prev_start_line != line - 1 ){
+		redraw = true;
+		prev_start_line = line - 1;
+	}
 	
 	/* 表示開始 */
-	for( rest = 28; macro && rest; ( macro = macro->next ), line++, rest-- ){
+	for( rest = MACROEDITOR_LINES_PER_PAGE; macro && rest; ( macro = macro->next ), line++, rest-- ){
 		char command[255];
 		
 		if( macro->action == MA_DELAY ){
-			snprintf( command, sizeof( command ), "%03d: Delay -----------> %lu ms", line, (unsigned long int)macro->data );
+			snprintf( command, sizeof( command ), "%03d: Delay -----------> %llu ms", line, (uint64_t)macro->data );
 		} else if( macro->action == MA_BUTTONS_PRESS ){
 			snprintf( command, sizeof( command ), "%03d: Buttons press ---> ", line );
 			macroeditor_print_button_symbol( macro->data, command, 255 );
@@ -141,7 +156,7 @@ MfMenuReturnCode macroeditorMain( SceCtrlLatch *pad_latch, SceCtrlData *pad_data
 		} else if( macro->action == MA_ANALOG_NEUTRAL ){
 			snprintf( command, sizeof( command ), "%03d: Analog(x,y)------> NEUTRAL", line );
 		} else if( macro->action == MA_ANALOG_MOVE ){
-			snprintf( command, sizeof( command ), "%03d: Analog(x,y)------> %u, %u", line, (unsigned int)MACRO_GET_ANALOG_X( macro->data ), (unsigned int)MACRO_GET_ANALOG_Y( macro->data ) );
+			snprintf( command, sizeof( command ), "%03d: Analog(x,y)------> %lu, %lu", line, (uint32_t)MACRO_GET_ANALOG_X( macro->data ), (uint32_t)MACRO_GET_ANALOG_Y( macro->data ) );
 		}
 		
 		if( redraw ) blitFillBox( 0, blitOffsetLine( y ), 480, blitMeasureLine( 2 ), MENU_BGCOLOR );
@@ -159,7 +174,7 @@ MfMenuReturnCode macroeditorMain( SceCtrlLatch *pad_latch, SceCtrlData *pad_data
 	
 	redraw = false;
 	
-	blitString( blitOffsetChar( 3 ), blitOffsetLine( 31 ), MENU_FGCOLOR, MENU_BGCOLOR, "\x80 = MoveUp, \x82 = MoveDown, \x83 = PageUp, \x81 = PageDown\n\x85 = Edit, \x86 = Back, START = Exit" );
+	blitString( blitOffsetChar( 3 ), blitOffsetLine( 31 ), MENU_FGCOLOR, MENU_BGCOLOR, "\x80 = MoveUp, \x82 = MoveDown, \x83 = PageUp, \x81 = PageDown\n\x85 = Edit menu, \x86 = Back, START = Exit" );
 	
 	return MR_CONTINUE;
 }
@@ -244,7 +259,7 @@ static MfMenuReturnCode macroeditor_menu( SceCtrlLatch *pad_latch, MacroData *ma
 
 static MfMenuReturnCode macroeditor_edit_delay( SceCtrlLatch *pad_latch, MacroData *macro, int *selected )
 {
-	CmndlgGetDigits cgd[1];
+	CmndlgGetDigitsData cgd[1];
 	cgd[0].title = "Set delay (1sec = 1000ms)";
 	cgd[0].unit  = "ms";
 	cgd[0].number = (long *)&(macro->data);
@@ -257,7 +272,7 @@ static MfMenuReturnCode macroeditor_edit_delay( SceCtrlLatch *pad_latch, MacroDa
 
 static MfMenuReturnCode macroeditor_edit_buttons( SceCtrlLatch *pad_latch, MacroData *macro, int *selected )
 {
-	CmndlgGetButtons cgb[1];
+	CmndlgGetButtonsData cgb[1];
 	
 	cgb[0].title   = "Set buttons state";
 	cgb[0].buttons = (unsigned int *)&(macro->data);
@@ -270,7 +285,7 @@ static MfMenuReturnCode macroeditor_edit_buttons( SceCtrlLatch *pad_latch, Macro
 
 static MfMenuReturnCode macroeditor_edit_analog( SceCtrlLatch *pad_latch, MacroData *macro, int *selected )
 {
-	CmndlgGetDigits cgd[2];
+	CmndlgGetDigitsData cgd[2];
 	int x, y;
 	
 	x = MACRO_GET_ANALOG_X( macro->data );
@@ -300,7 +315,7 @@ static MfMenuReturnCode macroeditor_edit_data( SceCtrlLatch *pad_latch, MacroDat
 	
 	if( macro->action == MA_DELAY ){
 		return macroeditor_edit_delay( pad_latch, macro, &selected );
-	} else if( macro->action == MA_BUTTONS_PRESS || macro->action == MA_BUTTONS_RELEASE ){
+	} else if( macro->action == MA_BUTTONS_PRESS || macro->action == MA_BUTTONS_RELEASE || macro->action == MA_BUTTONS_CHANGE ){
 		return macroeditor_edit_buttons( pad_latch, macro, &selected );
 	} else if( macro->action == MA_ANALOG_MOVE ){
 		return macroeditor_edit_analog( pad_latch, macro, &selected );

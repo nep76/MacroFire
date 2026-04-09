@@ -32,6 +32,6 @@ int mfCtrlReadLatch( SceCtrlLatch *latch );
 
 int main_thread( SceSize arglen, void *argp );
 int module_start( SceSize arglen, void *argp );
-int module_stop( void );
+int module_stop( SceSize arglen, void *argp );
 
 #endif

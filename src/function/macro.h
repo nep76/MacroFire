@@ -5,7 +5,9 @@
 #include <pspkernel.h>
 #include <pspctrl.h>
 #include <psprtc.h>
+#include "psp/memsce.h"
 #include "psp/cmndlg.h"
+#include "psp/fileh.h"
 #include "../menu.h"
 
 #include "macromgr.h"
@@ -14,6 +16,16 @@
 #define MACRO_MENU_OFFSET 4
 #define MACRO_MENU_BASECONF 2
 #define MACRO_NOTICE_DISPLAY_SEC 1.5
+#define MACRO_ERROR_DISPLAY_SEC  3
+
+/* マクロアクション識別子 */
+#define MACRO_FILE_RECORD_SEPARATOR '\t'
+#define MACRO_ACTION_DELAY      "Delay"
+#define MACRO_ACTION_BTNPRESS   "ButtonsPress"
+#define MACRO_ACTION_BTNRELEASE "ButtonsRelease"
+#define MACRO_ACTION_BTNCHANGE  "ButtonsChange"
+#define MACRO_ACTION_ALNEUTRAL  "AnalogNeutral"
+#define MACRO_ACTION_ALMOVE     "AnalogMove"
 
 typedef MfMenuReturnCode ( *MacroFunction )( SceCtrlLatch*, SceCtrlData* );
 

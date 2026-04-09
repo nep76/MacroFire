@@ -7,20 +7,18 @@
 
 PSP_MODULE_INFO( "MacroFire", PSP_MODULE_KERNEL, 0, 0 );
 
-static SceCtrlLatch st_pad_latch;
 static SceCtrlData  st_pad_data;
-static SCE_CTRL_LATCH_FUNC ctrlGetPadLatch = sceCtrlReadLatch;
 static SCE_CTRL_DATA_FUNC  ctrlGetPadData  = sceCtrlPeekBufferPositive;
 
 static bool st_apihooked = false;
-static bool st_for_wait_toggle_button_release = false;
+static bool st_wait_toggle_button_release = false;
 static unsigned int st_prev_pad_buttons;
 
 static void mf_call_intr( const int mfengine )
 {
 	int i;
 	for( i = 0; i < mftableEntry; i++ ){
-		if( mftable[i].intrFunc ) ( mftable[i].intrFunc )( gMfEngine );
+		if( mftable[i].intrFunc ) ( mftable[i].intrFunc )( mfengine );
 	}
 }
 
@@ -72,8 +70,7 @@ int mfCtrlReadBufferNegative( SceCtrlData *pad, int count )
 int mfCtrlPeekLatch( SceCtrlLatch *latch )
 {
 	SceCtrlData pad;
-	int ret = ( (SCE_CTRL_DATA_FUNC)Hooktable[0].syscall.func )( &pad, 1 ); // 0x80000023が返る。なぜ？
-	mf_key_hook( CALL_PEEK_LATCH, &pad );
+	int ret = sceCtrlReadBufferPositive( &pad, 1 );
 	
 	latch->uiMake    |= ( st_prev_pad_buttons ^ pad.Buttons ) & pad.Buttons;
 	latch->uiBreak   |= ( st_prev_pad_buttons ^ pad.Buttons ) & st_prev_pad_buttons;
@@ -88,8 +85,7 @@ int mfCtrlPeekLatch( SceCtrlLatch *latch )
 int mfCtrlReadLatch( SceCtrlLatch *latch )
 {
 	SceCtrlData pad;
-	int ret = ( (SCE_CTRL_DATA_FUNC)Hooktable[0].syscall.func )( &pad, 1 ); // 0x80000023が返る。なぜ？
-	mf_key_hook( CALL_READ_LATCH, &pad );
+	int ret = sceCtrlReadBufferPositive( &pad, 1 );
 	
 	latch->uiMake    = ( st_prev_pad_buttons ^ pad.Buttons ) & pad.Buttons;
 	latch->uiBreak   = ( st_prev_pad_buttons ^ pad.Buttons ) & st_prev_pad_buttons;
@@ -116,6 +112,7 @@ void mfHookApi( void )
 			Hooktable[i].hookfunc
 		);
 	}
+	
 	st_apihooked = true;
 }
 
@@ -128,6 +125,7 @@ void mfRestoreApi( void )
 	for( i = 0; i < ARRAY_NUM( Hooktable ); i++ ){
 		hookRestoreAddr( &(Hooktable[i].syscall) );
 	}
+	
 	st_apihooked = false;
 }
 
@@ -135,7 +133,6 @@ int main_thread( SceSize arglen, void *argp )
 {	
 	/* メニューを初期化 */
 	mfMenuInit();
-	mfMenuSetup( ctrlGetPadLatch, ctrlGetPadData, &st_pad_latch, &st_pad_data );
 	
 	{
 		chdir( "ms0:" );
@@ -148,7 +145,9 @@ int main_thread( SceSize arglen, void *argp )
 	}
 	
 	while( gRunning ){
-		sceKernelDelayThread( 50000 );
+		/* module_stop()が呼ばれないので、一時停止をして強制終了可能な状態にする */
+		//sceDisplayWaitVblankStart();
+		sceKernelDelayThread( 10000 );
 		
 		( ctrlGetPadData )( &st_pad_data, 1 );
 		
@@ -157,12 +156,12 @@ int main_thread( SceSize arglen, void *argp )
 			st_pad_data.Buttons ^= ( st_pad_data.Buttons & ( PSP_CTRL_WLAN_UP | PSP_CTRL_REMOTE | PSP_CTRL_DISC | PSP_CTRL_MS ) );
 			
 			if( st_pad_data.Buttons == gMfToggle ){
-				if( ! st_for_wait_toggle_button_release ){
-					gMfEngine = gMfEngine == MFENGINE_ON ? MFENGINE_OFF : MFENGINE_ON;
-					st_for_wait_toggle_button_release = true;
+				if( ! st_wait_toggle_button_release ){
+					gMfEngine = ( gMfEngine == MFENGINE_ON ? MFENGINE_OFF : MFENGINE_ON );
+					st_wait_toggle_button_release = true;
 				}
-			} else if( st_for_wait_toggle_button_release ){
-				st_for_wait_toggle_button_release = false;
+			} else if( st_wait_toggle_button_release ){
+				st_wait_toggle_button_release = false;
 			}
 		}
 		
@@ -176,11 +175,15 @@ int main_thread( SceSize arglen, void *argp )
 			mf_call_intr( gMfEngine );
 		}
 		
-		if( st_pad_data.Buttons & PSP_CTRL_VOLUP && st_pad_data.Buttons & PSP_CTRL_VOLDOWN ) mfMenu();
+		if( st_pad_data.Buttons & PSP_CTRL_VOLUP && st_pad_data.Buttons & PSP_CTRL_VOLDOWN ){
+			if( gMfEngine == MFENGINE_ON ){ mfRestoreApi(); }
+			mfMenu();
+			if( gMfEngine == MFENGINE_ON ){ mfHookApi(); }
+		}
 	}
 	
 	/* メニュー終了処理 */
-	mfMenuTerm();
+	//mfMenuTerm();
 	
 	{
 		/* 終了関数呼び出し */
@@ -191,30 +194,6 @@ int main_thread( SceSize arglen, void *argp )
 	}
 	
 	return sceKernelExitDeleteThread( 0 );
-}
-
-int module_start( SceSize arglen, void *argp )
-{
-	SceUID thid;
-	
-	thid = sceKernelCreateThread( "MacroFire", main_thread, 15, 0x1500, PSP_THREAD_ATTR_NO_FILLSTACK, 0 );
-	if( thid ) sceKernelStartThread( thid, arglen, argp );
-	
-	return 0;
-}
-
-int module_stop( void )
-{
-	int i;
-	gRunning = false;
-	
-	if( ! mfIsApiHooked() ) return 0;
-	
-	for( i = 0; i < ARRAY_NUM( Hooktable ); i++ ){
-		hookRestoreAddr( &(Hooktable[i].syscall) );
-	}
-	
-	return 0;
 }
 
 bool mfIsApiHooked( void )
@@ -240,4 +219,30 @@ bool mfIsEnabled( void )
 bool mfIsDisabled( void )
 {
 	return ( gMfEngine == 0 ? true : false );
+}
+
+int module_start( SceSize arglen, void *argp )
+{
+	SceUID thid;
+	
+	thid = sceKernelCreateThread( "MacroFire", main_thread, 15, 0x1500, PSP_THREAD_ATTR_NO_FILLSTACK, 0 );
+	if( thid ) sceKernelStartThread( thid, arglen, argp );
+	
+	return 0;
+}
+
+int module_stop( SceSize arglen, void *argp )
+{
+	/* 呼び出されていない。どうすればいいのか？ */
+	
+	int i;
+	gRunning = false;
+	
+	if( ! mfIsApiHooked() ) return 0;
+	
+	for( i = 0; i < ARRAY_NUM( Hooktable ); i++ ){
+		hookRestoreAddr( &(Hooktable[i].syscall) );
+	}
+	
+	return 0;
 }

@@ -9,6 +9,7 @@
 #include <pspdisplay.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdarg.h>
 
 #define ALPHA_BIT 0x8000
 #define MASK_4BIT 0xF
@@ -233,8 +234,6 @@ void blitLineRect( unsigned int sx, unsigned int sy, unsigned int ex, unsigned i
 */
 void blit8BitCharTableSwitch( Blit8BitCharTable table );
 
-
-
 /* blitStringf
 	”CˆÓ‚ÌˆÊ’u‚É‘®•¶š—ñ‚ğ•`‰æ‚·‚éB
 	
@@ -262,11 +261,9 @@ void blit8BitCharTableSwitch( Blit8BitCharTable table );
 	@return int
 		•`‰æ‚µ‚½•¶š”B
 */
-#ifndef USE_KERNEL_LIBC
-#include <stdarg.h>
-#include "psp/memsce.h"
 int blitStringf( unsigned int sx, unsigned int sy, u32 fgcolor, u32 bgcolor, const char *format, ... );
-#endif
+
+int blitStringvf( unsigned int sx, unsigned int sy, u32 fgcolor, u32 bgcolor, const char *format, va_list ap );
 
 #ifdef __cplusplus
 }

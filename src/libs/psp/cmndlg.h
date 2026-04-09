@@ -16,10 +16,16 @@
 
 #ifndef __CMNDLG_FUNCTION_EXPORT__
 
+#include "psp/cmndlg/msg.h"
 #include "psp/cmndlg/getdigits.h"
 #include "psp/cmndlg/getbuttons.h"
+#include "psp/cmndlg/getfilename.h"
 	
 #endif
+
+#define CMNDLG_DEFAULT_FGCOLOR 0xffffffff
+#define CMNDLG_DEFAULT_BGCOLOR 0xff000000
+#define CMNDLG_DEFAULT_FCCOLOR 0xff0000ff
 
 #ifdef __cplusplus
 extern "C" {
@@ -30,12 +36,6 @@ void cmndlgShutdown( void );
 void cmndlgLock( void );
 void cmndlgUnlock( void );
 
-u32 cmndlgGetFgColor( void );
-u32 cmndlgGetBgColor( void );
-u32 cmndlgGetFcColor( void );
-void cmndlgSetFgColor( u32 color );
-void cmndlgSetBgColor( u32 color );
-void cmndlgSetFcColor( u32 color );
 bool cmndlgErrorCodeIsSce( int errcode );
 
 

@@ -4,7 +4,11 @@
 
 #include "getdigits.h"
 
-static void cmndlg_getdigits_drawdialog( unsigned int x, unsigned int y, u32 fgcolor, u32 bgcolor, CmndlgGetDigits cgd[], unsigned int target, unsigned int count )
+static u32 fgcolor = 0xffffffff;
+static u32 bgcolor = 0xff000000;
+static u32 fccolor = 0xff0000ff;
+
+static void cmndlg_getdigits_drawdialog( unsigned int x, unsigned int y, u32 fgcolor, u32 bgcolor, CmndlgGetDigitsData cgd[], unsigned int target, unsigned int count )
 {
 	if( ! cgd || ! count ) return;
 	
@@ -56,7 +60,7 @@ static void cmndlg_getdigits_drawdialog( unsigned int x, unsigned int y, u32 fgc
 	);
 }
 
-int cmndlgGetDigits( unsigned int x, unsigned int y, CmndlgGetDigits cgd[], unsigned int count )
+int cmndlgGetDigits( unsigned int x, unsigned int y, CmndlgGetDigitsData cgd[], unsigned int count )
 {
 	SceCtrlLatch pad_latch;
 	bool accept = false;
@@ -67,10 +71,6 @@ int cmndlgGetDigits( unsigned int x, unsigned int y, CmndlgGetDigits cgd[], unsi
 	
 	savestat = (struct cmndlg_getdigits_savestat *)memsceMalloc( sizeof( struct cmndlg_getdigits_savestat ) * count );
 	if( ! savestat ) return CMNDLG_ERROR_FAILED_TO_MEMORY_ALLOCATE;
-
-	u32 fgcolor = cmndlgGetFgColor();
-	u32 bgcolor = cmndlgGetBgColor();
-	u32 fccolor = cmndlgGetFcColor();
 		
 	/* èâä˙âª */
 	for( i = 0; i < count; i++ ){

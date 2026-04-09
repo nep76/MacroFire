@@ -1,4 +1,4 @@
-MacroFire - BETA5 Version
+MacroFire - 1.0.0 Version
 
 
 Macro settings
@@ -32,11 +32,15 @@ Macro settings
   Clear macro
     記録しているマクロをクリアして、メモリを解放する。
 
-  Load from MS (未実装)
+  Create macro
+    編集可能なマクロの最小限構成を作成する。
+    具体的には、内容が Delay 0 ms のみのマクロを作成する。
+
+  Load from MemoryStick
     メモリースティックからマクロファイルをロードする。
 
-  Save to MS (未実装)
-    メモリースティックへ、現在記録しているマクロを保存する。
+  Save to MemoryStick
+    メモリースティックへ、現在保持しているマクロを保存する。
 
 
 Edit macro
@@ -87,10 +91,10 @@ Edit macro
 
 注意
 -------------------------------------------------
-  Run once/Run inifinityによって実行中に、MacroFire EngineをOFFにすると、
-  マクロはコマンド実行位置を先頭にリセットして、実行を待ちます。
-  つまり、MacroFireEngineをOFFにしてからONにすると、マクロは再び先頭から実行されます。
-  MacroFire Toggle Buttonsと組み合わせると、擬似的にマクロをボタンで実行/停止できます。
+  Run once/Run inifinityによって実行中に、MacroFire EngineをOFFにしてゲームに戻ると、
+  マクロはコマンド実行位置を先頭にリセットして、再実行を待ちます。
+  つまり、MacroFir eEngineをOFFにしてゲームに戻ったあと、再びONにするとマクロは先頭から再実行されます。
+  MacroFire Toggle Buttonsと組み合わせると、ゲーム上で擬似的にマクロをボタンで実行/停止できます。
 
 
 -------------------------------------------------

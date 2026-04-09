@@ -19,6 +19,14 @@ static RapidfireConf st_rfConf[] = {
 	{ PSP_CTRL_SELECT,   0 }
 };
 
+static short st_rapid = 0;
+
+static int st_release_delay = 0;
+static int st_press_delay   = 0;
+
+static int st_release_cnt = 0;
+static int st_press_cnt   = 0;
+
 #define RAPIDFIRE_MODE_NORMAL     0
 #define RAPIDFIRE_MODE_SEMI_RAPID 1
 #define RAPIDFIRE_MODE_AUTO_RAPID 2
@@ -39,34 +47,44 @@ static MfMenuItem st_rfMenuTable[] = {
 	{ MT_BORDER, 0, 0, { 0 } },
 	{ MT_OPTION, &(st_rfConf[10].mode), "START   ", { "NORMAL", "RAPID", "AUTO-RAPID", "AUTO-HOLD", 0 } },
 	{ MT_OPTION, &(st_rfConf[11].mode), "SELECT  ", { "NORMAL", "RAPID", "AUTO-RAPID", "AUTO-HOLD", 0 } },
+	
+	{ MT_BORDER, 0, 0, { 0 } },
+	{ MT_GET_DIGITS, &(st_release_delay), "Released delay", { "Set released delay", "delay", "3" } },
+	{ MT_GET_DIGITS, &(st_press_delay),   "Pressed delay ", { "Set pressed delay",  "delay", "3" } },
 };
-
-
-
-static short rapid = 0;
-static SceCtrlData st_dupe_pad;
 
 void rapidfireMain( HookCaller caller, SceCtrlData *pad_data, void *argp )
 {
 	int i;
 	
+	if( ! st_rapid ){
+		if( st_release_cnt ){
+			st_release_cnt--;
+			return;
+		} else{
+			st_release_cnt = st_release_delay;
+		}
+	}
+	
 	if( caller == CALL_PEEK_BUFFER_NEGATIVE || caller == CALL_READ_BUFFER_NEGATIVE )
 		pad_data->Buttons = ~pad_data->Buttons;
 	
-	st_dupe_pad = *pad_data;
-	
-	if( caller != CALL_PEEK_LATCH && caller != CALL_READ_LATCH ){
-		for( i = 0; i < ARRAY_NUM( st_rfConf ); i++ ){
-			if(
-				(st_dupe_pad.Buttons & st_rfConf[i].button && st_rfConf[i].mode == RAPIDFIRE_MODE_SEMI_RAPID ) ||
-				st_rfConf[i].mode == RAPIDFIRE_MODE_AUTO_RAPID
-			 ){
-				pad_data->Buttons ^= rapid ? st_rfConf[i].button : 0;
-			} else if( st_rfConf[i].mode == RAPIDFIRE_MODE_AUTO_HOLD ){
-				pad_data->Buttons |= st_rfConf[i].button;
-			}
+	for( i = 0; i < ARRAY_NUM( st_rfConf ); i++ ){
+		if(
+			(pad_data->Buttons & st_rfConf[i].button && st_rfConf[i].mode == RAPIDFIRE_MODE_SEMI_RAPID ) ||
+			st_rfConf[i].mode == RAPIDFIRE_MODE_AUTO_RAPID
+		 ){
+			pad_data->Buttons ^= st_rapid ? st_rfConf[i].button : 0;
+		} else if( st_rfConf[i].mode == RAPIDFIRE_MODE_AUTO_HOLD ){
+			pad_data->Buttons |= st_rfConf[i].button;
 		}
-		rapid = ( ! rapid );
+	}
+	
+	if( st_rapid && st_press_cnt ){
+		st_press_cnt--;
+	} else{
+		st_press_cnt = st_press_delay;
+		st_rapid = ( ! st_rapid );
 	}
 	
 	if( caller == CALL_PEEK_BUFFER_NEGATIVE || caller == CALL_READ_BUFFER_NEGATIVE )
@@ -83,7 +101,7 @@ MfMenuReturnCode rapidfireMenu( SceCtrlLatch *pad_latch, SceCtrlData *pad_data, 
 		case MR_CONTINUE:
 			blitString( blitOffsetChar( 3 ), blitOffsetLine(  2 ), MENU_FGCOLOR, MENU_BGCOLOR, "Please choose a rapidfire mode per buttons." );
 			blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "NORMAL    : standard control mode.\nRAPID     : hold the button to rapidfire.\nAUTO-RAPID: always to rapidfire.\nAUTO-HOLD : always to press and hold." );
-			blitString( blitOffsetChar( 3 ), blitOffsetLine( 31 ), MENU_FGCOLOR, MENU_BGCOLOR, "\x80\x82 = Move, \x83\x81 = Change mode, \x86 = Back, START = Exit" );
+			blitString( blitOffsetChar( 3 ), blitOffsetLine( 31 ), MENU_FGCOLOR, MENU_BGCOLOR, "\x80\x82 = Move, \x83\x81 = Change mode, \x85 = SetDelay, \x86 = Back, START = Exit" );
 			break;
 		case MR_ENTER:
 			break;

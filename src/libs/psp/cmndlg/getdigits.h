@@ -11,6 +11,7 @@
 #include <pspdisplay.h>
 #include <stdlib.h>
 #include "psp/blit.h"
+#include "psp/memsce.h"
 #define __CMNDLG_FUNCTION_EXPORT__
 #include "psp/cmndlg.h"
 #undef __CMNDLG_FUNCTION_EXPORT__
@@ -33,9 +34,9 @@ typedef struct {
 	char *unit;
 	long *number;
 	int numDigits;
-} CmndlgGetDigits;
+} CmndlgGetDigitsData;
 
-int cmndlgGetDigits( unsigned int x, unsigned int y, CmndlgGetDigits cgd[], unsigned int count );
+int cmndlgGetDigits( unsigned int x, unsigned int y, CmndlgGetDigitsData cgd[], unsigned int count );
 
 #ifdef __cplusplus
 }

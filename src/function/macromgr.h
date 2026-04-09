@@ -28,7 +28,7 @@ typedef enum {
 
 typedef struct _macro_data {
 	MacroAction action;
-	u64 data;
+	uint64_t data;
 	struct _macro_data *next;
 	struct _macro_data *prev;
 } MacroData;

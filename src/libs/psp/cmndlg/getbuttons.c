@@ -24,6 +24,10 @@ static struct cmndlg_getbuttons_buttonstat st_btnstat[CMNDLG_GETBUTTONS_ALL_AVAI
 	{ PSP_CTRL_VOLDOWN,  false }
 };
 
+static u32 fgcolor = 0xffffffff;
+static u32 bgcolor = 0xff000000;
+static u32 fccolor = 0xff0000ff;
+
 static void cmndlg_getbuttons_move_prev( unsigned int mask, int *selected )
 {
 	int i;
@@ -74,7 +78,7 @@ static unsigned int cmndlg_getbuttons_get_buttons( void )
 	return buttons;
 }
 
-static void cmndlg_getbuttons_drawdialog( unsigned int x, unsigned int y, u32 fgcolor, u32 bgcolor, CmndlgGetButtons cgb[], unsigned int target, unsigned int count )
+static void cmndlg_getbuttons_drawdialog( unsigned int x, unsigned int y, u32 fgcolor, u32 bgcolor, CmndlgGetButtonsData cgb[], unsigned int target, unsigned int count )
 {
 	if( ! cgb || ! count ) return;
 	
@@ -131,7 +135,7 @@ static void cmndlg_getbuttons_drawdialog( unsigned int x, unsigned int y, u32 fg
 	);
 }
 
-int cmndlgGetButtons( unsigned int x, unsigned int y, CmndlgGetButtons cgb[], unsigned int count )
+int cmndlgGetButtons( unsigned int x, unsigned int y, CmndlgGetButtonsData cgb[], unsigned int count )
 {
 	SceCtrlLatch pad_latch;
 	bool accept = false;
@@ -142,10 +146,6 @@ int cmndlgGetButtons( unsigned int x, unsigned int y, CmndlgGetButtons cgb[], un
 	
 	savestat = (struct cmndlg_getbuttons_savestat *)memsceMalloc( sizeof( struct cmndlg_getbuttons_savestat ) * count );
 	if( ! savestat ) return CMNDLG_ERROR_FAILED_TO_MEMORY_ALLOCATE;
-	
-	u32 fgcolor = cmndlgGetFgColor();
-	u32 bgcolor = cmndlgGetBgColor();
-	u32 fccolor = cmndlgGetFcColor();
 	
 	/* èâä˙âª */
 	for( i = 0; i < count; i++ ){

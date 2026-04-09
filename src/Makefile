@@ -1,7 +1,10 @@
 TARGET = macrofire
-PSP_FW_VERSION = 390
 
+# PRXを作成する
 BUILD_PRX = 1
+
+# エクスポート定義ファイル
+PRX_EXPORTS = exports.exp
 
 # 機能が制限されているが軽量なカーネルlibc(sysclib)。
 # でも機能制限されすぎなので使わない。
@@ -26,9 +29,13 @@ LDFLAGS =
 # newlibを使う場合、libpspuserをリンクしないとsceKernelFreeMemSizeのリンクに失敗する。
 # libpspuserより先にlibpspkernelをリンクしないと、システムコントロール系のシンボルに
 # ユーザモードの方をリンクしてしまい、カーネルモードスレッドを生成できない模様？
-LIBS = -lpsprtc -lpspkernel -lc -lpspuser
+#
+# libpspctrlは、フックしているキー操作関数のNIDがユーザモード側であるので、
+# ユーザモードのライブラリを先にリンクする必要がある？
+LIBS = -lpsprtc -lpspkernel -lc -lpspuser -lpspctrl
 
-OBJS = main.o \
+OBJS = exports.o \
+       main.o \
        menu.o \
        hook.o \
        function/rapidfire.o \
@@ -38,9 +45,15 @@ OBJS = main.o \
        $(CLASSG_LIBS)/sstring.o \
        $(CLASSG_LIBS)/psp/blit.o \
        $(CLASSG_LIBS)/psp/memsce.o \
+       $(CLASSG_LIBS)/psp/pathexpand.o \
+       $(CLASSG_LIBS)/psp/fileh.o \
+       $(CLASSG_LIBS)/psp/dirh.o \
+       $(CLASSG_LIBS)/psp/sosk.o \
        $(CLASSG_LIBS)/psp/cmndlg.o \
+       $(CLASSG_LIBS)/psp/cmndlg/msg.o \
        $(CLASSG_LIBS)/psp/cmndlg/getdigits.o \
        $(CLASSG_LIBS)/psp/cmndlg/getbuttons.o \
+       $(CLASSG_LIBS)/psp/cmndlg/getfilename.o \
 
 PSPSDK = $(shell psp-config --pspsdk-path)
 include $(PSPSDK)/lib/build_prx.mak

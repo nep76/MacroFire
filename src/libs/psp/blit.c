@@ -104,7 +104,7 @@ int blitString( unsigned int sx, unsigned int sy, u32 fgcolor, u32 bgcolor, cons
 	base_offset = sx + ( sy * dstat.bufferWidth );
 	
 	for( c = 0, x = 0; msg[c]; c++, x++ ){
-		if( msg[c] == '\n' || x >= ( dstat.width / BLIT_CHAR_WIDTH ) ){
+		if( msg[c] == '\n' || sx + ( x + 1 ) * BLIT_CHAR_WIDTH >= dstat.width ){
 			sy += BLIT_CHAR_HEIGHT;
 			base_offset = sx + ( sy * dstat.bufferWidth );
 			if( msg[c] == '\n' ){
@@ -252,16 +252,22 @@ void blit8BitCharTableSwitch( Blit8BitCharTable table )
 	}
 }
 
-#ifndef USE_KERNEL_LIBC
-int blitStringf( unsigned int sx, unsigned int sy, u32 fgcolor, u32 bgcolor, const char *format, ... )
+int blitStringvf( unsigned int sx, unsigned int sy, u32 fgcolor, u32 bgcolor, const char *format, va_list ap )
 {
 	char str[255];
+	
+	vsnprintf( str, 255, format, ap );
+	return blitString( sx, sy, fgcolor, bgcolor, str );
+}
+
+int blitStringf( unsigned int sx, unsigned int sy, u32 fgcolor, u32 bgcolor, const char *format, ... )
+{
+	int c;
 	va_list ap;
 	
 	va_start( ap, format );
-	vsnprintf( str, 255, format, ap );
+	c = blitStringvf( sx, sy, fgcolor, bgcolor, format, ap );
 	va_end( ap );
 	
-	return blitString( sx, sy, fgcolor, bgcolor, str );
+	return c;
 }
-#endif
