@@ -5,12 +5,13 @@
 #include <pspkernel.h>
 #include <pspctrl.h>
 #include <psprtc.h>
-#include "psp/memsce.h"
 #include "../menu.h"
 
-#include "macrotypes.h"
+#include "macromgr.h"
 #include "macroeditor.h"
-	
+
+#define MACRO_NOTICE_DISPLAY_SEC 1.5
+
 typedef MfMenuReturnCode ( *MacroFunction )( SceCtrlLatch*, SceCtrlData* );
 
 typedef enum {
@@ -18,8 +19,6 @@ typedef enum {
 	MRM_TRACE,
 	MRM_RECORD,
 } MacroRunMode;
-
-#define MACRO_NOTICE_DISPLAY_SEC 1.5
 
 void macroInit( void );
 void macroTerm( void );

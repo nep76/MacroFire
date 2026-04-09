@@ -6,10 +6,9 @@
 #define __MACROFIRE__
 
 #include <pspkernel.h>
-#include <pspdisplay_kernel.h>
-#include <pspdisplay.h>
 #include <pspctrl.h>
 #include <stdio.h>
+#include <unistd.h>
 #include <string.h>
 
 #define GLOBAL_VARIABLES_DEFINE

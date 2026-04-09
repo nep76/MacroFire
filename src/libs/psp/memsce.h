@@ -8,11 +8,8 @@
 	これによって、sceKernelTotalFreeMemSize()やsceKernelMaxFreeMemSize()が
 	使用量に応じた値を返す。
 	
-	ただし、PSPのメモリ関係APIに皮を被せることになるので、
-	管理情報を記録するために、若干のオーバヘッドがある。
-	
-	具体的には、メモリを割り当てる際、
-	管理情報記録のために、指定された容量よりもやや多くメモリを確保する。
+	EBOOT.PBPを作成する場合、PSP_HEAP_SIZE_KB()を少なくしておかないと
+	確保できる容量が減る。
 */
 
 #ifndef __MEMSCE_H__
@@ -25,18 +22,16 @@
 #define MEMSCE_POWER_OF_TWO( x ) ( ! ( x & ( x - 1 ) ) )
 #define MEMSCE_ALIGNOFFSET(x, align) (((x)+((align)-1))&~((align)-1))
 
+#define PSP_MEMPART_KERNEL_1 1
+#define PSP_MEMPART_USER_1   2
+#define PSP_MEMPART_KERNEL_2 3
+#define PSP_MEMPART_KERNEL_3 4
+#define PSP_MEMPART_KERNEL_4 5
+#define PSP_MEMPART_USER_2   6
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-enum MallocScePartitionType {
-	PSP_MEMPART_KERNEL_1 = 1,
-	PSP_MEMPART_USER_1,
-	PSP_MEMPART_KERNEL_2,
-	PSP_MEMPART_KERNEL_3,
-	PSP_MEMPART_KERNEL_4,
-	PSP_MEMPART_USER_2
-};
 
 struct heap_header {
 	char is_free;
@@ -54,7 +49,7 @@ struct heap_header {
  *	@returns:
  *		割り当てたメモリの先頭アドレス。
  */
-void *MemSceMalloc( SceSize size );
+void *memsceMalloc( SceSize size );
 
 /* MemSceCalloc
  *
@@ -70,7 +65,7 @@ void *MemSceMalloc( SceSize size );
  *	@returns:
  *		割り当てたメモリの先頭アドレス。
  */
-void *MemSceCalloc( SceSize blk_num, SceSize size );
+void *memsceCalloc( SceSize blk_num, SceSize size );
 
 /* MemSceRealloc
  *
@@ -88,7 +83,7 @@ void *MemSceCalloc( SceSize blk_num, SceSize size );
  *		割り当てたメモリの先頭アドレス。
  *		元のメモリアドレスとは変わる。
  */
-void *MemSceRealloc( void *src_heap_start, SceSize resize );
+void *memsceRealloc( void *src_heap_start, SceSize resize );
 
 /* MemSceMemalign
  *
@@ -106,7 +101,7 @@ void *MemSceRealloc( void *src_heap_start, SceSize resize );
  *	@returns:
  *		割り当てたメモリの先頭アドレス。
  */
-void *MemSceMemalign( SceSize boundary, SceSize size );
+void *memsceMemalign( SceSize boundary, SceSize size );
 
 /* MemSceFree
  *
@@ -117,7 +112,7 @@ void *MemSceMemalign( SceSize boundary, SceSize size );
  *	@param: void *first_mem_ptr
  *		解放するメモリのアドレス。
  */
-int MemSceFree( void *heap_start );
+int memsceFree( void *heap_start );
 
 /* MemSceMallocEx
  *
@@ -140,7 +135,6 @@ int MemSceFree( void *heap_start );
  *	@param: SceUID partitionid
  *		確保するメモリパーティション。
  *		(詳細 http://wiki.ps2dev.org/psp:memory_mapより)
- *			enum                   Partition
  *			PSP_MEMPART_KERNEL_1 = 1
  *			PSP_MEMPART_USER1    = 2
  *			PSP_MEMPART_KERNEL_2 = 3
@@ -165,7 +159,7 @@ int MemSceFree( void *heap_start );
  *	@returns:
  *		割り当てたメモリのアドレス。
  */
-void *MemSceMallocEx( SceSize boundary, SceUID partitionid, const char *name, int type, SceSize size, void *addr );
+void *memsceMallocEx( SceSize boundary, SceUID partitionid, const char *name, int type, SceSize size, void *addr );
 
 #ifdef __cplusplus
 }

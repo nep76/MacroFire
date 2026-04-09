@@ -23,6 +23,12 @@
 #define MAX_NUMBER_OF_THREADS 64
 #define MENUITEM_LENGTH 64
 
+/*
+	sceDisplayEnable()でLCDを点灯できるようだ?
+	ただ、Stubsには追加されているがプロトタイプが無い模様。
+*/
+void sceDisplayEnable( void );
+
 typedef enum {
 	CALL_PEEK_BUFFER_POSITIVE,
 	CALL_PEEK_BUFFER_NEGATIVE,
@@ -83,7 +89,8 @@ void mfThreadsStatChange( bool stat, SceUID thlist[], int thnum );
 
 /* MenuAPI */
 /*
-	ユーザの入力なしに、ソフト側からメニューを終了させる。
+	ユーザの入力なしに、ソフト側からメニューの終了を予約させる。
+	これをセットしたあと、ファンクションがメインメニューに戻った時に終了。
 */
 void mfMenuQuit( void );
 
@@ -104,12 +111,22 @@ MfMenuReturnCode mfMenuVertical( int x, int y, int w, MfMenuItem mi[], size_t it
 /* スクリーンをクリア */
 void mfClearColor( u32 color );
 
+/* メニュー実行の一時停止を予約 */
 void mfWaitScreenReload( int sec );
 
+/* VSYNC時に画面をクリアすることを予約 */
 void mfClearScreenWhenVsync( void );
 
+/* MacroFireエンジンが有効ならTRUE */
 bool mfIsEnabled( void );
 
+/* MacroFireエンジンが無効ならTRUE */
 bool mfIsDisabled( void );
+
+/* メニューの中断を有効にする */
+void mfMenuEnableInterrupt( void );
+
+/* メニューの中断を無効にする */
+void mfMenuDisableInterrupt( void );
 
 #endif

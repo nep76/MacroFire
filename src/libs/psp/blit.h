@@ -16,7 +16,7 @@
 #define MASK_6BIT 0x3F
 
 /* 字間の幅 */
-#define BLIT_LETTER_SPACE 2
+#define BLIT_LETTER_SPACE 1
 
 /* この値を変えても文字が大きくなったり小さくなったりはしません */
 #define BLIT_CHAR_WIDTH  ( 5 + BLIT_LETTER_SPACE )
@@ -26,8 +26,10 @@
 #define BLIT_SCR_HEIGHT 272
 
 /* 関数にみえるマクロ */
-#define blitOffsetChar( x ) ( x * BLIT_CHAR_WIDTH  )
-#define blitOffsetLine( x ) ( x * BLIT_CHAR_HEIGHT )
+#define blitOffsetChar( x ) ( ( x ) * BLIT_CHAR_WIDTH  )
+#define blitOffsetLine( x ) ( ( x ) * BLIT_CHAR_HEIGHT )
+#define blitMeasureChar( x ) ( ( x ) * BLIT_CHAR_WIDTH )
+#define blitMeasureLine( x ) ( ( x ) * BLIT_CHAR_HEIGHT )
 #define blitFillBox( x, y, w, h, c ) blitFillRect( x, y, x + w, y + h, c )
 #define blitLineBox( x, y, w, h, c ) blitLineRect( x, y, x + w, y + h, c )
 
@@ -48,6 +50,11 @@ typedef struct {
 	enum PspDisplayPixelFormats pixelFormat;
 	void *frameBuffer;
 } BlitDisplayStatus;
+
+typedef struct {
+	u8 *table;
+	int charnum;
+} BlitFontTable;
 
 /* blitColorConvert565
 	PSP_DISPLAY_PIXEL_FORAMT_8888形式の色を
@@ -144,19 +151,19 @@ int blitChar( unsigned int sx, unsigned int sy, const char chr, u32 fgcolor, u32
 	@param unsigned int sy
 		描画を開始するY座標。
 	
-	@param const char *msg
-		描画する文字列。
-	
 	@param u32 fgcolor
 		文字の色。
 	
 	@param u32 bgcolor
 		文字の背景の色。
 	
+	@param const char *msg
+		描画する文字列。
+	
 	@return int
 		描画した文字数。
 */
-int blitString( unsigned int sx, unsigned int sy, const char *msg, u32 fgcolor, u32 bgcolor );
+int blitString( unsigned int sx, unsigned int sy, u32 fgcolor, u32 bgcolor, const char *msg );
 
 /* blitFillRect
 	指定した範囲を塗りつぶす。
@@ -225,6 +232,41 @@ void blitLineRect( unsigned int sx, unsigned int sy, unsigned int ex, unsigned i
 	B8_BUTTON_SUMBOL: \x80-\x88までしかない、ボタンを表す図形。
 */
 void blit8BitCharTableSwitch( Blit8BitCharTable table );
+
+
+
+/* blitStringf
+	任意の位置に書式文字列を描画する。
+	
+	@param unsigned int sx
+		描画を開始するX座標。
+	
+	@param unsigned int sy
+		描画を開始するY座標。
+	
+	@param u32 fgcolor
+		文字の色。
+	
+	@param u32 bgcolor
+		文字の背景の色。
+	
+	@param size_t len
+		最大文字数。
+	
+	@param const char *format
+		printf形式の書式。
+	
+	@param ...
+		可変長引数。
+	
+	@return int
+		描画した文字数。
+*/
+#ifndef USE_KERNEL_LIBC
+#include <stdarg.h>
+#include "psp/memsce.h"
+int blitStringf( unsigned int sx, unsigned int sy, u32 fgcolor, u32 bgcolor, const char *format, ... );
+#endif
 
 #ifdef __cplusplus
 }

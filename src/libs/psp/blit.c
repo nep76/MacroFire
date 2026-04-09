@@ -2,8 +2,14 @@
 	PSP VSH 24bpp text bliter (Original from "SDK for devhook 0.43")
 */
 
-#include "blit.h"
 #include "font.c"
+#include "blit.h"
+
+
+BlitFontTable st_fonttable[] = {
+	{ font7Ascii, sizeof( font7Ascii ) },
+	{ font8Pspsdk, sizeof( font8Pspsdk ) }
+};
 
 static void blit_get_display_status( BlitDisplayStatus *stat )
 {
@@ -77,10 +83,10 @@ u32 blitConvertColorFrom8888( enum PspDisplayPixelFormats pxfmt, u32 color )
 int blitChar( unsigned int sx, unsigned int sy, const char chr, u32 fgcolor, u32 bgcolor )
 {
 	char tstr[2] = { chr, '\0' };
-	return blitString( sx ,sy, tstr, fgcolor, bgcolor );
+	return blitString( sx ,sy, fgcolor, bgcolor, tstr );
 }
 
-int blitString( unsigned int sx, unsigned int sy, const char *msg, u32 fgcolor, u32 bgcolor )
+int blitString( unsigned int sx, unsigned int sy, u32 fgcolor, u32 bgcolor, const char *msg )
 {
 	int c, x, y, p;
 	int base_offset, offset, pxlen;
@@ -113,10 +119,17 @@ int blitString( unsigned int sx, unsigned int sy, const char *msg, u32 fgcolor, 
 			offset = base_offset + ( y * dstat.bufferWidth ) + ( x * BLIT_CHAR_WIDTH );
 			if( (unsigned char)msg[c] < 0x80 ){
 				/* 7bit ASCII */
-				font = char_table[0][ msg[c]*8 + y ];
+				font = st_fonttable[0].table[ msg[c]*8 + y ];
 			} else{
 				/* 8bit ASCII */
-				font = char_table[1][ (msg[c] & 0x7f)*8 + y];
+				unsigned char t_c = (msg[c] & 0x7f)*8 + y;
+				if( t_c < st_fonttable[1].charnum ){
+					/* 文字が定義されていれば使用 */
+					font = st_fonttable[1].table[t_c];
+				} else{
+					/* 文字がテーブルの最大文字数を超えていたら ? を表示 */
+					font = st_fonttable[0].table[ '?'*8 + y ];
+				}
 			}
 			for( p = 0; p < BLIT_CHAR_WIDTH; p++ ){
 				if( font & 0x80 ){
@@ -228,11 +241,27 @@ void blit8BitCharTableSwitch( Blit8BitCharTable table )
 {
 	switch( table ){
 		case B8_BUTTON_SYMBOL:
-			char_table[1] = b8_button_symbol;
+			st_fonttable[1].table   = font8ButtonSymbols;
+			st_fonttable[1].charnum = sizeof( font8ButtonSymbols );
 			break;
 		case B8_PSPSDK:
 		default:
-			char_table[1] = b8_pspsdk;
+			st_fonttable[1].table  = font8Pspsdk;
+			st_fonttable[1].charnum = sizeof( font8Pspsdk );
 			break;
 	}
 }
+
+#ifndef USE_KERNEL_LIBC
+int blitStringf( unsigned int sx, unsigned int sy, u32 fgcolor, u32 bgcolor, const char *format, ... )
+{
+	char str[255];
+	va_list ap;
+	
+	va_start( ap, format );
+	vsnprintf( str, 255, format, ap );
+	va_end( ap );
+	
+	return blitString( sx, sy, fgcolor, bgcolor, str );
+}
+#endif

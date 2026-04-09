@@ -8,7 +8,7 @@
 #include <pspdebug.h>
 #include <stdbool.h>
 
-#define MF_MENU_TOP_MESSAGE "MacroFire vBETA2 In-game menu [ClassG: http://classg.sytes.net]"
+#define MF_MENU_TOP_MESSAGE "MacroFire vBETA3 In-game menu [ClassG: http://classg.sytes.net]"
 
 #ifdef GLOBAL_VARIABLES_DEFINE
 #define GLOBAL
@@ -26,6 +26,11 @@
 typedef int ( *SCE_CTRL_DATA_FUNC )( SceCtrlData*, int );
 typedef int ( *SCE_CTRL_LATCH_FUNC )( SceCtrlLatch* );
 
+/* debug */
+GLOBAL int gdebug1;
+GLOBAL int gdebug2;
+GLOBAL int gdebug3;
+
 /* グローバル関数 */
 bool mfIsApiHooked( void );
 void mfHookApi( void );
@@ -36,6 +41,7 @@ GLOBAL bool gRunning INIT_VALUE( true );
 
 /* グローバル設定記録変数 */
 GLOBAL int gMfEngine INIT_VALUE( 0 );
+GLOBAL int gMfBSS INIT_VALUE( 0 );
 
 #undef GLOBAL
 #undef VALUE

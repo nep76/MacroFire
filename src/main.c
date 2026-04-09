@@ -5,9 +5,9 @@
 #include "main.h"
 #include "hooktable.h"
 
+#define RUN_IN_KERNEL_MODE
 PSP_MODULE_INFO( "MacroFire", PSP_MODULE_KERNEL, 0, 0 );
 
-/* スタック節約 */
 static SceCtrlLatch pad_latch;
 static SceCtrlData  pad_data;
 static SCE_CTRL_LATCH_FUNC ctrlGetPadLatch = sceCtrlReadLatch;
@@ -130,7 +130,13 @@ void mfRestoreApi( void )
 
 int main_thread( SceSize arglen, void *argp )
 {	
+	/* メニューを初期化 */
+	mfMenuInit();
+	mfMenuSetup( ctrlGetPadLatch, ctrlGetPadData, &pad_latch, &pad_data );
+	
 	{
+		chdir( "ms0:" );
+		
 		/* 初期化関数呼び出し */
 		int i;
 		for( i = 0; i < mftableEntry; i++ ){
@@ -138,13 +144,9 @@ int main_thread( SceSize arglen, void *argp )
 		}
 	}
 	
-	/* メニューを初期化 */
-	mfMenuInit();
-	mfMenuSetup( ctrlGetPadLatch, ctrlGetPadData, &pad_latch, &pad_data );
-	
 	while( gRunning ){
-		
 		sceKernelDelayThread( 50000 );
+		
 		if( ! st_apihooked && gMfEngine ){
 			// APIをフック
 			mfHookApi();
@@ -155,9 +157,7 @@ int main_thread( SceSize arglen, void *argp )
 		( ctrlGetPadData )( &pad_data, 1 );
 		( ctrlGetPadLatch )( &pad_latch );
 		
-		if( pad_data.Buttons & PSP_CTRL_VOLUP && pad_data.Buttons & PSP_CTRL_VOLDOWN ){
-			mfMenu();
-		}
+		if( pad_data.Buttons & PSP_CTRL_VOLUP && pad_data.Buttons & PSP_CTRL_VOLDOWN ) mfMenu();
 	}
 	
 	/* メニュー終了処理 */
@@ -179,7 +179,7 @@ int module_start( SceSize arglen, void *argp )
 {
 	SceUID thid;
 	
-	thid = sceKernelCreateThread( "MacroFire", main_thread, 15, 0x600, 0, 0 );
+	thid = sceKernelCreateThread( "MacroFire", main_thread, 15, 0x1500, PSP_THREAD_ATTR_NO_FILLSTACK, 0 );
 	if( thid ) sceKernelStartThread( thid, arglen, argp );
 	
 	return 0;

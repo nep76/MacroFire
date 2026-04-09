@@ -81,9 +81,9 @@ MfMenuReturnCode rapidfireMenu( SceCtrlLatch *pad_latch, SceCtrlData *pad_data, 
 	
 	switch( mfMenuVertical( blitOffsetChar( 5 ), blitOffsetLine( 4 ), BLIT_SCR_WIDTH, st_rfMenuTable, ARRAY_NUM( st_rfMenuTable ), &selected ) ){
 		case MR_CONTINUE:
-			blitString( blitOffsetChar( 3 ), blitOffsetLine(  2 ), "Please choose a rapidfire mode per buttons.", MENU_FGCOLOR, MENU_BGCOLOR );
-			blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), "NORMAL: standard control mode.\nRAPID: hold the button to rapidfire.\nAUTO-RAPID: always to rapidfire.\nAUTO-HOLD: always to press and hold.", MENU_FGCOLOR, MENU_BGCOLOR );
-			blitString( blitOffsetChar( 3 ), blitOffsetLine( 31 ), "\x80 = MoveUp, \x82 = MoveDown, \x85 = Change mode, \x86 = Back, START = Exit", MENU_FGCOLOR, MENU_BGCOLOR);
+			blitString( blitOffsetChar( 3 ), blitOffsetLine(  2 ), MENU_FGCOLOR, MENU_BGCOLOR, "Please choose a rapidfire mode per buttons." );
+			blitString( blitOffsetChar( 5 ), blitOffsetLine( 25 ), MENU_FGCOLOR, MENU_BGCOLOR, "NORMAL: standard control mode.\nRAPID: hold the button to rapidfire.\nAUTO-RAPID: always to rapidfire.\nAUTO-HOLD: always to press and hold." );
+			blitString( blitOffsetChar( 3 ), blitOffsetLine( 31 ), MENU_FGCOLOR, MENU_BGCOLOR, "\x80 = MoveUp, \x82 = MoveDown, \x85 = Change mode, \x86 = Back, START = Exit" );
 			break;
 		case MR_ENTER:
 			break;

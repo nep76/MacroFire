@@ -9,10 +9,8 @@
 
 #ifdef MFTABLE_DEFINE
 #define EXPORT
-#define ENTRY( x ) = x
 #else
 #define EXPORT extern
-#define ENTRY( x )
 #endif
 
 /* 機能を実装したソース */
@@ -43,7 +41,6 @@ typedef struct {
 	MenuEntry menu;
 } MfEntry;
 
-EXPORT int mftableEntry ENTRY( 2 );
 EXPORT MfEntry mftable[]
 #ifdef MFTABLE_DEFINE
 = {
@@ -56,8 +53,12 @@ EXPORT MfEntry mftable[]
 }
 #endif
 ;
+EXPORT int mftableEntry
+#ifdef MFTABLE_DEFINE
+= sizeof( mftable ) / sizeof( MfEntry )
+#endif
+;
 
 #undef EXPORT
-#undef ENTRY
 
 #endif

@@ -19,7 +19,7 @@ MfHookParams Hooktable[] = {
 	{ { 0, 0 }, "sceController_Service", "sceCtrl", 0x1F803938, mfCtrlReadBufferPositive },
 	{ { 0, 0 }, "sceController_Service", "sceCtrl", 0x60B81F86, mfCtrlReadBufferNegative },
 	{ { 0, 0 }, "sceController_Service", "sceCtrl", 0xB1D0E5CD, mfCtrlPeekLatch },
-	{ { 0, 0 }, "sceController_Service", "sceCtrl", 0x0B588501, mfCtrlReadLatch },
+	{ { 0, 0 }, "sceController_Service", "sceCtrl", 0x0B588501, mfCtrlReadLatch }
 };
 
 #endif

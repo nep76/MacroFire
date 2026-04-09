@@ -1,9 +1,9 @@
 /*
-	malloc_sce.c
+	memsce.c
 */
 #include "memsce.h"
 
-void *MemSceMallocEx( SceSize boundary, SceUID partitionid, const char *name, int type, SceSize size, void *addr )
+void *memsceMallocEx( SceSize boundary, SceUID partitionid, const char *name, int type, SceSize size, void *addr )
 {
 	struct heap_header hhead;
 	void *heap_start;
@@ -27,7 +27,7 @@ void *MemSceMallocEx( SceSize boundary, SceUID partitionid, const char *name, in
 	return heap_start;
 }
 
-int MemSceFree( void *heap_start )
+int memsceFree( void *heap_start )
 {
 	struct heap_header *hhead;
 	if( ! heap_start ) return 0;
@@ -42,21 +42,21 @@ int MemSceFree( void *heap_start )
 	return sceKernelFreePartitionMemory( hhead->block_id );
 }
 
-void *MemSceMalloc( SceSize size )
+void *memsceMalloc( SceSize size )
 {
-	return MemSceMallocEx( 16, PSP_MEMPART_USER_1, "MemSceMalloc", PSP_SMEM_Low, size, 0 );
+	return memsceMallocEx( 16, PSP_MEMPART_USER_1, "memsceMalloc", PSP_SMEM_Low, size, 0 );
 }
 
-void *MemSceCalloc( SceSize blk_num, SceSize size )
+void *memsceCalloc( SceSize blk_num, SceSize size )
 {
-	void *mem = MemSceMalloc( blk_num * size );
+	void *mem = memsceMalloc( blk_num * size );
 	if( ! mem ) return NULL;
 	
 	memset( mem, 0, blk_num * size );
 	return mem;
 }
 
-void *MemSceRealloc( void *src_heap_start, SceSize resize )
+void *memsceRealloc( void *src_heap_start, SceSize resize )
 {
 	struct heap_header *src_hhead;
 	void *new_heap_start;
@@ -64,22 +64,22 @@ void *MemSceRealloc( void *src_heap_start, SceSize resize )
 	src_hhead = ( struct heap_header *)((unsigned int)src_heap_start - sizeof( struct heap_header ));
 	if( src_hhead->is_free ) return NULL;
 	
-	new_heap_start = MemSceMalloc( resize );
+	new_heap_start = memsceMalloc( resize );
 	if( src_hhead->size > resize ){
 		memcpy( new_heap_start, src_heap_start, resize );
 	} else{
 		memcpy( new_heap_start, src_heap_start, src_hhead->size );
 	}
 	
-	MemSceFree( src_heap_start );
+	memsceFree( src_heap_start );
 	
 	return new_heap_start;
 }
 
-void *MemSceMemalign( SceSize boundary, SceSize size )
+void *memsceMemalign( SceSize boundary, SceSize size )
 {
 	/* ƒoƒEƒ“ƒ_ƒŠ‹«ŠE‚ª2‚Ì‚×‚«æ‚©‚Ç‚¤‚©’²‚×‚é */
 	if( boundary <= 0 || ! MEMSCE_POWER_OF_TWO( boundary ) ) return 0;
 	
-	return MemSceMallocEx( boundary, PSP_MEMPART_USER_1, "MemSceMemalign", PSP_SMEM_Low, size, 0 );
+	return memsceMallocEx( boundary, PSP_MEMPART_USER_1, "MemSceMemalign", PSP_SMEM_Low, size, 0 );
 }
