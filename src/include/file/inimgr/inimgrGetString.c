@@ -2,15 +2,14 @@
 
 #include "inimgr_types.h"
 
-int inimgrGetString( IniUID uid, const char *section, const char *key, char *buf, size_t bufsize )
+int inimgrGetString( InimgrUID uid, const char *name, const char *key, char *res, size_t reslen )
 {
-	char *value = __inimgr_get_value( (struct inimgr_params *)uid, section, key );
+	int ret;
+	char *value;
 	
-	if( value ){
-		strutilCopy( buf, value, bufsize );
-		return strlen( buf );
-	} else {
-		return -1;
+	if( ( ret = __inimgr_get_value( (struct inimgr_params *)uid, name, key, &value ) ) == CG_ERROR_OK ){
+		ret = strutilCopy( res, value, reslen ) - 1;
 	}
+	
+	return ret;
 }
-

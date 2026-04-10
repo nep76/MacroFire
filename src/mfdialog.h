@@ -15,28 +15,33 @@
 	å^êÈåæ
 =========================================================*/
 typedef enum {
-	MF_DIALOG_NONE = 0,
-	MF_DIALOG_MESSAGE,
-	MF_DIALOG_SOSK,
-	MF_DIALOG_NUMEDIT,
-	MF_DIALOG_GETFILENAME,
-	MF_DIALOG_DETECTBUTTONS
+	MFDIALOG_NONE = 0,
+	MFDIALOG_MESSAGE,
+	MFDIALOG_SOSK,
+	MFDIALOG_NUMEDIT,
+	MFDIALOG_GETFILENAME,
+	MFDIALOG_DETECTBUTTONS
 } MfDialogType;
+
+typedef enum {
+	MFDIALOG_DRAW_FINISH = 0,
+	MFDIALOG_DRAW_CONTINUE
+} MfDialogDrawStatus;
 
 /*=========================================================
 	ä÷êî
 =========================================================*/
-inline MfDialogType mfDialogCurrentType( void );
-inline bool mfDialogLastResult( void );
+void mfDialogInit( PadutilRemap *remap );
+void mfDialogFinish( void );
+MfDialogType mfDialogCurrentType( void );
+bool mfDialogLastResult( void );
+int mfDialogMessage( const char *title, const char *message, unsigned int error, bool yesno );
+int mfDialogSosk( const char *title, char *text, size_t length, unsigned int availkb );
+int mfDialogNumedit( const char *title, const char *unit, void *num, uint32_t max );
+int mfDialogGetfilename( const char *title, const char *initdir, const char *initname, char *path, size_t pathmax, unsigned int options );
+int mfDialogDetectbuttons( const char *title, PadutilButtons availbtns, PadutilButtons *buttons );
 
-bool mfDialogMessage( const char *title, const char *message, unsigned int error, bool yesno );
-
-bool mfDialogSosk( const char *title, char *text, size_t length, unsigned int availkb );
-
-bool mfDialogNumedit( const char *title, const char *unit, void *num, uint32_t max );
-
-bool mfDialogGetfilename( const char *title, const char *initdir, const char *initname, char *path, size_t pathmax, unsigned int options );
-
-bool mfDialogDetectbuttons( const char *title, PadutilButtons availbtns, PadutilButtons *buttons );
+int mfDialogDraw( void );
+bool mfDialogResult( void );
 
 #endif

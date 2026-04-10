@@ -31,10 +31,10 @@
 	ä÷êî
 =========================================================*/
 void *macroProc( MfMessage message );
-void macroIniLoad( IniUID ini, char *buf, size_t len );
-void macroIniCreate( IniUID ini, char *buf, size_t len );
+void macroIniLoad( InimgrUID ini, char *buf, size_t len );
+void macroIniCreate( InimgrUID ini, char *buf, size_t len );
 void macroMain( MfHookAction action, SceCtrlData *pad, MfHprmKey *hk );
-void macroMenu( MfMenuMessage message );
+int  macroMenu( MfMenuMessage message );
 
 
 #endif

@@ -9,10 +9,10 @@
 -----------------------------------------------*/
 #ifdef PB_SJIS_SUPPORT
 #include "fonts/misaki8x8.c"
-static unsigned short pb_get_glyph_index_by_sjis( unsigned char sjis_hi, unsigned char sjis_lo )
+static unsigned int pb_get_glyph_index_by_sjis( unsigned char sjis_hi, unsigned char sjis_lo )
 {
-	unsigned char  kuten_hi = sjis_hi - 0x81;
-	unsigned short kuten_lo = sjis_lo - 0x40;
+	unsigned char kuten_hi = sjis_hi - 0x81;
+	unsigned int  kuten_lo = sjis_lo - 0x40;
 	
 	if( sjis_hi > 0x9F ) kuten_hi -= 0x40;
 	if( sjis_lo > 0x7E ) kuten_lo--;
@@ -36,22 +36,25 @@ static unsigned short pb_get_glyph_index_by_sjis( unsigned char sjis_hi, unsigne
 
 int pbPrint( int x, int y, unsigned int fg, unsigned int bg, const char *str )
 {
+	PbColor        *pc, f_pc, b_pc;
 	uintptr_t      start_addr, put_addr;
 	unsigned int   i, glyph_index;
+	unsigned int   glyph_x, glyph_y;
 	const char     *glyph;
 	unsigned char  glyph_line_data, chr_width, chr_width_bytes;
-	unsigned short glyph_x, glyph_y;
-	unsigned int   color;
 	
 	if( __pb_internal_params.options & PB_NO_DRAW ) return 0;
+	
+	pbColorParse8888( &f_pc, fg );
+	pbColorParse8888( &b_pc, bg );
 	
 #ifndef PB_SJIS_SUPPORT
 	chr_width       = PB_CHAR_WIDTH;
 	chr_width_bytes = PB_CHAR_WIDTH * __pb_internal_params.draw->pixelSize;
 #endif
 	
-	start_addr      = (uintptr_t)__pb_buf_addr( __pb_internal_params.draw, x, y );
-	put_addr        = start_addr;
+	start_addr = (uintptr_t)__pb_buf_addr( __pb_internal_params.draw, x, y );
+	put_addr   = start_addr;
 	for( i = 0; str[i]; i++ ){
 		if( (unsigned char)str[i] == '\n' ){
 			start_addr += __pb_internal_params.draw->pixelSize * __pb_internal_params.draw->width * PB_CHAR_HEIGHT;
@@ -89,8 +92,13 @@ int pbPrint( int x, int y, unsigned int fg, unsigned int bg, const char *str )
 		for( glyph_y = 0; glyph_y < PB_CHAR_HEIGHT; glyph_y++, put_addr += __pb_internal_params.draw->lineSize - chr_width_bytes ){
 			glyph_line_data = glyph[glyph_y];
 			for( glyph_x = 0; glyph_x < chr_width; glyph_x++, glyph_line_data <<= 1, put_addr += __pb_internal_params.draw->pixelSize ){
-				color = glyph_line_data & 0x80 ? fg : bg;
-				if( color != PB_TRANSPARENT ) PB_PUT_PIXEL( put_addr, color );
+				pc = NULL;
+				if( glyph_line_data & 0x80 ){
+					if( fg != PB_TRANSPARENT ) pc = &f_pc;
+				} else{
+					if( bg != PB_TRANSPARENT ) pc = &b_pc;
+				}
+				if( pc ) PB_PUT_PIXEL( put_addr, pc );
 			}
 		}
 		put_addr -= __pb_internal_params.draw->pixelSize * __pb_internal_params.draw->width * PB_CHAR_HEIGHT - chr_width_bytes;

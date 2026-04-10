@@ -4,5 +4,5 @@
 
 char *dirhGetCwd( DirhUID uid )
 {
-	return ((struct dirh_params *)uid)->cwd.path;
+	return ((struct dirh_params *)uid)->data.cwd.path;
 }

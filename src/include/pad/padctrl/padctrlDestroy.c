@@ -4,5 +4,5 @@
 
 void padctrlDestroy( PadctrlUID uid )
 {
-	if( uid ) memoryFree( (void *)uid );
+	memoryFree( (void *)uid );
 }

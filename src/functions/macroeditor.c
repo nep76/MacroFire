@@ -53,12 +53,12 @@ struct macroeditor_params {
 /*=========================================================
 	ローカル関数
 =========================================================*/
-static bool macroeditor_ctrl_edit_analog_x( MfMessage message, const char *label, void *var, void *pref, void *ex );
-static bool macroeditor_ctrl_edit_analog_y( MfMessage message, const char *label, void *var, void *pref, void *ex );
-static bool macroeditor_ctrl_edit_rapid_pd( MfMessage message, const char *label, void *var, void *pref, void *ex );
-static bool macroeditor_ctrl_edit_rapid_rd( MfMessage message, const char *label, void *var, void *pref, void *ex );
-static bool macroeditor_ctrl_set_buttons( MfMessage message, const char *label, void *var, void *pref, void *ex );
-static bool macroeditor_ctrl_set_type( MfMessage message, const char *label, void *var, void *pref, void *ex );
+static int macroeditor_ctrl_edit_analog_x( MfMessage message, const char *label, void *var, void *pref, void *ex );
+static int macroeditor_ctrl_edit_analog_y( MfMessage message, const char *label, void *var, void *pref, void *ex );
+static int macroeditor_ctrl_edit_rapid_pd( MfMessage message, const char *label, void *var, void *pref, void *ex );
+static int macroeditor_ctrl_edit_rapid_rd( MfMessage message, const char *label, void *var, void *pref, void *ex );
+static int macroeditor_ctrl_set_buttons( MfMessage message, const char *label, void *var, void *pref, void *ex );
+static int macroeditor_ctrl_set_type( MfMessage message, const char *label, void *var, void *pref, void *ex );
 
 /*=========================================================
 	ローカル変数
@@ -74,7 +74,7 @@ bool macroeditorInit( MacromgrUID uid )
 	
 	if( ! uid ) return false;
 	
-	st_params = memoryExalloc( "MacroFireMacroeditor", MEMORY_USER, 0, sizeof( struct macroeditor_params ), PSP_SMEM_High, NULL );
+	st_params = mfMenuMemoryAlloc( sizeof( struct macroeditor_params ) );
 	if( ! st_params ) return false;
 	
 	st_params->macro       = uid;
@@ -138,9 +138,9 @@ bool macroeditorMain( MfMessage message ) /* メニューメッセージが来る */
 	MacromgrAction  action;
 	uint64_t data, sub;
 	
-	unsigned int   line_number = 0;
-	unsigned short line_coord = 0;
-	unsigned short rest_lines, offset;
+	unsigned int line_number = 0;
+	unsigned int line_coord = 0;
+	unsigned int rest_lines, offset;
 	
 	unsigned int text_color, guide_color;
 	
@@ -225,11 +225,11 @@ bool macroeditorMain( MfMessage message ) /* メニューメッセージが来る */
 	
 	if( nowedit ){
 		if( st_params->menu.tables ){
-			if( mfMenuDrawTable( st_params->menu.tables, MF_MENU_NO_OPTIONS ) ){
-				return true;
-			} else{
+			if( mfMenuDrawTable( st_params->menu.tables, MF_MENU_NO_OPTIONS ) != MF_MENU_OK ){
 				mfMenuDestroyTables( st_params->menu.tables );
 				st_params->menu.tables = NULL;
+			} else{
+				return true;
 			}
 		}
 	} else{
@@ -333,7 +333,7 @@ bool macroeditorMain( MfMessage message ) /* メニューメッセージが来る */
 /*-----------------------------------------------
 	コントロール
 -----------------------------------------------*/
-static bool macroeditor_ctrl_edit_analog_x( MfMessage message, const char *label, void *var, void *pref, void *ex )
+static int macroeditor_ctrl_edit_analog_x( MfMessage message, const char *label, void *var, void *pref, void *ex )
 {
 	if( message & MF_CM_INFO ){
 		mfMenuSetInfoText( MF_MENU_INFOTEXT_COMMON_CTRL | MF_MENU_INFOTEXT_SET_LOWER_LINE, "(%s)%s", mfMenuAcceptSymbol(), MF_STR_MACROEDITOR_CTRL_EDIT );
@@ -347,12 +347,12 @@ static bool macroeditor_ctrl_edit_analog_x( MfMessage message, const char *label
 		dbgprintf( "%X: %d, %d", message, ((struct macroeditor_command_data *)var)->temp, MACROMGR_GET_ANALOG_Y( ((struct macroeditor_command_data *)var)->data ) );
 		((struct macroeditor_command_data *)var)->data = MACROMGR_SET_ANALOG_XY( ((struct macroeditor_command_data *)var)->temp, MACROMGR_GET_ANALOG_Y( ((struct macroeditor_command_data *)var)->data ) );
 		mfMenuSendSignal( MACROEDITOR_SIG_UPDATE_CMD );
-		return false;
+		mfMenuBack();
 	}
-	return true;
+	return CG_OK;
 }
 
-static bool macroeditor_ctrl_edit_analog_y( MfMessage message, const char *label, void *var, void *pref, void *ex )
+static int macroeditor_ctrl_edit_analog_y( MfMessage message, const char *label, void *var, void *pref, void *ex )
 {
 	if( message & MF_CM_INFO ){
 		mfMenuSetInfoText( MF_MENU_INFOTEXT_COMMON_CTRL | MF_MENU_INFOTEXT_SET_LOWER_LINE, "(%s)%s", mfMenuAcceptSymbol(), MF_STR_MACROEDITOR_CTRL_EDIT );
@@ -365,13 +365,13 @@ static bool macroeditor_ctrl_edit_analog_y( MfMessage message, const char *label
 	} else if( message & MF_CM_CONTINUE ){
 		((struct macroeditor_command_data *)var)->data = MACROMGR_SET_ANALOG_XY( MACROMGR_GET_ANALOG_X( ((struct macroeditor_command_data *)var)->data ), ((struct macroeditor_command_data *)var)->temp );
 		mfMenuSendSignal( MACROEDITOR_SIG_UPDATE_CMD );
-		return false;
+		mfMenuBack();
 	}
-	return true;
+	return CG_OK;
 }
 
 
-static bool macroeditor_ctrl_edit_rapid_pd( MfMessage message, const char *label, void *var, void *pref, void *ex )
+static int macroeditor_ctrl_edit_rapid_pd( MfMessage message, const char *label, void *var, void *pref, void *ex )
 {
 	if( message & MF_CM_INFO ){
 		mfMenuSetInfoText( MF_MENU_INFOTEXT_COMMON_CTRL | MF_MENU_INFOTEXT_SET_LOWER_LINE, "(%s)%s", mfMenuAcceptSymbol(), MF_STR_MACROEDITOR_CTRL_EDIT );
@@ -384,13 +384,13 @@ static bool macroeditor_ctrl_edit_rapid_pd( MfMessage message, const char *label
 	} else if( message & MF_CM_CONTINUE ){
 		((struct macroeditor_command_data *)var)->sub = MACROMGR_SET_RAPIDDELAY( ((struct macroeditor_command_data *)var)->temp, MACROMGR_GET_RAPIDRDELAY( ((struct macroeditor_command_data *)var)->sub ) );
 		mfMenuSendSignal( MACROEDITOR_SIG_UPDATE_CMD );
-		return false;
+		mfMenuBack();
 	}
-	return true;
+	return CG_OK;
 }
 
 
-static bool macroeditor_ctrl_edit_rapid_rd( MfMessage message, const char *label, void *var, void *pref, void *ex )
+static int macroeditor_ctrl_edit_rapid_rd( MfMessage message, const char *label, void *var, void *pref, void *ex )
 {
 	if( message & MF_CM_INFO ){
 		mfMenuSetInfoText( MF_MENU_INFOTEXT_COMMON_CTRL | MF_MENU_INFOTEXT_SET_LOWER_LINE, "(%s)%s", mfMenuAcceptSymbol(), MF_STR_MACROEDITOR_CTRL_EDIT );
@@ -403,22 +403,23 @@ static bool macroeditor_ctrl_edit_rapid_rd( MfMessage message, const char *label
 	} else if( message & MF_CM_CONTINUE ){
 		((struct macroeditor_command_data *)var)->sub = MACROMGR_SET_RAPIDDELAY( MACROMGR_GET_RAPIDPDELAY( ((struct macroeditor_command_data *)var)->sub ), ((struct macroeditor_command_data *)var)->temp );
 		mfMenuSendSignal( MACROEDITOR_SIG_UPDATE_CMD );
-		return false;
+		mfMenuBack();
 	}
-	return true;
+	return CG_OK;
 }
 
-static bool macroeditor_ctrl_set_buttons( MfMessage message, const char *label, void *var, void *pref, void *ex )
+static int macroeditor_ctrl_set_buttons( MfMessage message, const char *label, void *var, void *pref, void *ex )
 {
 	if( message & MF_CM_CONTINUE ){
 		mfMenuSendSignal( MACROEDITOR_SIG_UPDATE_CMD );
-		return false;
+		mfMenuBack();
+		return CG_OK;
 	} else{
 		return mfCtrlDefGetButtons( message, label, var, pref, ex );
 	}
 }
 
-static bool macroeditor_ctrl_set_type( MfMessage message, const char *label, void *var, void *pref, void *ex )
+static int macroeditor_ctrl_set_type( MfMessage message, const char *label, void *var, void *pref, void *ex )
 {
 	if( message & MF_CM_INFO ){
 		mfMenuSetInfoText( MF_MENU_INFOTEXT_COMMON_CTRL | MF_MENU_INFOTEXT_SET_LOWER_LINE, "(%s)%s", mfMenuAcceptSymbol(), MF_STR_MACROEDITOR_CTRL_CHANGE );
@@ -437,8 +438,8 @@ static bool macroeditor_ctrl_set_type( MfMessage message, const char *label, voi
 				}
 				mfMenuSendSignal( MACROEDITOR_SIG_UPDATE_CMD );
 			}
-			return false;
+			mfMenuBack();
 		}
 	}
-	return true;
+	return CG_OK;
 }

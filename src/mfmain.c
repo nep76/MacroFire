@@ -28,12 +28,11 @@ static void mf_shutdown( void );
 static void mf_get_gameid( SceUID fd, char *gameid, unsigned char *buf );
 static void mf_get_gameid_from_sha1hash( SceUID fd, char *gameid );
 static void mf_ini( const char *path );
-static void mf_ready( void );
+static void mf_ready( const char *cwd );
 static void mf_find_hook_address( void );
 static void mf_sending_toggle_message( bool engine );
-const char *mf_ini_find_loaded_section( IniUID ini, MfWorldId world, const char *game_id );
-static void mf_ini_load( IniUID ini );
-static void mf_ini_save( IniUID ini );
+static void mf_ini_load( InimgrUID ini );
+static void mf_ini_save( InimgrUID ini );
 static int mf_get_current_ctrl( SceCtrlData *pad, MfHprmKey *hk );
 static unsigned int mf_syscon_peek_dword( uint8_t *addr );
 static void mf_syscon_poke_dword( uint8_t *addr, unsigned int data );
@@ -43,7 +42,7 @@ static void mf_syscon_handler_transmit( SceSysconPacket *packet );
 static void mf_syscon_handler_recieve( SceSysconPacket *packet );
 static void mf_syscon_handler_handler4( SceSysconPacket *packet );
 #ifdef DEBUG
-static void mf_syscom_dump_paket( SceSysconPacket *packet );
+static void mf_syscom_dump_packet( SceSysconPacket *packet );
 #endif
 static unsigned int mf_conv_buttons_syscon_to_psp( unsigned int sysconbuttons );
 static unsigned int mf_conv_buttons_psp_to_syscon( unsigned int buttons );
@@ -53,7 +52,7 @@ static void mf_call_functions( MfHookAction action, SceCtrlData *pad, MfHprmKey 
 	ローカル変数
 =========================================================*/
 static char st_game_id[10];
-static const char *st_ini_loaded_section;
+static const char *st_ini_sections[3];
 
 static bool         st_hooked       = false;
 static MfWorldId    st_world        = 0;
@@ -84,40 +83,40 @@ static SceSysconDebugHandlers st_syscon_handlers = {
 int gDebug[10];
 #endif
 
+SceUID st_thid;
+
 /*-----------------------------------------------
 	MacroFireの初期化と終了
 -----------------------------------------------*/
 static bool mf_init( void )
 {
-	int i;
-	MfFuncInit initfunc;
 	unsigned char buf[] ={ 0, 0, 0, 0 };
 	const char *executable = sceKernelInitFileName();
+	
+	st_ini_sections[2] = MF_INI_SECTION_DEFAULT;
 	
 	/* 最初に行う */
 	dbgprintf( "Initializing menu");
 	if( ! mfMenuInit() ) gRunning = false;
 	
-		/* 実行環境取得 */
+	/* 実行環境取得 */
 	switch( sceKernelInitKeyConfig() ){
 		case PSP_INIT_KEYCONFIG_VSH:  
 			st_world = MF_WORLD_VSH;
-			strutilCopy( st_game_id, MF_INI_SECTION_VSH, sizeof( st_game_id ) );
+			st_ini_sections[1] = MF_INI_SECTION_VSH;
 			break;
 		case PSP_INIT_KEYCONFIG_POPS: 
 			st_world = MF_WORLD_POPS;
-			strutilCopy( st_game_id, MF_INI_SECTION_POPS, sizeof( st_game_id ) );
+			st_ini_sections[1] = MF_INI_SECTION_POPS;
 			break;
 		case PSP_INIT_KEYCONFIG_GAME: 
 			st_world = MF_WORLD_GAME;
-			strutilCopy( st_game_id, MF_INI_SECTION_GAME, sizeof( st_game_id ) );
+			st_ini_sections[1] = MF_INI_SECTION_GAME;
 			break;
 	}
 	
 	/* ゲームIDを取得 */
-	if( st_world == MF_WORLD_VSH ){
-		strutilCopy( st_game_id, MF_INI_SECTION_VSH, 10 );
-	} else if( st_world == MF_WORLD_GAME && sceKernelBootFrom() == PSP_BOOT_DISC && sceKernelInitApitype() != PSP_INIT_APITYPE_DISC_UPDATER  ){
+	if( st_world == MF_WORLD_GAME && sceKernelBootFrom() == PSP_BOOT_DISC && sceKernelInitApitype() != PSP_INIT_APITYPE_DISC_UPDATER  ){
 		SceUID sfo;
 		
 		/* UMDをdisc0:へマウント */
@@ -127,7 +126,7 @@ static bool mf_init( void )
 		sceUmdWaitDriveStat( UMD_WAITFORINIT );
 		
 		sfo = sceIoOpen( "disc0:/PSP_GAME/PARAM.SFO", PSP_O_RDONLY, 0777 ); 
-		if( ! ( sfo < 0 ) ){
+		if( CG_IS_VALID_UID( sfo ) ){
 			mf_get_gameid( sfo, st_game_id, buf );
 			sceIoClose( sfo );
 		}
@@ -136,7 +135,7 @@ static bool mf_init( void )
 		sceUmdDeactivate( 1, "disc0:" );
 	} else if( st_world == MF_WORLD_POPS ){
 		SceUID pbp = sceIoOpen( executable, PSP_O_RDONLY, 0777 ); 
-		if( ! ( pbp < 0 ) ){
+		if( CG_IS_VALID_UID( pbp ) ){
 			sceIoLseek( pbp, MF_EBOOTPBP_OFFSET_TO_PARAMSFO, PSP_SEEK_SET );
 			sceIoRead( pbp, buf, 4 );
 			sceIoLseek( pbp, *((unsigned int *)buf), PSP_SEEK_SET );
@@ -145,22 +144,16 @@ static bool mf_init( void )
 		}
 	} else if( st_world != MF_WORLD_VSH && executable ){
 		SceUID pbp = sceIoOpen( executable, PSP_O_RDONLY, 0777 );
-		if( ! ( pbp < 0 ) ){
+		if( CG_IS_VALID_UID( pbp ) ){
 			mf_get_gameid_from_sha1hash( pbp, st_game_id );
 			sceIoClose( pbp );
 		}
 	}
 	
-	/* ファンクションの初期化 */
-	dbgprint( "Sending message MF_MS_INIT to all functions..." );
-	
-	mfAnalogStickInit();
-	
-	for( i = 0; i < gMftabEntryCount; i++ ){
-		if( gMftab[i].proc ){
-			initfunc = ( gMftab[i].proc )( MF_MS_INIT );
-			if( initfunc ) initfunc();
-		}
+	if( *st_game_id != '\0' ){
+		st_ini_sections[0] = st_game_id;
+	} else{
+		strutilCopy( st_game_id, st_ini_sections[1], sizeof( st_game_id ) );
 	}
 	
 	return true;
@@ -202,9 +195,8 @@ static void mf_get_gameid_from_sha1hash( SceUID fd, char *gameid )
 	while( ( readbytes = sceIoRead( fd, buf, sizeof( buf ) ) ) )
 		sceKernelUtilsSha1BlockUpdate( &ctx, buf, readbytes );
 	
-	if( sceKernelUtilsSha1BlockResult( &ctx, digest ) < 0 ) return;
+	if( CG_IS_ERROR( sceKernelUtilsSha1BlockResult( &ctx, digest ) ) ) return;
 	snprintf( gameid, 10, "%08X", (digest[3]) | (digest[2]) << 8 | (digest[1]) << 16 | (digest[0]) << 24 ); 
-
 }
 
 static void mf_get_gameid( SceUID fd, char *gameid, unsigned char *buf )
@@ -277,12 +269,12 @@ static void mf_syscon_handler_recieve( SceSysconPacket *packet )
 	) return;
 	
 	syscon_pad.Buttons = mf_conv_buttons_syscon_to_psp( mf_syscon_peek_dword( packet->rx_data ) );
-	if( packet->rx_response == 0x08 ){
-		syscon_pad.Lx      = packet->rx_data[4];
-		syscon_pad.Ly      = packet->rx_data[5];
+	if( packet->rx_response == SCE_SYSCON_CMD_GET_CONTROLLER_ANALOG ){
+		syscon_pad.Lx = packet->rx_data[4];
+		syscon_pad.Ly = packet->rx_data[5];
 	} else{
-		syscon_pad.Lx      = PADUTIL_CENTER_X;
-		syscon_pad.Ly      = PADUTIL_CENTER_Y;
+		syscon_pad.Lx = PADUTIL_CENTER_X;
+		syscon_pad.Ly = PADUTIL_CENTER_Y;
 	}
 	
 	sceHprmPeekCurrentKey( &syscon_hk );
@@ -290,28 +282,25 @@ static void mf_syscon_handler_recieve( SceSysconPacket *packet )
 	st_raw_pad = syscon_pad;
 	st_raw_hk  = syscon_hk;
 	
-	if( ! st_hooked ) goto NEXT_HANDLER;
-	
-	/*
-		mfAnalogStickAdjustが内部でコールするpadutilAdjustAnalogStickで
-		float型の演算をするとなぜか落ちる。
-	*/
-	mf_call_functions( MF_UPDATE, &syscon_pad, &syscon_hk );
-	
-	mf_syscon_poke_dword( packet->rx_data, mf_conv_buttons_psp_to_syscon( syscon_pad.Buttons ) | ( mf_syscon_peek_dword( packet->rx_data ) & SCE_SYSCON_CTRL_UNK_BUTTONS ) );
-	if( packet->rx_response == 0x08 ){
-		packet->rx_data[4] = syscon_pad.Lx;
-		packet->rx_data[5] = syscon_pad.Ly;
-		packet->rx_data[6] = mf_syscon_make_rx_checksum( packet );
-	} else{
-		packet->rx_data[4] = mf_syscon_make_rx_checksum( packet );
+	if( st_hooked ){
+		/*
+			mfAnalogStickAdjustが内部でコールするpadutilAdjustAnalogStickで
+			float型の演算をするとなぜか落ちる。
+		*/
+		mf_call_functions( MF_UPDATE, &syscon_pad, &syscon_hk );
+		
+		mf_syscon_poke_dword( packet->rx_data, mf_conv_buttons_psp_to_syscon( syscon_pad.Buttons ) | ( mf_syscon_peek_dword( packet->rx_data ) & SCE_SYSCON_CTRL_UNK_BUTTONS ) );
+		if( packet->rx_response == SCE_SYSCON_CMD_GET_CONTROLLER_ANALOG ){
+			packet->rx_data[4] = syscon_pad.Lx;
+			packet->rx_data[5] = syscon_pad.Ly;
+			packet->rx_data[6] = mf_syscon_make_rx_checksum( packet );
+		} else{
+			packet->rx_data[4] = mf_syscon_make_rx_checksum( packet );
+		}
 	}
 	
-	goto NEXT_HANDLER;
-	
-	NEXT_HANDLER:
-		/* 他からのデバッグハンドラが登録されていれば、それを呼ぶ */
-		if( st_syscon_chain_handlers && st_syscon_chain_handlers->after_rx ) ( st_syscon_chain_handlers->after_rx )( packet );
+	/* 他からのデバッグハンドラが登録されていれば、それを呼ぶ */
+	if( st_syscon_chain_handlers && st_syscon_chain_handlers->after_rx ) ( st_syscon_chain_handlers->after_rx )( packet );
 }
 
 static void mf_syscon_handler_handler4( SceSysconPacket *packet )
@@ -321,7 +310,7 @@ static void mf_syscon_handler_handler4( SceSysconPacket *packet )
 }
 
 #ifdef DEBUG
-static void mf_syscom_dump_paket( SceSysconPacket *packet ){
+static void mf_syscom_dump_packet( SceSysconPacket *packet ){
 	/* 
 		呼ぶ前にどこかで
 			pbInit();
@@ -330,7 +319,7 @@ static void mf_syscom_dump_paket( SceSysconPacket *packet ){
 		をしておく
 	*/
 	
-	unsigned short y = 1;
+	unsigned int y = 1;
 	pbPrintf( 10, pbOffsetLine( y++ ), 0xffffffff, 0xff000000, "?1: unk00  = %02X, %02X, %02X, %02X", packet->unk00[0], packet->unk00[1], packet->unk00[2], packet->unk00[3] );
 	pbPrintf( 10, pbOffsetLine( y++ ), 0xffffffff, 0xff000000, "?1: unk04  = %02X, %02X", packet->unk04[0], packet->unk04[1] );
 	pbPrintf( 10, pbOffsetLine( y++ ), 0xffffffff, 0xff000000, "?1: status = %02X", packet->status );
@@ -468,12 +457,40 @@ static unsigned int mf_conv_buttons_psp_to_syscon( unsigned int buttons )
 /*-----------------------------------------------
 	メインスレッド開始時に最初に呼ばれる。
 -----------------------------------------------*/
-static void mf_ready( void )
+static void mf_ready( const char *cwd )
 {
-	if( st_world == MF_WORLD_VSH ){
-		/* VshBridge_Driverを待つ */
-		while( sceKernelFindModuleByName( "sceVshBridge_Driver" ) == NULL ) sceKernelDelayThread( 2000000 );
+	int i;
+	MfFuncInit initfunc;
+	
+	/* ファンクションの初期化 */
+	dbgprint( "Sending message MF_MS_INIT to all functions..." );
+	
+	mfAnalogStickInit();
+	for( i = 0; i < gMftabEntryCount; i++ ){
+		if( gMftab[i].proc ){
+			initfunc = ( gMftab[i].proc )( MF_MS_INIT );
+			if( initfunc ) initfunc();
+		}
 	}
+	
+	/* 起動待ち (なんとかなくせないものか?) */
+	dbgprint( "Waiting for loading modules..." );
+	if( st_world == MF_WORLD_VSH ){
+		/* sceVshBridge_Driverを待つ */
+		while( sceKernelFindModuleByName( "sceVshBridge_Driver" ) == NULL )
+			sceKernelDelayThread( 2000000 );
+	} else if( st_world == MF_WORLD_POPS ){
+		while( sceKernelFindModuleByName( "scePops_Manager" ) == NULL && sceKernelFindModuleByName( "popsloader_trademark" ) == NULL )
+			sceKernelDelayThread( 2000000 );
+	} else{
+#ifdef DEBUG
+		if( sceKernelFindModuleByName( "PSPLINK" ) == NULL )
+#endif
+		sceKernelDelayThread( 12000000 );
+	}
+	
+	dbgprint( "Checking ini..." );
+	mf_ini( cwd );
 }
 
 /*-----------------------------------------------
@@ -496,28 +513,13 @@ static void mf_find_hook_address( void )
 	}
 }
 
-const char *mf_ini_find_loaded_section( IniUID ini, MfWorldId world, const char *game_id )
-{
-	const char *section = NULL;
-	
-	if( inimgrExistSection( ini, game_id ) ) return game_id;
-	
-	switch( world ){
-		case MF_WORLD_VSH:  section = MF_INI_SECTION_VSH;  break;
-		case MF_WORLD_GAME: section = MF_INI_SECTION_GAME; break;
-		case MF_WORLD_POPS: section = MF_INI_SECTION_POPS; break;
-	}
-	
-	return inimgrExistSection( ini, section ) ? section : MF_INI_SECTION_DEFAULT;
-}
-
 /*-----------------------------------------------
 	INIの読み込みと保存
 -----------------------------------------------*/
 static void mf_ini( const char *path )
 {
-	IniUID ini;
 	char inipath[MF_PATH_MAX];
+	InimgrUID ini;
 	
 	/* 設定ファイルのパスを決定 */
 	{
@@ -532,24 +534,21 @@ static void mf_ini( const char *path )
 		strcpy( delim + 1, MF_INI_FILENAME );
 	}
 	
-	st_ini_loaded_section = MF_INI_LOAD_FAILED;
-	
 	ini = inimgrNew();
-	if( ! ini ){
-		dbgprintf( "Failed to create IniUID: %x", ini );
-		return;
+	if( ini < CG_OK ){
+		dbgprintf( "Failed: %X", ini );
 	} else{
 		if( mfConvertButtonReady() ){
-			if( inimgrLoad( ini, inipath, NULL, 0, 0, 0 ) == 0 ){
-				dbgprintf( "%s found", inipath );
-				/* ロードに成功したので、ターゲットセクションが存在するかを確認 */
-				st_ini_loaded_section = mf_ini_find_loaded_section( ini, st_world, st_game_id );
+			dbgprintf( "Open %s ...", inipath );
+			if( inimgrLoad( ini, inipath, NULL, 0 ) == CG_OK ){
+				dbgprint( "LOAD mode" );
 				mf_ini_load( ini );
 			} else{
-				dbgprintf( "%s not found", inipath );
+				dbgprint( "SAVE mode" );
 				mf_ini_save( ini );
-				if( inimgrSave( ini, inipath, NULL, 0, 0, 0 ) == 0 ){
-					st_ini_loaded_section = MF_INI_SECTION_DEFAULT;
+				if( inimgrSave( ini, inipath, NULL, 0 ) != CG_OK ){
+					strutilCopy( st_game_id, MF_INI_LOAD_FAILED, sizeof( st_game_id ) );
+					dbgprint( "Failed to save" );
 				}
 			}
 			mfConvertButtonFinish();
@@ -558,18 +557,22 @@ static void mf_ini( const char *path )
 	}
 }
 
-static void mf_ini_load( IniUID ini )
+static void mf_ini_load( InimgrUID ini )
 {
 	int i;
 	char buf[255];
-	const char *section = st_ini_loaded_section;
 	MfFuncIni inifunc;
 	
+	/* 必要なセクションをロード */
+	for( i = 0; i < sizeof( st_ini_sections ) >> 2; i++ ){
+		if( st_ini_sections[i] ) inimgrLoadSection( ini, st_ini_sections[i] );
+	}
+	
 	/* 設定値をロード */
-	inimgrGetBool( ini, section, "Startup", &st_is_enabled );
-	if( inimgrGetString( ini, section, "MenuButtons", buf, sizeof( buf ) ) > 0 )   st_menu_buttons = mfConvertButtonN2C( buf );
-	if( inimgrGetString( ini, section, "ToggleButtons", buf, sizeof( buf ) ) > 0 ) st_toggle_buttons = mfConvertButtonN2C( buf );
-	inimgrGetBool( ini, section, "StatusNotification", &st_status_notification );
+	mfIniGetBool( ini, "Startup", &st_is_enabled );
+	if( mfIniGetString( ini, "MenuButtons", buf, sizeof( buf ) ) == CG_OK )   st_menu_buttons = mfConvertButtonN2C( buf );
+	if( mfIniGetString( ini, "ToggleButtons", buf, sizeof( buf ) ) == CG_OK ) st_toggle_buttons = mfConvertButtonN2C( buf );
+	mfIniGetBool( ini, "StatusNotification", &st_status_notification );
 	
 	mfAnalogStickIniLoad( ini, buf, sizeof( buf ) );
 	mfMenuIniLoad( ini, buf, sizeof( buf ) );
@@ -583,11 +586,14 @@ static void mf_ini_load( IniUID ini )
 	}
 }
 
-static void mf_ini_save( IniUID ini )
+static void mf_ini_save( InimgrUID ini )
 {
 	int i;
 	char buf[255];
 	MfFuncIni inifunc;
+	
+	/* デフォルトセクションを作成 */
+	inimgrAddSection( ini, MF_INI_SECTION_DEFAULT );
 	
 	inimgrSetBool( ini, MF_INI_SECTION_DEFAULT, "Startup", st_is_enabled );
 	
@@ -633,8 +639,6 @@ static void mf_call_functions( MfHookAction action, SceCtrlData *pad, MfHprmKey 
 	/* アナログスティック調整 */
 	mfAnalogStickAdjust( pad );
 	
-	mfRapidfireReset();
-	
 	for( i = 0; i < gMftabEntryCount; i++ ){
 		if( gMftab[i].proc ){
 			hookfunc = ( gMftab[i].proc )( MF_MS_HOOK );
@@ -672,8 +676,8 @@ static int mf_main( SceSize arglen, void *argp )
 	bool wait_toggle_buttons_release = false;
 	PadutilButtons buttons;
 	
-	mf_ready();
-	
+	mf_ready( argp );
+
 	mf_find_hook_address();
 	
 	if( st_status_notification ) mfNotificationStart();
@@ -750,7 +754,6 @@ void mfHook( void )
 	if( st_hooked ) return;
 	
 	dbgprint( "Hooking API" );
-	
 	
 	for( i = 0; i < hooktableEntryCount; i++ ){
 		dbgprintf( "Hooking %p -> %p", hooktable[i].restore.addr, hooktable[i].hook );
@@ -908,11 +911,6 @@ const char *mfGetGameId()
 	return st_game_id;
 }
 
-const char *mfGetIniSection( void )
-{
-	return st_ini_loaded_section;
-}
-
 unsigned int mfGetWorld( void )
 {
 	return st_world;
@@ -932,18 +930,10 @@ bool mfIsRunningApp( MfAppId app )
 
 int mfNotificationStart( void )
 {
-	SceUID msg_thid;
-	
 	st_ovmsg = ovmsgInit();
 	if( st_ovmsg < 0 ) return st_ovmsg;
 	
-	msg_thid = sceKernelCreateThread( "MacroFireNotification", ovmsgMain, 16, 0x300, 0, 0 );
-	if( msg_thid > 0 ){
-		sceKernelStartThread( msg_thid, sizeof( OvmsgUID* ), &st_ovmsg );
-		return 0;
-	} else{
-		return msg_thid;
-	}
+	return ovmsgStart( st_ovmsg, "MacroFireNotifier", 16 );
 }
 
 void mfNotificationShutdownStart( void )
@@ -972,6 +962,33 @@ bool mfNotificationPrintf( const char *format, ... )
 	ret = ovmsgVprintf( st_ovmsg, format, ap );
 	va_end( ap );
 	
+	return ret;
+}
+
+int mfIniGetInt( InimgrUID ini, const char *key, int *data )
+{
+	int i, ret = -1;
+	for( i = 0; i < sizeof( st_ini_sections ) >> 2; i++ ){
+		if( st_ini_sections[i] && ( ( ret = inimgrGetInt( ini, st_ini_sections[i], key, data ) ) == CG_OK ) ) return CG_OK;
+	}
+	return ret;
+}
+
+int mfIniGetString( InimgrUID ini, const char *key, char *buf, size_t buflen )
+{
+	int i, ret = -1;
+	for( i = 0; i < sizeof( st_ini_sections ) >> 2; i++ ){
+		if( st_ini_sections[i] && ( ( ret = inimgrGetString( ini, st_ini_sections[i], key, buf, buflen ) ) > 0 ) ) return CG_OK;
+	}
+	return ret;
+}
+
+int mfIniGetBool( InimgrUID ini, const char *key, bool *bl )
+{
+	int i, ret = -1;
+	for( i = 0; i < sizeof( st_ini_sections ) >> 2; i++ ){
+		if( st_ini_sections[i] && ( ( ret = inimgrGetBool( ini, st_ini_sections[i], key, bl ) ) == CG_OK ) ) return CG_OK;
+	}
 	return ret;
 }
 
@@ -1069,9 +1086,6 @@ int module_start( SceSize arglen, void *argp )
 	dbgprint( "Initializing" );
 	mf_init();
 	
-	dbgprint( "Checking ini" );
-	mf_ini( (const char *)argp );
-	
 	/*
 		MacroFireが起動される前に設定されているデバッグハンドラを外す。
 		vsh.txt/game.txt/pops.txtで後から起動されたプラグインの機能が生きた方がわかりやすいでしょう?
@@ -1095,7 +1109,7 @@ int module_start( SceSize arglen, void *argp )
 		
 		他からのデバッグハンドラを覚えておける数は1つだけ。
 		2つ以上覚えておくようにもできるが、解除に問題がある。
-		このAPIは、解除に必要な引数がNULLを渡すだけで、どのデバッグハンドラを解除しようとしているのかを特定できない。
+		このAPIは、解除に必要なステップが、引数がNULLを渡すだけで、どのデバッグハンドラを解除しようとしているのかを特定できない。
 	*/
 	
 	st_syscon_hook.restore.api = *(st_syscon_hook.restore.addr);
@@ -1106,6 +1120,15 @@ int module_start( SceSize arglen, void *argp )
 		mfMenuAddSysThreadId( thid );
 		sceKernelStartThread( thid, arglen, argp );
 	}
+	
+#ifdef MF_LOW_MEMORY_TEST
+	{
+		unsigned int allocsize = sceKernelMaxFreeMemSize() - MF_LOW_MEMORY_TEST;
+		SceUID muid = sceKernelAllocPartitionMemory( 2, "DummyBlock", PSP_SMEM_Low, allocsize, NULL );
+		dbgprintf( "Allocating dummy block: %d bytes: %X", allocsize, muid );
+		dbgprintf( "Free space: %d", sceKernelMaxFreeMemSize() );
+	}
+#endif
 	
 	return 0;
 }

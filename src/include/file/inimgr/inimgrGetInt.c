@@ -2,14 +2,14 @@
 
 #include "inimgr_types.h"
 
-bool inimgrGetInt( IniUID uid, const char *section, const char *key, int *var )
+int inimgrGetInt( InimgrUID uid, const char *name, const char *key, int *res )
 {
-	char *value = __inimgr_get_value( (struct inimgr_params *)uid, section, key );
+	int ret;
+	char *value;
 	
-	if( value ){
-		*var = strtol( value, NULL, 10 );
-		return true;
-	} else{
-		return false;
+	if( ( ret = __inimgr_get_value( (struct inimgr_params *)uid, name, key, &value ) ) == CG_ERROR_OK ){
+		*res = strtol( value, NULL, 10 );
 	}
+	
+	return ret;
 }

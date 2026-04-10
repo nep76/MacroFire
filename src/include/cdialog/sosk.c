@@ -18,7 +18,7 @@
 	ƒ[ƒJƒ‹ŠÖ”
 =========================================================*/
 static bool cdialog_sosk_select_next_table( unsigned int types, struct cdialog_sosk_work_chtab *chtab );
-static short cdialog_sosk_calc_height( unsigned int types );
+static int  cdialog_sosk_calc_height( unsigned int types );
 static void cdialog_sosk_draw( struct cdialog_dev_base_params *base, CdialogSoskData *data, struct cdialog_sosk_work *work );
 static void cdialog_sosk_input_char( struct cdialog_sosk_work_text *text, char chr, size_t len );
 static void cdialog_sosk_input_bs( struct cdialog_sosk_work_text *text );
@@ -87,7 +87,7 @@ CdialogResult cdialogSoskGetResult( void )
 	return st_params->base.result;
 }
 
-int cdialogSoskStart( unsigned short x, unsigned short y )
+int cdialogSoskStart( unsigned int x, unsigned int y )
 {
 	int ret;
 	
@@ -99,7 +99,7 @@ int cdialogSoskStart( unsigned short x, unsigned short y )
 	return ret;
 }
 
-int cdialogSoskStartNoLock( unsigned short x, unsigned short y )
+int cdialogSoskStartNoLock( unsigned int x, unsigned int y )
 {
 	int ret;
 	
@@ -302,8 +302,8 @@ void cdialogSoskDestroy( void )
 
 static bool cdialog_sosk_select_next_table( unsigned int types, struct cdialog_sosk_work_chtab *chtab )
 {
-	unsigned short index;
-	unsigned int   current_type;
+	unsigned int index;
+	unsigned int current_type;
 	
 	if( ! types ) return false;
 	
@@ -335,11 +335,11 @@ static bool cdialog_sosk_select_next_table( unsigned int types, struct cdialog_s
 	return true;
 }
 
-static short cdialog_sosk_calc_height( unsigned int types )
+static int cdialog_sosk_calc_height( unsigned int types )
 {
 	struct cdialog_sosk_work_chtab chtab;
 	CdialogSoskInputType type;
-	unsigned short height = 0, current_height;
+	unsigned int height = 0, current_height;
 	
 	cdialog_sosk_select_next_table( types, &chtab );
 	type = chtab.type;
@@ -361,9 +361,9 @@ static short cdialog_sosk_calc_height( unsigned int types )
 static void cdialog_sosk_draw( struct cdialog_dev_base_params *base, CdialogSoskData *data, struct cdialog_sosk_work *work )
 {
 	char textblock[CDIALOG_SOSK_INPUT_AREA_WIDTH + 1];
-	unsigned short i;
-	unsigned short kbx = 0, kby = 0;
-	unsigned short x = 0, y = 0;
+	unsigned int i;
+	unsigned int kbx = 0, kby = 0;
+	unsigned int x = 0, y = 0;
 	
 	strutilCopy( textblock, work->text.buf + work->text.offset, CDIALOG_SOSK_INPUT_AREA_WIDTH + 1 );
 	

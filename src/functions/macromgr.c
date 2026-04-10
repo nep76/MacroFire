@@ -24,7 +24,7 @@ struct macromgr_params {
 	ƒ[ƒJƒ‹ŠÖ”
 =========================================================*/
 static MacromgrCommand *macromgr_command_new( struct macromgr_params *params );
-static int macromgr_ini_parser( struct macromgr_params *params, InimgrCallbackParams *cbp, char *buf, size_t buflen, MacromgrCommand *macro );
+static int macromgr_ini_parser( struct macromgr_params *params, InimgrContext ctx, MacromgrCommand *macro );
 
 /*=========================================================
 	ŠÖ”
@@ -34,8 +34,8 @@ MacromgrUID macromgrNew( void )
 	DmemUID uid;
 	struct macromgr_params *params;
 	
-	uid = dmemNew( 0, PSP_SMEM_Low );
-	if( ! uid ) return 0;
+	uid = dmemNew( 0, MEMORY_USER, PSP_SMEM_Low );
+	if( ! CG_IS_VALID_UID( uid ) ) return 0;
 	
 	params = (struct macromgr_params *)dmemAlloc( uid, sizeof( struct macromgr_params ) );
 	if( ! params ) return 0;
@@ -49,7 +49,6 @@ MacromgrUID macromgrNew( void )
 void macromgrDestroy( MacromgrUID uid )
 {
 	macromgrClear( uid );
-	
 	dmemDestroy( ((struct macromgr_params*)uid)->dmem );
 }
 
@@ -179,16 +178,16 @@ void macromgrSetCommand( MacromgrCommand *macro, MacromgrAction action, Macromgr
 	macro->sub    = sub;
 }
 
-int macromgrLoader( InimgrCallbackMode mode, InimgrCallbackParams *cbp, char *buf, size_t buflen, void *arg )
+int macromgrLoader( InimgrContext ctx, void *arg )
 {
 	struct macromgr_params *params = *((struct macromgr_params **)arg);
 	
 	macromgrCreateRoot( (MacromgrUID)params );
 	
-	return macromgr_ini_parser( params, cbp, buf, buflen, params->macro );
+	return macromgr_ini_parser( params, ctx, params->macro );
 }
 
-int macromgrAppendLoader( InimgrCallbackMode mode, InimgrCallbackParams *cbp, char *buf, size_t buflen, void *arg )
+int macromgrAppendLoader( InimgrContext ctx, void *arg )
 {
 	struct macromgr_params *params = *((struct macromgr_params **)arg);
 	MacromgrCommand *lastmacro;
@@ -202,7 +201,7 @@ int macromgrAppendLoader( InimgrCallbackMode mode, InimgrCallbackParams *cbp, ch
 	if( lastmacro->next ){
 		lastmacro->next->prev = lastmacro;
 		lastmacro             = lastmacro->next;
-		ret = macromgr_ini_parser( params, cbp, buf, buflen, lastmacro );
+		ret = macromgr_ini_parser( params, ctx, lastmacro );
 	} else{
 		ret = CG_ERROR_NOT_ENOUGH_MEMORY;
 	}
@@ -210,11 +209,10 @@ int macromgrAppendLoader( InimgrCallbackMode mode, InimgrCallbackParams *cbp, ch
 	return ret;
 }
 
-int macromgrSaver( InimgrCallbackMode mode, InimgrCallbackParams *cbp, char *buf, size_t buflen, void *arg )
+int macromgrSaver( InimgrContext ctx, void *arg )
 {
 	struct macromgr_params *params = *((struct macromgr_params **)arg);
-	char buttons[128];
-	unsigned int len = 0;
+	char buf[128];
 	MacromgrCommand *cmd;
 	
 	if( ! mfConvertButtonReady() ) return CG_ERROR_NOT_ENOUGH_MEMORY;
@@ -223,35 +221,39 @@ int macromgrSaver( InimgrCallbackMode mode, InimgrCallbackParams *cbp, char *buf
 		switch( cmd->action ){
 			case MACROMGR_DELAY:
 				/* USE_KERNEL_LIBC ‚¾‚Æ %llu ‚ª‚È‚º‚Èí‚É0 */
-				len = snprintf( buf, buflen, "%s = %u", MACROMGR_INI_KEY_DELAY, (unsigned int)cmd->data );
+				snprintf( buf, sizeof( buf ), "%u", (unsigned int)cmd->data );
+				inimgrWriteEntry( ctx, MACROMGR_INI_KEY_DELAY, buf );
 				break;
 			case MACROMGR_BUTTONS_PRESS:
-				mfConvertButtonC2N( cmd->data, buttons, sizeof( buttons ) );
-				len = snprintf( buf, buflen, "%s = %s", MACROMGR_INI_KEY_BUTTONS_PRESS, buttons );
+				mfConvertButtonC2N( cmd->data, buf, sizeof( buf ) );
+				inimgrWriteEntry( ctx, MACROMGR_INI_KEY_BUTTONS_PRESS, buf );
 				break;
 			case MACROMGR_BUTTONS_RELEASE:
-				mfConvertButtonC2N( cmd->data, buttons, sizeof( buttons ) );
-				len = snprintf( buf, buflen, "%s = %s", MACROMGR_INI_KEY_BUTTONS_RELEASE, buttons );
+				mfConvertButtonC2N( cmd->data, buf, sizeof( buf ) );
+				inimgrWriteEntry( ctx, MACROMGR_INI_KEY_BUTTONS_RELEASE, buf );
 				break;
 			case MACROMGR_BUTTONS_CHANGE:
-				mfConvertButtonC2N( cmd->data, buttons, sizeof( buttons ) );
-				len = snprintf( buf, buflen, "%s = %s", MACROMGR_INI_KEY_BUTTONS_CHANGE, buttons );
+				mfConvertButtonC2N( cmd->data, buf, sizeof( buf ) );
+				inimgrWriteEntry( ctx, MACROMGR_INI_KEY_BUTTONS_CHANGE, buf );
 				break;
 			case MACROMGR_ANALOG_MOVE:
-				len = snprintf( buf, buflen, "%s = %d,%d", MACROMGR_INI_KEY_ANALOG_MOVE, MACROMGR_GET_ANALOG_X( cmd->data ), MACROMGR_GET_ANALOG_Y( cmd->data ) );
+				snprintf( buf,sizeof( buf ), "%d,%d", MACROMGR_GET_ANALOG_X( cmd->data ), MACROMGR_GET_ANALOG_Y( cmd->data ) );
+				inimgrWriteEntry( ctx, MACROMGR_INI_KEY_ANALOG_MOVE, buf );
 				break;
 			case MACROMGR_RAPIDFIRE_START:
-				mfConvertButtonC2N( cmd->data, buttons, sizeof( buttons ) );
-				len = snprintf( buf, buflen, "%s = %d,%d,%s", MACROMGR_INI_KEY_RAPIDFIRE_START, MACROMGR_GET_RAPIDPDELAY( cmd->sub ), MACROMGR_GET_RAPIDRDELAY( cmd->sub ), buttons );
+				{
+					size_t offset = snprintf( buf, sizeof( buf ), "%d,%d,", MACROMGR_GET_RAPIDPDELAY( cmd->sub ), MACROMGR_GET_RAPIDRDELAY( cmd->sub ) );
+					mfConvertButtonC2N( cmd->data, buf + offset, sizeof( buf ) - offset );
+					inimgrWriteEntry( ctx, MACROMGR_INI_KEY_RAPIDFIRE_START, buf );
+				}
 				break;
 			case MACROMGR_RAPIDFIRE_STOP:
-				mfConvertButtonC2N( cmd->data, buttons, sizeof( buttons ) );
-				len = snprintf( buf, buflen, "%s = %s", MACROMGR_INI_KEY_RAPIDFIRE_STOP, buttons );
+				mfConvertButtonC2N( cmd->data, buf, sizeof( buf ) );
+				inimgrWriteEntry( ctx, MACROMGR_INI_KEY_RAPIDFIRE_STOP, buf );
 				break;
 			default:
 				continue;
 		}
-		inimgrCbWriteln( cbp, buf, len );
 	}
 	
 	mfConvertButtonFinish();
@@ -284,17 +286,13 @@ static MacromgrCommand *macromgr_command_new( struct macromgr_params *params )
 	return newdata;
 }
 
-static int macromgr_ini_parser( struct macromgr_params *params, InimgrCallbackParams *cbp, char *buf, size_t buflen, MacromgrCommand *macro )
+static int macromgr_ini_parser( struct macromgr_params *params, InimgrContext ctx, MacromgrCommand *macro )
 {
 	char *key, *value;
 	
 	if( ! mfConvertButtonReady() ) return CG_ERROR_NOT_ENOUGH_MEMORY;
 	
-	while( inimgrCbReadln( cbp, buf, buflen ) ){
-		strutilRemoveChar( buf, "\x20\t" );
-		
-		if( ! inimgrParseEntry( buf, &key, &value ) ) continue;
-		
+	while( inimgrReadEntry( ctx, &key, &value ) ){
 		if( strcasecmp( key, MACROMGR_INI_KEY_DELAY ) == 0 ){
 			macro->action = MACROMGR_DELAY;
 			macro->data   = strtoul( value, NULL, 10 );
@@ -323,7 +321,7 @@ static int macromgr_ini_parser( struct macromgr_params *params, InimgrCallbackPa
 			macro->sub    = 0;
 		} else if( strcasecmp( key, MACROMGR_INI_KEY_RAPIDFIRE_START ) == 0 ){
 			unsigned int buttons;
-			unsigned short pd, rd;
+			unsigned int pd, rd;
 			char *token, *saveptr = NULL;
 			token = strtok_r( value, ",", &saveptr );
 			pd = token ? strtoul( token, NULL, 10 ) : MF_RAPIDFIRE_DEFAULT_PRESS_DELAY;

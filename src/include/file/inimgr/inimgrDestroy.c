@@ -2,12 +2,12 @@
 
 #include "inimgr_types.h"
 
-void inimgrDestroy( IniUID uid )
+int inimgrDestroy( InimgrUID uid )
 {
 	struct inimgr_params *params = (struct inimgr_params *)uid;
 	
-	if( ! params ) return;
-	
+	if( params->ini > 0 ) fiomgrClose( params->ini );
 	dmemDestroy( params->dmem );
+	
+	return CG_ERROR_OK;
 }
-

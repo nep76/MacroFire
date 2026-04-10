@@ -2,187 +2,105 @@
 
 #include "inimgr_types.h"
 
-static enum inimgr_line_type inimgr_parse_line( const char *line, char **start );
+static int inimgr_check_sigver( char *sigver_line, const char *sig, InimgrVersion reqver );
+static char *inimgr_line_is_section( char *line );
 
-int inimgrLoad( IniUID uid, const char *inipath, const char *sig, unsigned char major, unsigned char minor, unsigned char rev )
+int inimgrLoad( InimgrUID uid, const char *path, const char *sig, InimgrVersion version )
 {
-	FiomgrHandle fh;
-	int    ret = CG_ERROR_OK;
-	char   buf[INIMGR_ENTRY_BUFFER];
-	struct inimgr_callback_info *callback_info    = NULL;
-	struct inimgr_params        *params           = (struct inimgr_params *)uid;
-	struct inimgr_section       *current_section  = NULL;
-	struct inimgr_entry         *current_entry    = NULL;
-	struct inimgr_callback      *callback         = NULL;
+	struct inimgr_params  *params = (struct inimgr_params *)uid;
+	struct inimgr_section *current_section = params->section;
+	char *line_start;
 	
-	fh = fiomgrOpen( inipath, FH_O_RDONLY | FH_O_ALLOC_HIGH, 0777 );
-	if( fh < 0 ) return CG_ERROR_INVALID_ARGUMENT;
+	params->ini = fiomgrOpen( path, FH_O_RDWR | FH_O_ALLOC_HIGH, 0777 );
+	if( ! CG_IS_VALID_UID( params->ini ) ) return params->ini;
 	
-	/* シグネチャとバージョンをチェック */
 	if( sig ){
-		char *ini_version;
-		
-		if( strchr( sig, '\x20' ) ){
-			fiomgrClose( fh );
-			return CG_ERROR_INVALID_ARGUMENT;
+		int ret;
+		while( ( line_start = __inimgr_read_line( params->ini, params->buffer, sizeof( params->buffer ) ) ) ){
+			if( line_start && *line_start != ';' && *line_start != '\0' ) break;
 		}
 		
-		while( fiomgrReadln( fh, buf, sizeof( buf ) ) ){
-			if( buf[0] != ';' && buf[0] != '\0' ) break;
+		if( ( ret = inimgr_check_sigver( line_start, sig, version ) ) != CG_ERROR_OK ){
+			fiomgrClose( params->ini );
+			params->ini = 0;
+			return ret;
 		}
 		
-		ini_version = strchr( buf, '\x20' );
-		if( ini_version ){
-			*ini_version = '\0';
-			for( ini_version++; *ini_version != '\0' && ( *ini_version == '\x20' || *ini_version == '=' ); ini_version++ );
-		}
-		
-		/* シグネチャ比較 */
-		if( strcasecmp( sig, buf ) != 0 ) goto EXCEPTION_INVALID_SIGNATURE;
-		
-		if( major || minor || rev ){
-			char *tmp, *save_ptr;
-			unsigned char num;
-			
-			if( *ini_version == '\0' ) goto EXCEPTION_INVALID_VERSION;
-			
-			/* メジャー番号 */
-			tmp = strtok_r( ini_version, ".", &save_ptr );
-			num = (unsigned char)( tmp ? strtoul( tmp, NULL, 10 ) : 0 );
-			if( major > num ) goto EXCEPTION_INVALID_VERSION;
-			
-			/* マイナー番号 */
-			tmp = strtok_r( NULL, ".", &save_ptr );
-			num = (unsigned char)( tmp ? strtoul( tmp, NULL, 10 ) : 0 );
-			if( minor > num ) goto EXCEPTION_INVALID_VERSION;
-			
-			/* リビジョン番号 */
-			tmp = strtok_r( NULL, ".", &save_ptr );
-			num = (unsigned char)( tmp ? strtoul( tmp, NULL, 10 ) : 0 );
-			if( rev > num ) goto EXCEPTION_INVALID_VERSION;
+		/* セクション行の次の行がデフォルトセクションの開始位置 */
+		params->section->offsetStart = fiomgrTell( params->ini );
+	}
+	
+	/* 各セクションのオフセットと長さを取得 */
+	while( ( line_start = __inimgr_read_line( params->ini, params->buffer, sizeof( params->buffer ) ) ) ){
+		if( ( line_start = inimgr_line_is_section( line_start ) ) ){
+			current_section->next = __inimgr_create_section( params, line_start );
+			if( ! current_section->next ){
+				fiomgrClose( params->ini );
+				params->ini = 0;
+				return CG_ERROR_NOT_ENOUGH_MEMORY;
+			}
+			current_section->next->prev = current_section;
+			current_section->next->next = NULL;
+			current_section = current_section->next;
+			current_section->offsetStart = fiomgrTell( params->ini );
+		} else if( current_section ){
+			current_section->offsetEnd = fiomgrTell( params->ini );
 		}
 	}
 	
-	current_section = params->index;
+	params->last = params->section;
 	
-	/* データ読み込み */
-	while( fiomgrReadln( fh, buf, sizeof( buf ) ) ){
-		struct inimgr_section  *new_section;
-		struct inimgr_entry    *new_entry;
-		char *line_start = NULL, *key = NULL, *value = NULL;
-		
-		switch( inimgr_parse_line( buf, &line_start ) ){
-			case INIMGR_LINE_NULL:
-				break;
-			case INIMGR_LINE_SECTION:
-				if( callback_info ){
-					callback_info->length = ( fiomgrTell( fh ) - strlen( buf ) ) - callback_info->offset;
-					callback_info = NULL;
-				}
-				
-				if( ( callback = __inimgr_find_callback( params, line_start ) ) ){
-					if( ! callback->infoList ){
-						callback->infoList = dmemAlloc( params->dmem, sizeof( struct inimgr_callback_info ) );
-						callback_info = callback->infoList;
-					} else{
-						for( callback_info = callback->infoList; callback_info->next; callback_info = callback_info->next );
-						callback_info->next = dmemAlloc( params->dmem, sizeof( struct inimgr_callback_info ) );
-						callback_info = callback_info->next;
-					}
-					if( callback->cmplen >= 0 ){
-						callback_info->section = dmemAlloc( params->dmem, strlen( line_start ) + 1 );
-						strcpy( callback_info->section, line_start );
-					} else{
-						callback_info->section = NULL;
-					}
-					callback_info->offset = fiomgrTell( fh );
-					callback_info->length = 0;
-					callback_info->next   = NULL;
-				}
-				
-				new_section = __inimgr_create_section( params, line_start );
-				if( ! new_section ) goto EXCEPTION_NOT_ENOUGH_MEMORY;
-				
-				new_section->prev = current_section;
-				
-				current_entry = NULL;
-				current_section->next = new_section;
-				current_section = new_section;
-				
-				break;
-			case INIMGR_LINE_ENTRY:
-				if( callback_info || ! current_section || ! inimgrParseEntry( line_start, &key, &value ) ) break;
-				
-				new_entry = __inimgr_create_entry( params, key, value );
-				if( ! new_entry ) goto EXCEPTION_NOT_ENOUGH_MEMORY;
-				
-				new_entry->prev = current_entry;
-				if( current_entry ){
-					current_entry->next = new_entry;
-				} else{
-					current_section->entry = new_entry;
-				}
-				current_entry = new_entry;
-				
-				break;
-		}
-	}
-	if( callback_info ) callback_info->length = fiomgrTell( fh ) - callback_info->offset;
-	
-	/* コールバックセクションの処理 */
-	for( callback = params->callbacks; ret == CG_ERROR_OK && callback; callback = callback->next ){
-		InimgrCallbackParams cb_params;
-		
-		if( ! callback->cb ) continue;
-		
-		cb_params.uid    = uid;
-		cb_params.ini    = fh;
-		
-		for( callback_info = callback->infoList; callback_info; callback_info = callback_info->next ){
-			cb_params.cbinfo = callback_info;
-			
-			fiomgrSeek( fh, callback_info->offset, FH_SEEK_SET );
-			buf[0] = '\0';
-			
-			ret = ( (InimgrCallback)callback->cb )( INIMGR_CB_LOAD, &cb_params, buf, sizeof( buf ), callback->arg );
-		}
-	}
-	
-	fiomgrClose( fh );
-	
-	return ret;
-	
-	/* シグネチャ異常 */
-	EXCEPTION_INVALID_SIGNATURE:
-		fiomgrClose( fh );
-		return INIMGR_ERROR_INVALID_SIGNATURE;
-	
-	EXCEPTION_INVALID_VERSION:
-		fiomgrClose( fh );
-		return INIMGR_ERROR_INVALID_VERSION;
-	
-	/* メモリ不足の際に飛ばすgotoラベル */
-	EXCEPTION_NOT_ENOUGH_MEMORY:
-		fiomgrClose( fh );
-		return CG_ERROR_NOT_ENOUGH_MEMORY;
+	return CG_ERROR_OK;
 }
 
-static enum inimgr_line_type inimgr_parse_line( const char *line, char **start )
+static int inimgr_check_sigver( char *sigver_line, const char *sig, InimgrVersion reqver )
 {
-	char *end;
+	char *ver_start;
 	
-	*start = strutilCounterPbrk( line, "\t\x20" );
-	if( ! *start || **start == ';' ) return INIMGR_LINE_NULL;
+	if( sig[0] == '\0' || strchr( sig, '\x20' ) ) return CG_ERROR_INVALID_ARGUMENT;
 	
-	end = strutilCounterReversePbrk( *start, "\t\x20" );
-	
-	if( **start == '[' && *end == ']' ){
-		(*start)++;
-		*end = '\0';
-		return INIMGR_LINE_SECTION;
+	ver_start = strpbrk( sigver_line, "\x20\t" );
+	if( ver_start ){
+		*ver_start++ = '\0';
+		ver_start = strutilCounterPbrk( ver_start, "\x20\t" );
 	}
 	
-	*(end + 1) = '\0';
+	if( strcasecmp( sigver_line, sig ) != 0 ) return CG_ERROR_INI_SIGNATURE_MISMATCH;
 	
-	return INIMGR_LINE_ENTRY;
+	if( reqver ){
+		unsigned char major, minor, rev;
+		char *num, *saveptr;
+		
+		if( ! ver_start ) return CG_ERROR_INI_VERSION_NOT_SUPPORTED;
+		strutilTrim( ver_start, "\x20\t" );
+		
+		num = strtok_r( ver_start, ".", &saveptr );
+		if( num ){
+			major = (unsigned char)( num ? strtoul( num, NULL, 10 ) : 0 );
+			num   = strtok_r( NULL, ".", &saveptr );
+			minor = (unsigned char)( num ? strtoul( num, NULL, 10 ) : 0 );
+			num   = strtok_r( NULL, ".", &saveptr );
+			rev   = (unsigned char)( num ? strtoul( num, NULL, 10 ) : 0 );
+		} else{
+			major = (unsigned char)( num ? strtoul( ver_start, NULL, 10 ) : 0 );
+			minor = 0;
+			rev   = 0;
+		}
+		if( inimgrMakeVersion( major, minor, rev ) < reqver ) return CG_ERROR_INI_VERSION_NOT_SUPPORTED;
+	}
+	
+	return CG_ERROR_OK;
 }
+
+static char *inimgr_line_is_section( char *line )
+{
+	char *line_end;
+	if( *line == '[' && isalnum( *(line + 1) ) ){
+		if( ( line_end = strchr( line, ']' ) ) ){
+			*line_end = '\0';
+			return line + 1;
+		}
+	}
+	return NULL;
+}
+

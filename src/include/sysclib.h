@@ -13,6 +13,11 @@
 #ifndef PSP_SYSCLIB_H
 #define PSP_SYSCLIB_H
 
+#include <pspkerneltypes.h>
+
 char *strtok_r( char *str, const char *delim, char **save_ptr );
+
+/* ‹@”\‚µ‚Ä‚¢‚È‚¢ */
+int truncate( const char *path, SceOff length );
 
 #endif

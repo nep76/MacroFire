@@ -1,8 +1,9 @@
 /*=========================================================
 
 	mfrapidfire.h
+	場所: ./mfrapidfire
 
-	連射実装。
+	連射機能。
 
 =========================================================*/
 #ifndef MFRAPIDFIRE_H
@@ -33,7 +34,9 @@ typedef intptr_t MfRapidfireUID;
 typedef enum {
 	MF_RAPIDFIRE_MODE_NORMAL = 0,
 	MF_RAPIDFIRE_MODE_RAPID,
-	MF_RAPIDFIRE_MODE_HOLD
+	MF_RAPIDFIRE_MODE_AUTORAPID,
+	MF_RAPIDFIRE_MODE_HOLD,
+	MF_RAPIDFIRE_MODE_AUTOHOLD
 } MfRapidfireMode;
 
 typedef struct {
@@ -41,9 +44,8 @@ typedef struct {
 	MfRapidfireMode mode;         /* モード */
 	unsigned int    pressDelay;   /* 連射時のディレイ */
 	unsigned int    releaseDelay; /* 連射時のディレイ */
-	unsigned int    nextDelay;    /* 次のボタンアクションまでの待ち時間 */
-	bool            autorun;      /* ボタンが押下されていなくとも自動実行するかどうか */
-	unsigned int    bitFlags;     /* モードに応じて必要なフラグがセットされる */
+	unsigned int    nextDelay;    /* 次のボタンアクションまでの待ち時間 (内部で使用) */
+	unsigned int    bitFlags;     /* モードに応じて必要なフラグがセットされる (内部で使用) */
 } MfRapidfireData;
 
 typedef struct {
@@ -57,14 +59,18 @@ typedef struct {
 MfRapidfireUID mfRapidfireNew( void );
 void mfRapidfireDestroy( MfRapidfireUID uid );
 MfRapidfireUID mfRapidfireBind( MfRapidfireParams *params );
-void mfRapidfireSetRapid( MfRapidfireUID uid, unsigned int buttons, unsigned int pdelay, unsigned int rdelay, bool autorun );
-void mfRapidfireSetHold( MfRapidfireUID uid, unsigned int buttons, bool autorun );
-void mfRapidfireClear( MfRapidfireUID uid, unsigned int buttons );
-bool mfRapidfireGetEntry( MfRapidfireUID uid, enum PspCtrlButtons button, MfRapidfireMode *mode, unsigned int *pdelay, unsigned int *rdelay, bool *autorun );
-bool mfRapidfireReadEntry( MfRapidfireUID uid, unsigned int *button, MfRapidfireMode *mode, unsigned int *pdelay, unsigned int *rdelay, bool *autorun, unsigned short *save );
+void mfRapidfireSetMode( MfRapidfireUID uid, unsigned int buttons, MfRapidfireMode mode, unsigned int pdelay, unsigned rdelay );
+bool mfRapidfireGetEntry( MfRapidfireUID uid, MfRapidfireData *data, enum PspCtrlButtons button );
+bool mfRapidfireReadEntry( MfRapidfireUID uid, MfRapidfireData *data, unsigned int *save );
 void mfRapidfireExec( MfRapidfireUID uid, MfHookAction action, SceCtrlData *pad );
-void mfRapidfireReset( void );
-void mfRapidfireGetModeByName( const char *str, MfRapidfireMode *mode, bool *autorun );
-const char *mfRapidfireGetNameByMode( MfRapidfireMode mode, bool autorun );
+MfRapidfireMode mfRapidfireGetModeByName( const char *name );
+const char *mfRapidfireGetNameByMode( MfRapidfireMode mode );
+
+/* mfRapidfireSetMode()のマクロ */
+#define mfRapidfireRapid( uid, buttons, pd, rd )     mfRapidfireSetMode( uid, buttons, MF_RAPIDFIRE_MODE_RAPID, pd, rd )
+#define mfRapidfireAutoRapid( uid, buttons, pd, rd ) mfRapidfireSetMode( uid, buttons, MF_RAPIDFIRE_MODE_AUTORAPID, pd, rd )
+#define mfRapidfireHold( uid, buttons )              mfRapidfireSetMode( uid, buttons, MF_RAPIDFIRE_MODE_HOLD, 0, 0 )
+#define mfRapidfireAutoHold( uid, buttons )          mfRapidfireSetMode( uid, buttons, MF_RAPIDFIRE_MODE_AUTOHOLD, 0, 0 )
+#define mfRapidfireClear( uid, buttons )             mfRapidfireSetMode( uid, buttons, MF_RAPIDFIRE_MODE_NORMAL, 0, 0 )
 
 #endif

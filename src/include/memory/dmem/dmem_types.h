@@ -14,8 +14,9 @@ struct dmem_heap {
 };
 
 struct dmem_root {
-	size_t minHeapSize;
-	int    allocType;
+	size_t           minHeapSize;
+	MemoryPartition  memPart;
+	int              allocType;
 	struct dmem_heap *heapList;
 	struct dmem_heap *lastUse;
 };

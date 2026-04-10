@@ -32,8 +32,7 @@ static void makepath_normalize_abspath( char *path )
 {
 	int i, j;
 	
-	/* ドライブ部を飛ばす */
-	path += makepath_get_drive_offset( path );
+	if( ! *path ) return;
 	
 	/* "//","///"などの無駄なスラッシュの連続を排除 */
 	for( i = 0, j = 0; path[i + 1]; i++ ){
@@ -82,7 +81,7 @@ static void makepath_normalize_abspath( char *path )
 
 bool makepath( const char* basepath, char *path, size_t len )
 {
-	unsigned short drive_offset;
+	unsigned int drive_offset;
 	
 	if( ! path || ! len ) return false;
 	
@@ -101,9 +100,6 @@ bool makepath( const char* basepath, char *path, size_t len )
 			strutilInsert( path, "/", len );
 			strutilInsert( path, basepath, len );
 		}
-	} else{
-		/* ドライブ部を含むが、末尾がドライブ区切りを示すコロンで終わっている場合はスラッシュを追加 */
-		if( drive_offset == strlen( path ) ) strutilCat( path, "/", len );
 	}
 	
 	makepath_normalize_abspath( path );

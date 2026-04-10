@@ -10,13 +10,13 @@ OvmsgUID ovmsgInit( void )
 	
 	params->selfThreadId = 0;
 	
-	params->ctrlEvId = sceKernelCreateEventFlag( "OvmsgCtrl", 0, 0, 0 );
+	params->ctrlEvId = sceKernelCreateEventFlag( "OvmsgCtrl", 0, 0, NULL );
 	if( params->ctrlEvId < 0 ){
 		ret = params->ctrlEvId;
 		memoryFree( params );
 		return ret;
 	}
-	params->workEvId = sceKernelCreateEventFlag( "OvmsgWork", 0, 0, 0 );
+	params->workEvId = sceKernelCreateEventFlag( "OvmsgWork", 0, 0, NULL );
 	if( params->workEvId < 0 ){
 		ret = params->workEvId;
 		sceKernelDeleteEventFlag( params->ctrlEvId );

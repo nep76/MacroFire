@@ -9,7 +9,7 @@
 #define CDIALOG_STRINGS
 
 /* 共通 */
-#define CDIALOG_STR_HELP_LABEL "ヘルプ"
+#define CDIALOG_STR_HELP_LABEL  "ヘルプ"
 #define CDIALOG_STR_HELP_ACCEPT "決定"
 #define CDIALOG_STR_HELP_CANCEL "キャンセル"
 #define CDIALOG_STR_HELP_MOVE   "移動"

@@ -3,7 +3,7 @@
 #include "dmem_types.h"
 
 static size_t dmem_need_heapsize( size_t minblock, size_t requestsize );
-static struct dmem_heap *dmem_heap_new( size_t heapsize, int type );
+static struct dmem_heap *dmem_heap_new( size_t heapsize, MemoryPartition partid, int type );
 
 void *dmemAlloc( DmemUID uid, size_t size )
 {
@@ -12,7 +12,7 @@ void *dmemAlloc( DmemUID uid, size_t size )
 	
 	if( ! root->lastUse ){
 		/* ‚Ü‚¾ƒq[ƒv‚ªˆê‚Â‚à–³‚¯‚ê‚ÎÅ‰‚Ìƒq[ƒv‚ðì¬‚·‚é */
-		root->heapList = dmem_heap_new( dmem_need_heapsize( root->minHeapSize, size ), root->allocType );
+		root->heapList = dmem_heap_new( dmem_need_heapsize( root->minHeapSize, size ), root->memPart, root->allocType );
 		if( ! root->heapList ) return NULL;
 		root->lastUse = root->heapList;
 		ptr = heapAlloc( root->lastUse->uid, size + sizeof( struct dmem_heap * ) );
@@ -29,7 +29,7 @@ void *dmemAlloc( DmemUID uid, size_t size )
 		if( ! ptr ){
 			struct dmem_heap *last;
 			
-			heap = dmem_heap_new( dmem_need_heapsize( root->minHeapSize, size ), root->allocType );
+			heap = dmem_heap_new( dmem_need_heapsize( root->minHeapSize, size ), root->memPart, root->allocType );
 			if( ! heap ) return NULL;
 			
 			for( last = root->lastUse; last->next; last = last->next );
@@ -52,7 +52,7 @@ void *dmemAlloc( DmemUID uid, size_t size )
 
 static size_t dmem_need_heapsize( size_t minblock, size_t requestsize )
 {
-	size_t first_data_size = requestsize + DMEM_HEADER_SIZE; //HEAP_HEADER_SIZE + sizeof( struct dmem_heap );
+	size_t first_data_size = requestsize + DMEM_HEADER_SIZE;
 	
 	if( first_data_size > minblock ){
 		return first_data_size;
@@ -61,16 +61,16 @@ static size_t dmem_need_heapsize( size_t minblock, size_t requestsize )
 	}
 }
 
-static struct dmem_heap *dmem_heap_new( size_t heapsize, int type )
+static struct dmem_heap *dmem_heap_new( size_t heapsize, MemoryPartition partid, int type )
 {
 	struct dmem_heap *newheap;
-	HeapUID huid = heapExCreate( "DmemHeap", MEMORY_USER, heapsize, type );
-	if( ! huid ) return NULL;
+	HeapUID huid = heapExCreate( "DmemHeap", partid, heapsize, type );
+	if( ! CG_IS_VALID_UID( huid ) ) return NULL;
 	
-	newheap              = heapAlloc( huid, sizeof( struct dmem_heap ) );
-	newheap->uid         = huid;
-	newheap->count       = 0;
-	newheap->next        = NULL;
+	newheap        = heapAlloc( huid, sizeof( struct dmem_heap ) );
+	newheap->uid   = huid;
+	newheap->count = 0;
+	newheap->next  = NULL;
 	
 	return newheap;
 }

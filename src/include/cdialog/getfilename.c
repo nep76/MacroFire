@@ -79,7 +79,7 @@ CdialogResult cdialogGetfilenameGetResult( void )
 	return st_params->base.result;
 }
 
-int cdialogGetfilenameStart( unsigned short x, unsigned short y )
+int cdialogGetfilenameStart( unsigned int x, unsigned int y )
 {
 	int ret;
 	
@@ -91,7 +91,7 @@ int cdialogGetfilenameStart( unsigned short x, unsigned short y )
 	return ret;
 }
 
-int cdialogGetfilenameStartNoLock( unsigned short x, unsigned short y )
+int cdialogGetfilenameStartNoLock( unsigned int x, unsigned int y )
 {
 	int ret;
 	
@@ -140,14 +140,14 @@ int cdialogGetfilenameUpdate( void )
 		int ret;
 		
 		if( ! st_params->work.dirh ){
-			st_params->work.dirh = dirhNew( st_params->data.pathMax, DIRH_O_DOPEN_WITH_THREAD | DIRH_O_ALLOC_HIGH );
-			if( ! st_params->work.dirh ) return CG_ERROR_NOT_ENOUGH_MEMORY;
+			st_params->work.dirh = dirhNew( st_params->data.pathMax, DIRH_O_ALLOC_HIGH );
+			if( ! CG_IS_VALID_UID( st_params->work.dirh ) ) return CG_ERROR_NOT_ENOUGH_MEMORY;
 			
 			strutilCopy( st_params->data.path, st_params->data.initialDir ? st_params->data.initialDir : CDIALOG_GETFILENAME_DEFAULT_PATH, st_params->data.pathMax );
 		}
 		
-		ret = dirhChdir( st_params->work.dirh, st_params->data.path, 3 );
-		if( ret < 0 ) return ret;
+		ret = dirhChdir( st_params->work.dirh, st_params->data.path, 3000000 );
+		if( CG_IS_ERROR( ret ) ) return ret;
 		
 		if( ! st_params->work.filename ){
 			st_params->work.filename    = st_params->data.path + strlen( st_params->data.path ) + 1;
@@ -290,7 +290,7 @@ int cdialogGetfilenameShutdownStartNoLock( void )
 		st_params->base.status = CDIALOG_SHUTDOWN;
 	}
 	
-	dirhDestroy( st_params->work.dirh );
+	if( CG_IS_VALID_UID( st_params->work.dirh ) ) dirhDestroy( st_params->work.dirh );
 	cdialogDevPrepareToFinish( &(st_params->base) );
 	
 	return 0;
@@ -313,11 +313,11 @@ void cdialogGetfilenameDestroy( void )
 
 static void cdialog_getfilename_draw( struct cdialog_dev_base_params *base, CdialogGetfilenameData *data, struct cdialog_getfilename_work *work )
 {
-	unsigned short line, line_offset;
-	char *cwd;
-	unsigned short buflen;
-	char buf[CDIALOG_GETFILENAME_WIDTH + 2];
+	unsigned int line, line_offset;
+	unsigned int buflen;
 	DirhFileInfo *file;
+	char *cwd;
+	char buf[CDIALOG_GETFILENAME_WIDTH + 2];
 	
 	/* ˜g‚ð•`‰æ */
 	pbFillRectRel( base->x, base->y, base->width, base->height, base->color->bg );
@@ -612,13 +612,13 @@ static DirhFileType cdialog_getfilename_get_filetype( const char *path )
 	
 	memset( &stat, 0, sizeof( SceIoStat ) );
 	if( sceIoGetstat( path, &stat ) < 0 ){
-		return DIRH_NULL;
+		return DIRH_UNK;
 	} else if( FIO_S_ISDIR( stat.st_mode ) ){
 		return DIRH_DIR;
 	} else if( FIO_S_ISREG( stat.st_mode ) ){
 		return DIRH_FILE;
 	} else{
-		return DIRH_NULL;
+		return DIRH_UNK;
 	}
 }
 

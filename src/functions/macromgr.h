@@ -85,9 +85,9 @@ MacromgrCommand *macromgrInsertBefore( MacromgrUID uid, MacromgrCommand *macro )
 MacromgrCommand *macromgrInsertAfter( MacromgrUID uid, MacromgrCommand *macro );
 bool macromgrRemove( MacromgrUID uid, MacromgrCommand *macro );
 void macromgrClear( MacromgrUID uid );
-int macromgrLoader( InimgrCallbackMode mode, InimgrCallbackParams *cbp, char *buf, size_t buflen, void *arg );
-int macromgrAppendLoader( InimgrCallbackMode mode, InimgrCallbackParams *cbp, char *buf, size_t buflen, void *arg );
-int macromgrSaver( InimgrCallbackMode mode, InimgrCallbackParams *cbp, char *buf, size_t buflen, void *arg );
+int macromgrLoader( InimgrContext ctx, void *arg );
+int macromgrAppendLoader( InimgrContext ctx, void *arg );
+int macromgrSaver( InimgrContext ctx, void *arg );
 
 /*
 int macromgrLoad( MacromgrUID uid, const char *path );

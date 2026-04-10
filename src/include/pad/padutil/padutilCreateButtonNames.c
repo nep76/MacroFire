@@ -3,7 +3,7 @@
 #include "padutil_types.h"
 
 static PadutilButtonName *st_names;
-static unsigned short    st_names_refcount;
+static unsigned int      st_names_refcount;
 
 PadutilButtonName *padutilCreateButtonNames( void )
 {

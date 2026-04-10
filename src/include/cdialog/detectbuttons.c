@@ -76,7 +76,7 @@ CdialogResult cdialogDetectbuttonsGetResult( void )
 	return st_params->base.result;
 }
 
-int cdialogDetectbuttonsStart( unsigned short x, unsigned short y )
+int cdialogDetectbuttonsStart( unsigned int x, unsigned int y )
 {
 	int ret;
 	
@@ -88,17 +88,13 @@ int cdialogDetectbuttonsStart( unsigned short x, unsigned short y )
 	return ret;
 }
 
-int cdialogDetectbuttonsStartNoLock( unsigned short x, unsigned short y )
+int cdialogDetectbuttonsStartNoLock( unsigned int x, unsigned int y )
 {
 	int ret;
 	unsigned char i;
 	
-	st_params->base.status = CDIALOG_INIT;
-	
-	st_params->showMessage = false;
-	
-	st_params->work.flags = 0;
-	
+	st_params->base.status         = CDIALOG_INIT;
+	st_params->work.flags          = 0;
 	st_params->work.buttons        = *(st_params->data.buttons);
 	st_params->work.buf[0]         = '\0';
 	st_params->work.buttonNames    = padutilCreateButtonSymbols();

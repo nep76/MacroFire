@@ -5,13 +5,18 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include "memory/memory.h"
+#include "memory/dmem.h"
 #include "util/makepath.h"
 #include "cgerrno.h"
 
+enum dirh_event {
+	DIRH_EVENT_OK    = 0x00000001,
+	DIRH_EVENT_EXIT  = 0x00000002
+};
+
 struct dirh_cwd {
 	char  *path;
-	size_t length;
+	size_t max;
 };
 
 struct dirh_entry {
@@ -20,20 +25,21 @@ struct dirh_entry {
 	int          pos;
 };
 
+struct dirh_data {
+	struct dirh_cwd   cwd;
+	struct dirh_entry entry;
+};
+
 struct dirh_thread_dopen_params {
-	SceUID     selfThreadId;
-	const char *path;
-	bool       completed;
-	struct dirh_entry *entry;
+	SceUID eventId;
+	struct dirh_data *data;
+	int status;
 };
 
 struct dirh_params {
-	struct dirh_cwd cwd;
-	struct dirh_entry entry;
-	struct dirh_thread_dopen_params *thdopen;
+	SceUID semaId;
+	struct dirh_data data;
 	unsigned int options;
 };
 
 void __dirh_clear_entries( struct dirh_entry *entry );
-int __dirh_parse_dirent( const char *dirpath, struct dirh_entry *entry );
-bool __dirh_wait_for_dopen_thread( struct dirh_thread_dopen_params *thdopen, enum PspThreadStatus stat );

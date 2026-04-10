@@ -17,7 +17,7 @@ char *padutilGetButtonNamesByCode( PadutilButtonName *availbtn, PadutilButtons b
 		strutilCopy( delimtoken, delim, sizeof( delimtoken ) );
 		
 		if( opt & PADUTIL_OPT_IGNORE_SP ){
-			strutilRemoveChar( delimtoken, "\x20\t" );
+			strutilTrim( delimtoken, "\x20\t" );
 		}
 		if( opt & PADUTIL_OPT_TOKEN_SP ){
 			int len = strlen( delimtoken );

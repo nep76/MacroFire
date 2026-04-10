@@ -2,12 +2,12 @@
 
 #include "inimgr_types.h"
 
-int inimgrSetInt( IniUID uid, const char *section, const char *key, const long num )
+int inimgrSetInt( InimgrUID uid, const char *name, const char *key, int32_t integer )
 {
-	char value[32];
+	char value[11];
 	
-	value[0] = '\0';
-	snprintf( value, sizeof( value ), "%ld", num );
+	/* 32ビットの数値は10桁を越えないのでバッファ長はチェックしない */
+	sprintf( value, "%d", integer );
 	
-	return __inimgr_set_value( (struct inimgr_params *)uid, section, key, value );
+	return __inimgr_set_value( (struct inimgr_params *)uid, __inimgr_find_section( (struct inimgr_params *)uid, name ), key, value );
 }

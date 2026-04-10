@@ -4,12 +4,9 @@
 
 struct inimgr_entry *__inimgr_find_entry( struct inimgr_section *section, const char *key )
 {
-	struct inimgr_entry *current_entry;
-	
-	if( ! section ) return NULL;
-	
-	for( current_entry = section->entry; current_entry; current_entry = current_entry->next ){
-		if( strcasecmp( current_entry->key, key ) == 0 ) break;
+	struct inimgr_entry *entry;
+	for( entry = section->entry; entry; entry = entry->next ){
+		if( strcasecmp( entry->key, key ) == 0 ) return entry;
 	}
-	return current_entry;
+	return NULL;
 }

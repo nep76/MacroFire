@@ -24,9 +24,9 @@ int fiomgrWrite( FiomgrHandle fh, void *data, size_t length )
 	if( length > ( FIOMGR_CACHE_SIZE - 1 ) ){
 		number_of_bytes_write = sceIoWrite( params->fd, data, length );
 	} else{
-		number_of_bytes_write = strutilCat( params->cache.memory, data, FIOMGR_CACHE_SIZE ) - 1;
-		params->cache.length = number_of_bytes_write;
+		memcpy( params->cache.memory + params->cache.length, data, length );
+		params->cache.length += length;
 	}
 	
-	return number_of_bytes_write;
+	return length;
 }

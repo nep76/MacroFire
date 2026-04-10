@@ -30,8 +30,8 @@ void sceDisplayEnable( void );
 	キャッシュの関係で摩訶不思議なバグに悩まれることがあるっぽい。
 	通常はmemcpy()を使い、データが多少化けても問題のない背景転送などに使った方が無難？
 -----------------------------------------------*/
-int  sceDmacMemcpy( void *dest, const void *src, SceSize size );
-//int  sceDmacTryMemcpy( void *dest, const void *src, SceSize size );
+int sceDmacMemcpy( void *dest, const void *src, SceSize size );
+//int sceDmacTryMemcpy( void *dest, const void *src, SceSize size );
 
 /*-----------------------------------------------
 	sceSysregAudioIoEnable

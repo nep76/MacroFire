@@ -4,27 +4,11 @@
 
 char *strutilCounterPbrk( const char *__restrict__ src, const char *__restrict__ search )
 {
-	bool find = false;
-	
-	if( search[0] == '\0' ) return NULL;
-	
-	for( ; *src != '\0'; src++ ){
-		for( ; *search != '\0'; search++ ){
-			if( *src == *search ){
-				find = true;
-				break;
-			}
+	while( *src != '\0' ){
+		if( ! strchr( search, *src ) ){
+			return (char *)src;
 		}
-		if( find ){
-			find = false;
-		} else{
-			break;
-		}
+		src++;
 	}
-	
-	if( *src == '\0' ){
-		return NULL;
-	} else{
-		return (char *)src;
-	}
+	return strchr( search, *src );
 }

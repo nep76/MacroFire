@@ -26,7 +26,7 @@
 	íËêî
 ==========================================================*/
 #define MF_TITLE        MF_STR_TITLE
-#define MF_VERSION      "3.2.0"
+#define MF_VERSION      "3.2.1"
 #define MF_AUTHOR       "ClassG (http://classg.sytes.net)"
 
 #define MF_INI_PATH_DEFAULT    "ms0:/seplugins/"
@@ -82,7 +82,7 @@ int mfDebugPrintf( const char *format, ... )
 	SceUID fd;
 	va_list ap;
 	char buf[255];
-	unsigned short len = 0;
+	unsigned int len = 0;
 	
 	va_start( ap, format );
 	vsnprintf( buf, 255, format, ap );
@@ -145,8 +145,6 @@ void mfConvertButtonFinish( void );
 char *mfConvertButtonC2N( PadutilButtons buttons, char *buf, size_t len );
 PadutilButtons mfConvertButtonN2C( char *buttons );
 const char *mfGetGameId( void );
-const char *mfGetIniTargetSection( void );
-const char *mfGetIniSection( void );
 unsigned int mfGetWorld( void );
 bool mfIsRunningApp( MfAppId app );
 int mfNotificationStart( void );
@@ -154,6 +152,9 @@ void mfNotificationShutdownStart( void );
 SceUID mfNotificationThreadId( void );
 void mfNotificationPrintTerm( void );
 bool mfNotificationPrintf( const char *format, ... );
+int mfIniGetInt( InimgrUID ini, const char *key, int *data );
+int mfIniGetString( InimgrUID ini, const char *key, char *buf, size_t buflen );
+int mfIniGetBool( InimgrUID ini, const char *key, bool *bl );
 
 #ifndef MFDIALOG_H
 #include "mfdialog.h"
@@ -174,5 +175,8 @@ bool mfNotificationPrintf( const char *format, ... );
 #ifndef MFRAPIDFIRE_H
 #include "mfrapidfire.h"
 #endif
+
+#undef GLOBAL
+#undef INIT
 
 #endif

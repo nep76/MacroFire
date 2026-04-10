@@ -2,17 +2,20 @@
 
 #include "inimgr_types.h"
 
-struct inimgr_section *__inimgr_find_section( struct inimgr_params *params, const char *section )
+struct inimgr_section *__inimgr_find_section( struct inimgr_params *params, const char *name )
 {
-	struct inimgr_section *current_section;
+	struct inimgr_section *section;
 	
-	if( params->last && strcasecmp( params->last->name, section ) == 0 ) return params->last;
+	if( ! name || *name == '\0' ) name = INIMGR_DEFAULT_SECTION;
 	
-	for( current_section = params->index; current_section; current_section = current_section->next ){
-		if( strcasecmp( current_section->name, section ) == 0 ){
-			params->last = current_section;
-			break;
+	if( params->last && ( strcasecmp( params->last->name, name ) == 0 ) ) return params->last;
+	
+	for( section = params->section; section; section = section->next ){
+		if( strcasecmp( section->name, name ) == 0 ){
+			params->last = section;
+			return section;
 		}
 	}
-	return current_section;
+	
+	return NULL;
 }

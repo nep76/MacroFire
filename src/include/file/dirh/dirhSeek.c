@@ -7,16 +7,16 @@ void dirhSeek( DirhUID uid, DirhWhence whence, int offset )
 	struct dirh_params *params = (struct dirh_params *)uid;
 	
 	switch( whence ){
-		case DIRH_SEEK_SET: params->entry.pos = 0; break;
-		case DIRH_SEEK_END: params->entry.pos = params->entry.count; break;
+		case DIRH_SEEK_SET: params->data.entry.pos = 0; break;
+		case DIRH_SEEK_END: params->data.entry.pos = params->data.entry.count; break;
 		case DIRH_SEEK_CUR: break;
 	}
 	
-	params->entry.pos += offset;
+	params->data.entry.pos += offset;
 	
-	if( params->entry.pos < 0 ){
-		params->entry.pos = 0;
-	} else if( params->entry.pos > params->entry.count ){
-		params->entry.pos = params->entry.count;
+	if( params->data.entry.pos < 0 ){
+		params->data.entry.pos = 0;
+	} else if( params->data.entry.pos > params->data.entry.count ){
+		params->data.entry.pos = params->data.entry.count;
 	}
 }

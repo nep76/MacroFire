@@ -33,6 +33,7 @@
 =========================================================*/
 #define CDIALOG_VOID_ABORT( err, syserr ) { cdialogDevSetLastError( err, syserr ); return }
 #define CDIALOG_ABORT( ret, err, syserr ) { cdialogDevSetLastError( err, syserr ); return ret }
+#define CDIALOG_GET_BTNCODE( btn ) ( ( btn ) & -( btn ) )
 
 #ifdef __cplusplus
 extern "C" {
@@ -53,15 +54,15 @@ struct cdialog_dev_color {
 };
 
 typedef struct cdialog_dev_help {
-	unsigned short x, y;
+	unsigned int x, y;
 	const char *str;
 } CdialogDevHelp;
 
 struct cdialog_dev_base_params {
 	CdialogStatus status;
 	CdialogResult result;
-	unsigned short x, y;
-	unsigned short width, height;
+	unsigned int x, y;
+	unsigned int width, height;
 	struct cdialog_dev_color *color;
 	PadctrlUID paduid;
 	PadutilAnalogStick analogStick;
@@ -85,9 +86,9 @@ void cdialogDevPrepareToFinish( struct cdialog_dev_base_params *params );
 void cdialogDevSetAnalogStickAdjust( struct cdialog_dev_base_params *params, PadutilCoord x, PadutilCoord y, PadutilCoord deadzone, PadutilSensitivity sens );
 void cdialogDevSetRepeatButtons( struct cdialog_dev_base_params *params, unsigned int buttons );
 PadutilButtons cdialogDevReadCtrlBuffer( struct cdialog_dev_base_params *params, SceCtrlData *pad, u32 *hprmkey );
-void cdialogDevHelp( struct cdialog_dev_help *help, unsigned short x, unsigned short y, const char *str );
+void cdialogDevHelp( struct cdialog_dev_help *help, unsigned int x, unsigned int y, const char *str );
 void cdialogDevSetHelp( struct cdialog_dev_help *help, size_t count );
-int cdialogDevDrawHelp( unsigned short x, unsigned short y, struct cdialog_dev_color *colors );
+int cdialogDevDrawHelp( unsigned int x, unsigned int y, struct cdialog_dev_color *colors );
 
 #ifdef __cplusplus
 }

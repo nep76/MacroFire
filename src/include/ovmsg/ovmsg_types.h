@@ -17,7 +17,7 @@ struct ovmsg_params {
 	SceUID selfThreadId;
 	int ctrlEvId, workEvId;
 	
-	unsigned short x, y, w, h;
+	unsigned int x, y, w, h;
 	unsigned int fgcolor;
 	unsigned int bgcolor;
 	

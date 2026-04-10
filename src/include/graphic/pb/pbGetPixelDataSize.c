@@ -4,10 +4,9 @@
 
 int pbGetPixelDataSize( int format )
 {
-	switch( format ){
-		case PB_PXF_8888:
-			return 4;
-		default:
-			return 2;
+	if( format == PB_PXF_8888 ){
+		return 4;
+	} else{
+		return 2;
 	}
 }

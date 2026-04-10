@@ -2,385 +2,225 @@
 	
 	inimgr.h
 	
-	INIマネージャ。
-	
-	コールバック関数で低レベル操作ができすぎる気がする。
-	もう少し抽象的にしたい。
-	
-	コールバックのサフィックスがださい。
+	INIファイルマネージャ。
 	
 =========================================================*/
 #ifndef INIMGR_H
 #define INIMGR_H
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <ctype.h>
-#include <string.h>
-#include "memory/dmem.h"
-#include "file/fiomgr.h"
-#include "util/strutil.h"
-#include "cgerrno.h"
+#include <pspkernel.h>
+#include <stdbool.h>
 
-#ifdef PSP_USE_KERNEL_LIBC
-#include "sysclib.h"
-#endif
-	
-/*-----------------------------------------------
-	定数
------------------------------------------------*/
-#define INIMGR_SECTION_BUFFER  32
-#define INIMGR_ENTRY_BUFFER   255
+/*=========================================================
+	定数/マクロ
+=========================================================*/
+#define INIMGR_ENTRY_LENGTH   255
+#define INIMGR_SECTION_LENGTH 32
 
-#define INIMGR_ERROR_INVALID_SIGNATURE -1
-#define INIMGR_ERROR_INVALID_VERSION   -2
+/*=========================================================
+	オプション
+=========================================================*/
+#define INIMGR_CREATE ( FH_O_RDONLY )
+#define INIMGR_SAVE ( FH_O_RDWR | FH_O_CREAT )
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-/*-----------------------------------------------
+/*=========================================================
 	型宣言
------------------------------------------------*/
-typedef uintptr_t IniUID;
+=========================================================*/
+typedef intptr_t InimgrUID;
+typedef intptr_t InimgrContext;
+typedef uint32_t InimgrVersion;
 
 typedef enum {
-	INIMGR_CB_LOAD = 0,
-	INIMGR_CB_SAVE
-} InimgrCallbackMode;
+	INIMGR_OP_LOAD,
+	INIMGR_OP_SAVE
+} InimgrOpMode;
 
-struct inimgr_callback_info {
-	char *section;
-	SceOff offset;
-	unsigned int length;
-	struct inimgr_callback_info *next;
-};
+typedef int ( *InimgrCallback )( InimgrContext, void* );
 
-struct inimgr_callback {
-	char *section;
-	int cmplen;
-	void *cb;
-	void *arg;
-	struct inimgr_callback_info *infoList;
-	struct inimgr_callback *next;
-};
-
-struct inimgr_entry {
-	char   *key;
-	char   *value;
-	size_t vspace;
-	struct inimgr_entry *prev, *next;
-};
-
-struct inimgr_section {
-	char   *name;
-	struct inimgr_entry *entry;
-	struct inimgr_section *prev, *next;
-};
-
-struct inimgr_params {
-	DmemUID dmem;
-	struct inimgr_callback *callbacks; /* コールバック設定 */
-	struct inimgr_section  *index;     /* セクションのリンクリスト */
-	struct inimgr_section  *last;      /* 常に終端のセクションを指す */
-};
+/*=========================================================
+	関数
+=========================================================*/
+/*-----------------------------------------------
+	inimgrNew
 	
-typedef struct {
-	IniUID uid;
-	FiomgrHandle ini;
-	struct inimgr_callback_info *cbinfo;
-} InimgrCallbackParams;
-
-typedef int ( *InimgrCallback )( InimgrCallbackMode, InimgrCallbackParams*, char*, size_t, void* );
+	新しいINIマネージャを生成する。
+	
+	@return: InimgrUID
+		他の関数で使うUID。
+-----------------------------------------------*/
+InimgrUID inimgrNew( void );
 
 /*-----------------------------------------------
-	関数プロトタイプ
+	inimgrDestroy
+	
+	INIマネージャを削除する。
+	
+	@param: InimgrUID uid
+		inimgrNew()で得たUID。
+	
+	@return: int
+		= 0: 成功
+		< 0: エラー
 -----------------------------------------------*/
+int inimgrDestroy( InimgrUID uid );
 
-/*
-	INIマネージャを初期化し、INIハンドルを得る
+/*-----------------------------------------------
+	inimgrMakeVersion
 	
-	@return IniUID
-		>= 0: 有効なINIハンドル
-		< 0 : 失敗
-*/
-IniUID inimgrNew( void );
+	inimgrLoad()やinimgrSave()、inimgrMerge()で使うバージョン番号を生成する。
+	これで生成したInimgrVersionは、単純に == != < =< > >= といった演算子で比較可能。
+	
+	
+-----------------------------------------------*/
+InimgrVersion inimgrMakeVersion( unsigned char major, unsigned char minor, unsigned char rev );
 
-/*
-	通常のINIファイル実装に存在しない拡張機能。
-	これにより、key = paramという形式以外のデータや、
-	INIマネージャを通さず直接ファイルを読んでデータを読むことで省メモリにできる。
+/*-----------------------------------------------
+	inimgrRegisterCallback
 	
-	このセクションを便宜上コールバックセクションと呼ぶ。
+	inimgrLoadSection()/inimgrSave()/inimgrMerge()で呼び出されるコールバック関数。
+	セクション内に大量のデータがある場合などに使用し、ファイルから直接データを呼んでメモリを節約する。
 	
-	次に出現するセクションまでの全てのデータはINIマネージャの手を離れるため、
-	INIファイル中に全く異なるフォーマットのデータを唐突に出現させることができてしまうことや、
-	セクションごとにしか設定できないため、セクションが細かく分かれてしまう場合があるなどのデメリットもある。
+	コールバックセクション内であっても key = value の形式以外で読み書きすることはできない。
 	
-	inimgrLoad()/inimgrSave()によるINIファイルの読み込み/保存時に、
-	コールバック関数を呼び出すセクション名を指定する。
+	inimgrLoadSection()時に、コールバックが設定されたセクションを読み出そうとすると、コールバックされる。
+	inimgrSave()/inimgrMerge()では、コールバックが設定されたセクションを書き出そうとしたときにコールバックされる。
 	
-	inimgrSave()は、これにより設定されたセクション名の記録を開始する時に、コールバック関数を呼び出す。
-	コールバック関数はinimgrMakeEntry()やinimgrWriteln()などを使って設定値を書き出す。
-	inimgrSave()から呼び出されたコールバック関数では、inimgrCbSeek*()を使ってはいけない。
+	コールバックされた関数は、inimgrReadEntry()/inimgrWriteEntry()を使ってデータを読み出したり書き出したりする。
 	
-	inimgrLoad()は、これにより設定されたセクション名を探し当てると、その位置を記録する。
-	その後、一度INIファイルを全て読み出した後、コールバック関数を呼び出す。
-	従って、コールバック関数内から、INIファイル中の他の設定値を呼び出すことは可能。
-	ただし、他のコールバックセクションは発見した順に処理されるため、読めるかどうかはファイルの内容による。
-	コールバック関数はinimgrReadln()やinimgrParseEntry()を使って必要な情報を抽出する。
+	対象となるセクション名の指定にはワイルドカード( ? * )が使用できる。
+	マッチするセクションでは、全てコールバックされる。
 	
-	また、対象となるセクション名には、"*"というサフィックスをつけることができる。
-	これをつけると、指定されたセクション名はセクション名のプリフィックスとして扱われる。
-	仮に "MySection*" というセクション名を指定したとすると、"MySection" という文字列で始まるセクション名、
-	たとえば、
-	    MySection
-	    MySection1
-	    MySectionA
-	    MySectionHoge
-	    MySectionFoobar
-	    MySection...
-	などは、設定した同じコールバック関数が呼ばれる。
+	@param: InimgrUID uid
+		inimgrNew()で得たUID。
 	
-	一見ワイルドカードのように見えるが、``ワイルドカードではない''。
-	あくまでサフィックスであり、"*MySection" や "My*Section" のような指定はできない。
+	@param: const char *wildcard
+		コールバックさせるセクション名。
+		ワイルドカードを使用可能。
 	
-	また、"*"という1文字をセクション名として指定すると全てのセクションで同じコールバック関数を呼ばせることができる。
-	ただし、INIマネージャはコールバック関数の設定を調べるとき、設定された順に一致するセクション名を探し、
-	最初に見つけたコールバック関数を実行して次のセクションに制御を移す。
-	
-	したがって、コールバック関数の設定順序で動作が以下のように異なる。
-	    "MySection" にコールバック関数Aを設定後、"*" にコールバック関数Bを設定 -> "MySection" では関数Aが実行され、それ以外では関数Bが実行される。
-	    "*" にコールバック関数Yを設定後、"MySection" にコールバック関数Zを設定 -> "MySection" を含む、全てのセクションで関数Yのみが実行される。
-	
-	@param IniUID uid
-		INIハンドル。
-	
-	@param const char *section
-		コールバック関数と関連付けるセクション名。
-	
-	@param InimgrCallback cb
+	@param: InimgrCallback cb
 		コールバック関数。
 	
-	@param void *arg
+	@param: void *arg
 		コールバック関数に渡される引数。
+		セットされた値がそのまま渡される。
 	
-	@return int
-		0  : 成功
-		< 0: 失敗
-*/
-int inimgrSetCallback( IniUID uid, const char *section, InimgrCallback cb, void *arg );
+	@return: int
+		= 0: 成功
+		< 0: エラー
+-----------------------------------------------*/
+int inimgrRegisterCallback( InimgrUID uid, const char *wildcard, InimgrCallback cb, void *arg );
 
-/*
-	INIファイルを読み込み、設定内容をメモリに取り込む。
-	設定内容が巨大な場合、ヒープを食いつぶすので注意。
+/*-----------------------------------------------
+	inimgrLoad
 	
-	@param IniUID uid
-		INIハンドル。
+	INIファイルをロードする準備を行う。
+	この関数でINIファイルが完全にロードされるわけではない。
+	これにより各セクションのファイル内でのオフセットを取得する。
 	
-	@param const char *inipath
-		読み込むINIファイルのパス。
+	実際にデータを使用するには、さらにinimgrLoadSection()で必要なセクションを読み出さなければいけない。
 	
-	@param const char *sig
+	@param: InimgrUID uid
+		inimgrNew()で得たUID。
+	
+	@param: const char *path
+		INIファイルのパス。
+	
+	@param: const char *sig
 		チェックするシグネチャ。
-		空白文字を含むことはできない。
-		一致しない場合は読み込みを中断。
-		NULLでシグネチャ、バージョンともにチェックしない。
+		一致しなければ、CG_ERROR_INI_SIGNATURE_MISMATCH を返す。
 	
-	@param unsigned char major
-		チェックするメジャーバージョン番号。
-		シグネチャのチェックを通過してから判定される。
-		この番号に満たない場合は読み込みを中断。
-		
-		後続の二つの番号も併せて、全てに0が指定されるとバージョンをチェックしない。
-	
-	@param unsigned char minor
-		チェックするマイナーバージョン番号。
-		メジャーバージョン番号のチェックを通過してから判定される。
-		この番号に満たない場合は読み込みを中断。
-	
-	@param unsigned char rev
-		チェックするリビジョン番号。
-		マイナーバージョン番号のチェックを通過してから判定される。
-		この番号に満たない場合は読み込みを中断。
+	@param: InimgrVersion version
+		inimgrMakeVersion()の返り値。
+		有効なバージョンを指定する。
+		指定したバージョンよりも、INIファイルのバージョンが古ければ
+		CG_ERROR_INI_VERSION_NOT_SUPPORTED を返す。
 	
 	@return int
-		0  : 成功
-		< 0: 失敗
-		-1 : 一致しないシグネチャ
-		-2 : 不正なバージョン
-*/
-int inimgrLoad( IniUID uid, const char *inipath, const char *sig, unsigned char major, unsigned char minor, unsigned char rev );
+		= 0: 成功
+		< 0: エラー
+-----------------------------------------------*/
+int inimgrLoad( InimgrUID uid, const char *path, const char *sig, InimgrVersion version );
 
-/*
-	メモリ上のINI情報をファイルへ書き出す。
+/*-----------------------------------------------
+	inimgrLoadSection
 	
-	@param IniUID uid
-		INIハンドル。
-	
-	@param const char *inipath
-		書き込み先のINIファイルのパス。
-		すでに存在するファイルであれば上書きし、存在しなければ作成する。
-	
-	@param const char *sig
-		シグネチャ。
-		空白文字を含むことはできない。
-		NULLでシグネチャとバージョンを記録しない。
-	
-	@param unsigned char major
-		メジャーバージョン番号。
-		
-		後続の二つの番号も併せて、全てに0が指定されるとバージョンを記録しない。
-	
-	@param unsigned char minor
-		マイナーバージョン番号。
-	
-	@param unsigned char rev
-		リビジョン番号。
-	
-	@return int
-		0  : 成功
-		< 0: 失敗
-*/
-int inimgrSave( IniUID uid, const char *inipath, const char *sig, unsigned char major, unsigned char minor, unsigned char rev );
+	指定したセクションをロードして、読み書き可能な状態にする。
+	inimgrLoad()は、単にセクションのオフセットを記録しているだけなので、
+	この関数でエントリを読み出さなければ inimgrGet* / inimgrSet* は行えない。
+-----------------------------------------------*/
+int inimgrLoadSection( InimgrUID uid, const char *name );
 
-/*
-	INIハンドルとそれに対応するINI情報を破棄する。
-	対象のINIハンドルは無効になるため、使ってはいけない。
+/*-----------------------------------------------
+	inimgrLoadAllSections
 	
-	@param IniUID uid
-		INIハンドル。
-*/
-void inimgrDestroy( IniUID uid );
+	inimgrLoadSection()を存在するすべてのセクションに対して行う。
+-----------------------------------------------*/
+int inimgrLoadAllSections( InimgrUID uid );
 
-/*
-	現在のINI情報に新しいセクションを追加/削除する。
-	セクション名は大文字と小文字を区別しない。
+/*-----------------------------------------------
+	inimgrAddSection
 	
-	また "__default"というセクション名は予約されているため使用できない。
+	新しいセクションを作成する。
+	inimgrSet*は、存在しないセクションへ値をセットすることは出来ない。
+	自動的にセクションは作成されないため、自分で作成する必要がある。
 	
-	@param IniUID uid
-		INIハンドル。
-	
-	@param const char *section
-		セクション名。
-	
-	@return int
-		0  : 成功
-		< 0: 失敗
-*/
-int inimgrAddSection( IniUID uid, const char *section );
-void inimgrDeleteSection( IniUID uid, const char *section );
-bool inimgrExistSection( IniUID uid, const char *section );
+	すでに存在しているセクションを作成しようとした場合は何もせず成功を返す。
+-----------------------------------------------*/
+int inimgrAddSection( InimgrUID uid, const char *name );
 
-/*
-	INI情報から指定されたセクション内にある指定されたキーを検索し、
-	それに関連づけられている値を取得する。
+/*-----------------------------------------------
+	inimgrSave
 	
-	セクション、あるいはキーが存在しない場合は偽が返り、値のセットは行わない。
-	セクション名にNULLを渡すと、デフォルトセクションが指定されたものと見なす。
-	
-	@param IniUID uid
-		INIハンドル。
-	
-	@param const char *section
-		検索対象のセクション名。
-	
-	@param const char *key
-		検索対象のキー名。
-	
-	@param int *var
-		検索対象の値をセットする変数のポインタ。
-	
-	@return bool
-		検索対象が見つかった場合に真、そうでなければ偽。
-*/	
-bool inimgrGetInt( IniUID uid, const char *section, const char *key, int *var );
+	メモリ上のデータをINIファイルとして書き出す。
+	指定したパスへ、メモリ上のデータを単に上書きする。
+	読み出されなかったセクションは空になってしまう。
+-----------------------------------------------*/
+int inimgrSave( InimgrUID uid, const char *path, const char *sig, InimgrVersion version );
 
-/*
-	INI情報から指定されたセクション内にある指定されたキーを検索し、
-	それに関連づけられている値を文字列として指定されたバッファにコピーする。
+/*-----------------------------------------------
+	inimgrMerge (未実装)
 	
-	セクション、あるいはキーが存在しない場合は-1が返り、値のセットは行わない。
-	セクション名にNULLを渡すと、デフォルトセクションが指定されたものと見なす。
+	メモリ上のデータと、既存のINIファイルをマージする。
+	メモリ上のデータが優先される。
 	
-	@param IniUID uid
-		INIハンドル。
-	
-	@param const char *section
-		検索対象のセクション名。
-	
-	@param const char *key
-		検索対象のキー名。
-	
-	@param char *buf
-		検索対象の文字列をコピーするバッファ。
-	
-	@param size_t bufsize
-		上記のバッファのサイズ。
-	
-	@return unsigned int
-		バッファにコピーされたバイト数。
-*/
-int inimgrGetString( IniUID uid, const char *section, const char *key, char *buf, size_t bufsize );
+	マージするには、一度一時ファイルに書き出す必要があるため、一時ファイルのパスを引数に必要とする。
+-----------------------------------------------*/
+int inimgrMerge( InimgrUID uid, const char *path, const char *tempfile, const char *sig, InimgrVersion version );
 
-/*
-	INI情報から指定されたセクション内にある指定されたキーを検索し、
-	それに関連づけられている値を文字列として扱い、
-	ONと等しければtrueを、OFFと等しければfalseを返す。
+/*-----------------------------------------------
+	inimgrReadEntry
 	
-	ON/OFFは大文字と小文字を区別しない。
-	
-	セクション、あるいはキーが存在しない、または値がON/OFFのいずれでもない場合は偽が返り、値のセットは行わない。
-	セクション名にNULLを渡すと、デフォルトセクションが指定されたものと見なす。
-	
-	@param IniUID uid
-		INIハンドル。
-	
-	@param const char *section
-		検索対象のセクション名。
-	
-	@param const char *key
-		検索対象のキー名。
-	
-	@param const bool *var
-		検索対象の値をセットする変数のポインタ。
-	
-	@return bool
-		検索対象が見つかった場合に真、そうでなければ偽。
-*/	
-bool inimgrGetBool( IniUID uid, const char *section, const char *key, bool *var );
+	エントリを一つ読み出す。
+-----------------------------------------------*/
+bool inimgrReadEntry( InimgrContext context, char **key, char **value );
 
-/*
-	inimgrSetInt
-	inimgrSetString
-	inimgrSetBool
+/*-----------------------------------------------
+	inimgrWriteEntry
 	
-	セクションに対してキーを設定する。
-	すでに存在する場合はキーの値を更新する。
+	エントリを一つ書き出す。
+-----------------------------------------------*/
+bool inimgrWriteEntry( InimgrContext context, const char *key, const char *value );
+
+/*-----------------------------------------------
+	inimgrGetCurrentUID
 	
-	キー名は大文字と小文字を区別しない。
-	セクション名にNULLを渡すと、デフォルトセクションが指定されたものと見なす。
-*/
-int inimgrSetInt( IniUID uid, const char *section, const char *key, const long num );
-int inimgrSetString( IniUID uid, const char *section, const char *key, const char *str );
-int inimgrSetBool( IniUID uid, const char *section, const char *key, const bool on );
+	現在のInimgrUIDを返す。
+-----------------------------------------------*/
+InimgrUID inimgrGetCurrentUID( InimgrContext context );
 
-inline IniUID inimgrCbGetIniHandle( InimgrCallbackParams *params );
-int inimgrCbReadln( InimgrCallbackParams *params, char *buf, size_t buflen );
-int inimgrCbSeekSet( InimgrCallbackParams *params, SceOff offset );
-int inimgrCbSeekCur( InimgrCallbackParams *params, SceOff offset );
-int inimgrCbSeekEnd( InimgrCallbackParams *params, SceOff offset );
-int inimgrCbTell( InimgrCallbackParams *params );
-int inimgrCbWriteln( InimgrCallbackParams *params, char *buf, size_t buflen );
-bool inimgrParseEntry( char *entry, char **key, char **value );
-int inimgrMakeEntry( char *entry, size_t len, char *key, char *value );
-int inimgrMakeSection( char *buf, size_t len, char *section );
+/*-----------------------------------------------
+	inimgrGetCurrentOpMode
+	
+	現在のオプモードを返す。
+-----------------------------------------------*/
+InimgrOpMode inimgrGetCurrentOpMode( InimgrContext context );
 
+int inimgrGetInt( InimgrUID uid, const char *name, const char *key, int *res );
+int inimgrGetString( InimgrUID uid, const char *name, const char *key, char *res, size_t reslen );
+int inimgrGetBool( InimgrUID uid, const char *name, const char *key, bool *res );
+int inimgrSetInt( InimgrUID uid, const char *name, const char *key, int32_t integer );
+int inimgrSetString( InimgrUID uid, const char *name, const char *key, const char *str );
+int inimgrSetBool( InimgrUID uid, const char *name, const char *key, bool bl );
 
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif

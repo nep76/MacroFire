@@ -4,10 +4,13 @@
 
 void pbLine( int sx, int sy, int ex, int ey, uint32_t color )
 {
+	PbColor pc;
 	uintptr_t draw_addr;
 	int       e, dx, dy;
 	
 	if( color == PB_TRANSPARENT || __pb_internal_params.options & PB_NO_DRAW ) return;
+	
+	pbColorParse8888( &pc, color );
 	
 	if( sx > ex ) PB_SWAP( &sx, &ex );
 	if( sy > ey ) PB_SWAP( &sy, &ey );
@@ -15,9 +18,9 @@ void pbLine( int sx, int sy, int ex, int ey, uint32_t color )
 	draw_addr = (uintptr_t)__pb_buf_addr( __pb_internal_params.draw, sx, sy );
 	
 	if( sx == ex ){
-		for( ; sy <= ey; sy++, draw_addr += __pb_internal_params.draw->lineSize ) PB_PUT_PIXEL( draw_addr, color );
+		for( ; sy <= ey; sy++, draw_addr += __pb_internal_params.draw->lineSize ) PB_PUT_PIXEL( draw_addr, &pc );
 	} else if( sy == ey ){
-		for( ; sx <= ex; sx++, draw_addr += __pb_internal_params.draw->pixelSize ) PB_PUT_PIXEL( draw_addr, color );
+		for( ; sx <= ex; sx++, draw_addr += __pb_internal_params.draw->pixelSize ) PB_PUT_PIXEL( draw_addr, &pc );
 	} else{
 		/* ƒuƒŒƒ[ƒ“ƒnƒ€‚Ìü•ª•`‰æƒAƒ‹ƒSƒŠƒYƒ€ */
 		e  = 0;
@@ -32,7 +35,7 @@ void pbLine( int sx, int sy, int ex, int ey, uint32_t color )
 					e -= dx;
 					draw_addr += __pb_internal_params.draw->lineSize;
 				}
-				PB_PUT_PIXEL( draw_addr, color );
+				PB_PUT_PIXEL( draw_addr, &pc );
 			}
 		} else{
 			int y;
@@ -42,7 +45,7 @@ void pbLine( int sx, int sy, int ex, int ey, uint32_t color )
 					e -= dy;
 					draw_addr += __pb_internal_params.draw->pixelSize;
 				}
-				PB_PUT_PIXEL( draw_addr, color );
+				PB_PUT_PIXEL( draw_addr, &pc );
 			}
 		}
 	}

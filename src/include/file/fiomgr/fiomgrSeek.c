@@ -20,30 +20,10 @@ SceOff fiomgrSeek( FiomgrHandle fh, SceOff offset, int whence )
 	
 	__fiomgr_cache_clear( params );
 	
-	switch( whence ){
-		case FH_SEEK_SET:
-			if( params->largeFile ){
-				pos = sceIoLseek( params->fd, offset, FH_SEEK_SET );
-			} else{
-				pos = sceIoLseek32( params->fd, offset, FH_SEEK_SET );
-			}
-			break;
-		case FH_SEEK_CUR:
-			if( params->largeFile ){
-				pos = sceIoLseek( params->fd, offset, FH_SEEK_CUR );
-			} else{
-				pos = sceIoLseek32( params->fd, offset, FH_SEEK_CUR );
-			}
-			break;
-		case FH_SEEK_END:
-			if( params->largeFile ){
-				pos = sceIoLseek( params->fd, offset, FH_SEEK_END );
-			} else{
-				pos = sceIoLseek32( params->fd, offset, FH_SEEK_END );
-			}
-			break;
-		default:
-			pos = 0;
+	if( params->flags & FH_O_LARGEFILE ){
+		pos = sceIoLseek( params->fd, offset, whence );
+	} else{
+		pos = sceIoLseek32( params->fd, offset, whence );
 	}
 	
 	return pos;

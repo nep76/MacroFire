@@ -45,8 +45,8 @@ typedef struct {
 } CdialogNumeditData;
 
 struct cdialog_numedit_work {
-	unsigned short maxdigits;
-	unsigned short pos;
+	unsigned int maxdigits;
+	unsigned int pos;
 	char *numbers;
 	char buf[CDIALOG_NUMEDIT_MAX_NUMBER_OF_DIGITS + 1];
 };
@@ -66,8 +66,8 @@ int cdialogNumeditInit( CdialogNumeditParams *params );
 CdialogNumeditData *cdialogNumeditGetData( void );
 CdialogStatus cdialogNumeditGetStatus( void );
 CdialogResult cdialogNumeditGetResult( void );
-int cdialogNumeditStart( unsigned short x, unsigned short y );
-int cdialogNumeditStartNoLock( unsigned short x, unsigned short y );
+int cdialogNumeditStart( unsigned int x, unsigned int y );
+int cdialogNumeditStartNoLock( unsigned int x, unsigned int y );
 int cdialogNumeditUpdate( void );
 int cdialogNumeditShutdownStartNoLock( void );
 int cdialogNumeditShutdownStart( void );

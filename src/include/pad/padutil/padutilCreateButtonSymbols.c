@@ -4,7 +4,7 @@
 #include "graphic/pb.h"
 
 static PadutilButtonName *st_symbols;
-static unsigned short    st_symbols_refcount;
+static unsigned int      st_symbols_refcount;
 
 PadutilButtonName *padutilCreateButtonSymbols( void )
 {

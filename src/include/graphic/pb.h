@@ -103,6 +103,13 @@ typedef enum {
 	PB_NO_DRAW       = 0x80000000
 } PbOptions;
 
+typedef struct {
+	uint8_t red;
+	uint8_t green;
+	uint8_t blue;
+	uint8_t alpha;
+} PbColor;
+
 typedef uintptr_t PbContext;
 
 /*=========================================================
@@ -141,6 +148,14 @@ void pbLine( int sx, int sy, int ex, int ey, uint32_t color );
 void pbLineRect( int sx, int sy, int ex, int ey, uint32_t color );
 void pbFillRect( int sx, int sy, int ex, int ey, uint32_t color );
 void pbLineCircle( int x, int y, unsigned int radius, uint32_t color );
+void pbColorParse5650( PbColor *cd, unsigned int color );
+void pbColorParse5551( PbColor *cd, unsigned int color );
+void pbColorParse4444( PbColor *cd, unsigned int color );
+void pbColorParse8888( PbColor *cd, unsigned int color );
+unsigned int pbColorGet5650( PbColor *cd );
+unsigned int pbColorGet5551( PbColor *cd );
+unsigned int pbColorGet4444( PbColor *cd );
+unsigned int pbColorGet8888( PbColor *cd );
 
 #define pbOffsetChar( n ) ( ( n ) * ( 6 ) )
 #define pbOffsetLine( n ) ( ( n ) * 8 )

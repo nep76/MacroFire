@@ -182,7 +182,7 @@ PadutilButtons cdialogDevReadCtrlBuffer( struct cdialog_dev_base_params *params,
 	return (PadutilButtons)( padutilSetPad( real_pad.Buttons ) | padutilSetHprm( real_hprmkey ) );
 }
 
-void cdialogDevHelp( struct cdialog_dev_help *help, unsigned short x, unsigned short y, const char *str )
+void cdialogDevHelp( struct cdialog_dev_help *help, unsigned int x, unsigned int y, const char *str )
 {
 	help->x   = x;
 	help->y   = y;
@@ -195,7 +195,7 @@ void cdialogDevSetHelp( struct cdialog_dev_help *help, size_t count )
 	st_help_count = count;
 }
 
-int cdialogDevDrawHelp( unsigned short x, unsigned short y, struct cdialog_dev_color *colors )
+int cdialogDevDrawHelp( unsigned int x, unsigned int y, struct cdialog_dev_color *colors )
 {
 	size_t count = st_help_count;
 	while( count-- ){

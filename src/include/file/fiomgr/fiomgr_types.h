@@ -22,13 +22,16 @@ struct fiomgr_cache_params {
 };
 
 struct fiomgr_params {
+	char    *path;
+	int     flags;
+	SceMode mode;
+	
 	SceUID    fd;
-	bool      largeFile;
 	bool      eof;
 	struct fiomgr_cache_params cache;
 };
 
-int __fiomgr_open( struct fiomgr_params **params, const char *path, int flags, int perm );
-inline void __fiomgr_cache_flush( struct fiomgr_params *params );
-inline void __fiomgr_cache_clear( struct fiomgr_params *params );
-inline void __fiomgr_cache_load( struct fiomgr_params *params );
+void __fiomgr_cache_flush( struct fiomgr_params *params );
+void __fiomgr_cache_clear( struct fiomgr_params *params );
+void __fiomgr_cache_load( struct fiomgr_params *params );
+int __fiomgr_close( struct fiomgr_params *fh );

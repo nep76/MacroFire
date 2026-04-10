@@ -28,7 +28,7 @@ typedef enum {
 	CDIALOG_MESSAGE_ERROR = 0x00000002
 } CdialogMessageOptions;
 
-typedef int ( *CdialogMessageCallback )( unsigned short x, unsigned short y, struct cdialog_dev_color *colors );
+typedef int ( *CdialogMessageCallback )( unsigned int x, unsigned int y, struct cdialog_dev_color *colors );
 
 typedef struct {
 	char title[CDIALOG_MESSAGE_TITLE_LENGTH];
@@ -53,8 +53,8 @@ int cdialogMessageInit( CdialogMessageParams *params );
 CdialogMessageData *cdialogMessageGetData( void );
 CdialogStatus cdialogMessageGetStatus( void );
 CdialogResult cdialogMessageGetResult( void );
-int cdialogMessageStart( unsigned short x, unsigned short y );
-int cdialogMessageStartNoLock( unsigned short x, unsigned short y );
+int cdialogMessageStart( unsigned int x, unsigned int y );
+int cdialogMessageStartNoLock( unsigned int x, unsigned int y );
 int cdialogMessageUpdate( void );
 int cdialogMessageShutdownStartNoLock( void );
 int cdialogMessageShutdownStart( void );

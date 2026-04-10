@@ -4,5 +4,5 @@
 
 int dirhTell( DirhUID uid )
 {
-	return ((struct dirh_params *)uid)->entry.pos;
+	return ((struct dirh_params *)uid)->data.entry.pos;
 }

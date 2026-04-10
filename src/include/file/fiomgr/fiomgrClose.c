@@ -4,16 +4,19 @@
 
 int fiomgrClose( FiomgrHandle fh )
 {
-	int ret;
 	struct fiomgr_params *params = (struct fiomgr_params *)fh;
-	
-	if( ( params->cache.lastState != FIOMGR_CACHE_LAST_READ ) && params->cache.length ){
-		__fiomgr_cache_flush( params );
-	}
-	
-	ret = sceIoClose( params->fd );
+	int ret = __fiomgr_close( params );
 	
 	if( ! ( ret < 0 ) ) memoryFree( params );
 	
 	return ret;
+}
+
+int __fiomgr_close( struct fiomgr_params *params )
+{
+	if( ( params->cache.lastState != FIOMGR_CACHE_LAST_READ ) && params->cache.length ){
+		__fiomgr_cache_flush( params );
+	}
+	
+	return sceIoClose( params->fd );
 }

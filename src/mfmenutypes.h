@@ -13,7 +13,6 @@
 /*=========================================================
 	É}ÉNÉç
 =========================================================*/
-
 #define mfMenuIsPressed( buttons )     mfIsPressed( mfMenuGetCurrentButtons(), ( buttons ) )
 #define mfMenuIsOnlyPressed( buttons ) mfIsOnlyPressed( mfMenuGetCurrentButtons(), ( buttons ) )
 #define mfMenuIsAnyPressed( buttons )  mfIsAnyPressed( mfMenuGetCurrentButtons(), ( buttons ) )
@@ -36,8 +35,13 @@ typedef enum {
 	MF_MM_CONTINUE = 0x00000020
 } MfMenuMessage;
 
-typedef void ( *MfMenuProc )( MfMessage );
-typedef void ( *MfMenuExtraProc )( MfMessage, void* );
+typedef enum {
+	MF_MENU_OK = CG_OK,
+	MF_MENU_BACK
+} MfMenuStatus;
+
+typedef int ( *MfMenuProc )( MfMessage );
+typedef int ( *MfMenuExtraProc )( MfMessage, void* );
 
 typedef struct {
 	bool      active;
@@ -50,9 +54,9 @@ typedef struct {
 typedef struct {
 	char *label;
 	int x, y;
-	unsigned short rows, cols;
-	unsigned int   *colsWidth;
-	MfMenuEntry    **entry;
+	unsigned int rows, cols;
+	unsigned int *colsWidth;
+	MfMenuEntry  **entry;
 } MfMenuTable;
 
 #endif

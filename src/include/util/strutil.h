@@ -101,7 +101,7 @@ char *strutilCounterPbrk( const char *__restrict__ src, const char *__restrict__
 char *strutilCounterReversePbrk( const char *__restrict__ src, const char *__restrict__ search );
 
 /*
-	strutilRemoveChar 
+	strutilTrim
 	
 	文字列から、指定した文字を削除し、さらに詰める。
 	
@@ -115,7 +115,41 @@ char *strutilCounterReversePbrk( const char *__restrict__ src, const char *__res
 	@return: int
 		取り除いた文字数。
 */
-int strutilRemoveChar( char *__restrict__ str, const char *__restrict__ search );
+int strutilTrim( char *__restrict__ str, const char *__restrict__ search );
+
+/*
+	strutilLTrim
+	
+	文字列から、指定した文字を削除し、さらに詰める。
+	
+	@param: char *str
+		処理対象の文字列。
+	
+	@param: const char *search
+		取り除く文字を指定。
+		文字列で指定するが、取り除きたい文字を全て書き出す。
+	
+	@return: int
+		取り除いた文字数。
+*/
+int strutilLTrim( char *__restrict__ str, const char *__restrict__ search );
+
+/*
+	strutilRTrim
+	
+	文字列から、指定した文字を削除し、さらに詰める。
+	
+	@param: char *str
+		処理対象の文字列。
+	
+	@param: const char *search
+		取り除く文字を指定。
+		文字列で指定するが、取り除きたい文字を全て書き出す。
+	
+	@return: int
+		取り除いた文字数。
+*/
+int strutilRTrim( char *__restrict__ str, const char *__restrict__ search );
 
 /*
 	strutilToUpperFirst
@@ -179,6 +213,23 @@ unsigned int strutilCountChar( const char *str, char c );
 */
 int strutilInsert( char *__restrict__ dest, const char *__restrict__ src, size_t max );
 int strutilNInsert( char *__restrict__ dest, const char *__restrict__ src, size_t n, size_t max );
+
+/*
+	strutilWildcard
+	
+	ワイルドカードの判定を行う。
+	
+	@param: const char *__restrict__ wc
+		ワイルドカード文字列。
+	
+	@param: const char *__restrict__ name
+		マッチするか調べる文字列。
+	
+	@return: int
+		0        = マッチしていない
+		それ以外 = マッチ
+*/
+int strutilWildcard( const char *__restrict__ wc, const char *__restrict__ name );
 
 #ifdef __cplusplus
 }

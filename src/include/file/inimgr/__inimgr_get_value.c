@@ -2,21 +2,18 @@
 
 #include "inimgr_types.h"
 
-char *__inimgr_get_value( struct inimgr_params *params, const char *section, const char *key )
+int __inimgr_get_value( struct inimgr_params *params, const char *name, const char *key, char **result )
 {
-	struct inimgr_section *target_section;
+	struct inimgr_section *section;
+	struct inimgr_entry   *entry;
 	
-	if( ! params  ) return NULL;
-	if( ! section ) section = INIMGR_DEFAULT_SECTION_NAME;
-	
-	target_section = __inimgr_find_section( params, section );
-	
-	if( target_section ){
-		struct inimgr_entry *target_entry = __inimgr_find_entry( target_section, key );
-		if( target_entry ){
-			return target_entry->value;
-		}
+	if( ! ( section = __inimgr_find_section( params, name ) ) ){
+		return CG_ERROR_INI_SECTION_NOT_FOUND;
+	} else if( ! ( entry   = __inimgr_find_entry( section, key ) ) ){
+		return CG_ERROR_INI_KEY_NOT_FOUND;
 	}
 	
-	return NULL;
+	*result = entry->value;
+	
+	return CG_ERROR_OK;
 }

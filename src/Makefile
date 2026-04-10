@@ -36,6 +36,10 @@
 # PSPLINK用にデバッグメッセージをprintf出力する:
 #     WITH_PSPLINK_DEBUG=1
 #
+# メインスレッド起動時に、指定したサイズを残してメモリを全て確保し、
+# 空きメモリの少ない状態をシミュレート:
+#     WITH_LOW_MEMORY_SIM=<FreeSize>
+#
 #======================================
 
 TARGET = macrofire
@@ -68,23 +72,21 @@ CLASSG_LIBS = -lcdialog -lovmsg -linimgr -ldirh -lfiomgr -lpadctrl -lpadutil -lp
 
 OBJS = \
 	exports.o \
-	sceSYSCON_Driver.o \
-	sceDmac.o \
-	sceUtility.o \
-	sceUmd.o \
 	mfmain.o \
-	mfanalogstick.o \
-	mfrapidfire.o \
-	mfctrl.o \
-	mfdialog.o \
-	mfmenu.o \
-	functions/remap.o \
-	functions/rapidfire.o \
-	functions/macromgr.o \
-	functions/macro.o \
-	functions/macroeditor.o 
+	$(patsubst %.S,%.o,$(wildcard psplib/*.S)) \
+	$(patsubst %.c,%.o,$(wildcard mfctrl/*.c)) \
+	$(patsubst %.c,%.o,$(wildcard mfdialog/*.c)) \
+	$(patsubst %.c,%.o,$(wildcard mfanalogstick/*.c)) \
+	$(patsubst %.c,%.o,$(wildcard mfrapidfire/*.c)) \
+	$(patsubst %.c,%.o,$(wildcard mfmenu/*.c)) \
+	$(patsubst %.c,%.o,$(wildcard functions/*.c))
+
 
 LIBS := $(CLASSG_LIBS) $(LIBS)
+
+ifdef WITH_LOW_MEMORY_SIM
+	CFLAGS += -DMF_LOW_MEMORY_TEST=$(WITH_LOW_MEMORY_SIM)
+endif
 
 ifdef WITH_PSPLINK_DEBUG
 	CFLAGS += -fno-builtin-printf -g -DDEBUG=1
@@ -105,13 +107,14 @@ endif
 
 ifeq ($(USE_KERNEL_LIBC),1)
     CFLAGS += -DPSP_USE_KERNEL_LIBC
-	OBJS += sceSystemMemoryManager.o
 	LIBS += -lsysclib
 else
 	LIBS += -lpspkernel -lc -lpspuser
 endif
 
 export WITH_LIBS_DEBUG
+export USE_KERNEL_LIBC
+export USE_KERNEL_LIBS
 
 PSPSDK = $(shell psp-config --pspsdk-path)
 include $(PSPSDK)/lib/build_prx.mak

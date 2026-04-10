@@ -2,19 +2,20 @@
 
 #include "inimgr_types.h"
 
-bool inimgrGetBool( IniUID uid, const char *section, const char *key, bool *var )
+int inimgrGetBool( InimgrUID uid, const char *name, const char *key, bool *res )
 {
-	char *value = __inimgr_get_value( (struct inimgr_params *)uid, section, key );
+	int ret;
+	char *value;
 	
-	if( value ){
-		strupr( value );
-		if( strcasecmp( value, "On" ) == 0 ){
-			*var = true;
-		} else if( strcasecmp( value, "Off" ) == 0 ){
-			*var = false;
+	if( ( ret = __inimgr_get_value( (struct inimgr_params *)uid, name, key, &value ) ) == CG_ERROR_OK ){
+		if( strcasecmp( value, "ON" ) == 0 ){
+			*res = true;
+		} else if( strcasecmp( value, "OFF" ) == 0 ){
+			*res = false;
+		} else{
+			ret = CG_ERROR_INI_INVALID_VALUE;
 		}
-		return true;
 	}
 	
-	return false;
+	return ret;
 }

@@ -20,12 +20,13 @@
 #include "pad/padutil.h"
 #include "graphic/pb.h"
 #include "mfmemory.h"
+#include "cgtypes.h"
 
 /*=========================================================
 	マクロ
 =========================================================*/
 #define MF_SIZEOF_ARRAY( x ) sizeof( x ) / sizeof( x[0] )
-#define MF_PATH_MAX 255
+#define MF_PATH_MAX CG_PATH_MAX
 
 #define MF_TARGET_BUTTONS ( \
 	PSP_CTRL_CIRCLE   | PSP_CTRL_CROSS    | PSP_CTRL_SQUARE | PSP_CTRL_TRIANGLE | \
@@ -122,11 +123,11 @@ typedef enum {
 	プロシージャ
 -----------------------------------------------*/
 typedef void ( *MfFuncInit   )( void );
-typedef void ( *MfFuncIni    )( IniUID, char*, size_t );
+typedef void ( *MfFuncIni    )( InimgrUID, char*, size_t );
 typedef void ( *MfFuncTerm   )( void );
 typedef void ( *MfFuncHook   )( MfHookAction, SceCtrlData*, MfHprmKey* );
 typedef void ( *MfFuncToggle )( bool );
-typedef void ( *MfFuncMenu   )( MfMessage );
+typedef int  ( *MfFuncMenu   )( MfMessage );
 typedef void *( *MfProc      )( MfRootMessage message );
 
 #endif

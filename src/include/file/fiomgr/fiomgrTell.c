@@ -7,7 +7,7 @@ SceOff fiomgrTell( FiomgrHandle fh )
 	struct fiomgr_params *params = (struct fiomgr_params *)fh;
 	SceOff pos;
 	
-	if( params->largeFile ){
+	if( params->flags & FH_O_LARGEFILE ){
 		pos = sceIoLseek( params->fd, 0, FH_SEEK_CUR );
 	} else{
 		pos = sceIoLseek32( params->fd, 0, FH_SEEK_CUR );

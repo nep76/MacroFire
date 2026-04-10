@@ -24,21 +24,14 @@
 /*=========================================================
 	å^êÈåæ
 =========================================================*/
-typedef enum {
-	RAPIDFIRE_NORMAL = 0,
-	RAPIDFIRE_RAPID,
-	RAPIDFIRE_AUTORAPID,
-	RAPIDFIRE_HOLD,
-	RAPIDFIRE_AUTOHOLD
-} rapidfireMode;
 
 /*=========================================================
 	ä÷êî
 =========================================================*/
 void *rapidfireProc( MfMessage message );
-void rapidfireIniLoad( IniUID ini, char *buf, size_t len );
-void rapidfireIniCreate( IniUID ini, char *buf, size_t len );
+void rapidfireIniLoad( InimgrUID ini, char *buf, size_t len );
+void rapidfireIniCreate( InimgrUID ini, char *buf, size_t len );
 void rapidfireMain( MfHookAction action, SceCtrlData *pad, MfHprmKey *hk );
-void rapidfireMenu( MfMessage message );
+int  rapidfireMenu( MfMessage message );
 
 #endif

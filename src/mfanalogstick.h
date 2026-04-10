@@ -14,11 +14,11 @@
 	ä÷êî
 =========================================================*/
 void mfAnalogStickInit( void );
-void mfAnalogStickIniLoad( IniUID ini, char *buf, size_t len );
-void mfAnalogStickIniSave( IniUID ini, char *buf, size_t len );
+void mfAnalogStickIniLoad( InimgrUID ini, char *buf, size_t len );
+void mfAnalogStickIniSave( InimgrUID ini, char *buf, size_t len );
 bool mfAnalogStickIsEnabled( void );
 void mfAnalogStickAdjust( SceCtrlData *pad );
-void mfAnalogStickMenu( MfMessage message );
+int  mfAnalogStickMenu( MfMessage message );
 const PadutilAnalogStick *mfAnalogStickGetContext( void );
 
 #endif

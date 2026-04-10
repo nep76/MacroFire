@@ -26,6 +26,6 @@ typedef enum {
 /*=========================================================
 	コントロールプロシージャ
 =========================================================*/
-typedef bool ( *MfControl )( MfMessage message, const char *label, void *var, void *arg, void *ex );
+typedef int ( *MfControl )( MfMessage message, const char *label, void *var, void *arg, void *ex );
 
 #endif

@@ -39,7 +39,45 @@ typedef uintptr_t DmemUID;
 /*=========================================================
 	関数
 =========================================================*/
-DmemUID dmemNew( size_t minblock, int type );
+
+/*-----------------------------------------------
+	dmemNew
+	
+	動的メモリUIDを生成する。
+	パーティションIDは、最初に作成するヒープエリアの位置。
+	
+	@param: size_t minblock
+		ヒープ1ブロックの最小サイズ。
+		ヒープが足りなくなると、このサイズの新しいヒープを作成しそれをつなぐ。
+		
+	@param: MemoryPartition partid
+		ヒープをを作成するメモリパーティション。
+	
+	@param: int type
+		割り当て方向。
+		DMEM_HIGHかDMEM_LOWを指定。
+	
+	@return: DmemUID
+		動的メモリUID。
+		0で失敗。
+-----------------------------------------------*/
+DmemUID dmemNew( size_t minblock, MemoryPartition partid, int type );
+
+/*-----------------------------------------------
+	dmemAlloc
+	
+	動的メモリUIDからメモリ領域を確保する。
+	
+	@param: DmemUID
+		dmemNew()で得たUID。
+	
+	@param: size_t size
+		確保するサイズ。
+	
+	@return: void*
+		メモリ領域へのポインタ。
+	
+-----------------------------------------------*/
 void *dmemAlloc( DmemUID uid, size_t size );
 void *dmemCalloc( DmemUID uid, size_t nelem, size_t size );
 int dmemFree( DmemUID uid, void *ptr );

@@ -189,7 +189,7 @@ extern "C" {
 typedef uint64_t       PadutilButtons;
 typedef unsigned char  PadutilCoord;
 typedef char           PadutilRelCoord;
-typedef unsigned short PadutilSensitivity;
+typedef unsigned int   PadutilSensitivity;
 
 typedef struct {
 	PadutilCoord       originX;

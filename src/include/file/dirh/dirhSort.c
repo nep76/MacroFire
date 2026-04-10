@@ -8,7 +8,7 @@ void dirhSort( DirhUID uid, int ( *compare )( const void*, const void* ) )
 {
 	struct dirh_params *params = (struct dirh_params *)uid;
 	
-	qsort( params->entry.list, params->entry.count, sizeof( DirhFileInfo ), compare ? compare : dirh_default_sort );
+	qsort( params->data.entry.list, params->data.entry.count, sizeof( DirhFileInfo ), compare ? compare : dirh_default_sort );
 }
 
 static int dirh_default_sort( const void *a, const void *b )

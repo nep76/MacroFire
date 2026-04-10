@@ -71,7 +71,7 @@ CdialogResult cdialogNumeditGetResult( void )
 	return st_params->base.result;
 }
 
-int cdialogNumeditStart( unsigned short x, unsigned short y )
+int cdialogNumeditStart( unsigned int x, unsigned int y )
 {
 	int ret;
 	
@@ -83,10 +83,10 @@ int cdialogNumeditStart( unsigned short x, unsigned short y )
 	return ret;
 }
 
-int cdialogNumeditStartNoLock( unsigned short x, unsigned short y )
+int cdialogNumeditStartNoLock( unsigned int x, unsigned int y )
 {
 	int ret;
-	unsigned short width;
+	unsigned int width;
 	
 	st_params->base.status = CDIALOG_INIT;
 	
@@ -232,9 +232,9 @@ void cdialogNumeditDestroy( void )
 
 void cdialog_numedit_draw( struct cdialog_dev_base_params *base, CdialogNumeditData *data, struct cdialog_numedit_work *work )
 {
-	unsigned short i;
-	unsigned short avail_offset;
-	unsigned short display_x_start = base->width - pbOffsetChar( work->maxdigits + strlen( data->unit ) + 2 );
+	unsigned int i;
+	unsigned int avail_offset;
+	unsigned int display_x_start = base->width - pbOffsetChar( work->maxdigits + strlen( data->unit ) + 2 );
 	
 	{
 		char *digits = strutilCounterPbrk( work->numbers, "0" );
@@ -336,7 +336,7 @@ void cdialog_numedit_set_number( void *num, uint32_t max, uint32_t *value )
 void cdialog_numedit_rotate( enum cdialog_numedit_rotate_direction rotate, struct cdialog_numedit_work *work, uint32_t max )
 {
 	char max_str[CDIALOG_NUMEDIT_MAX_NUMBER_OF_DIGITS + 1];
-	unsigned short offset = CDIALOG_NUMEDIT_MAX_NUMBER_OF_DIGITS - work->maxdigits;
+	unsigned int offset = CDIALOG_NUMEDIT_MAX_NUMBER_OF_DIGITS - work->maxdigits;
 	
 	snprintf( max_str, sizeof( max_str ), "%010u", max );
 	
@@ -355,7 +355,7 @@ void cdialog_numedit_rotate( enum cdialog_numedit_rotate_direction rotate, struc
 	}
 	
 	if( work->numbers[0] >= max_str[offset] ){
-		unsigned short i;
+		unsigned int i;
 		for( i = 0; i <= work->maxdigits; i++ ){
 			if(
 				( i == 0 && work->numbers[i] > max_str[offset + i] ) ||

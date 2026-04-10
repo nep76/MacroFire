@@ -19,7 +19,7 @@
 #define REMAP_INI_SIGNATURE "MACROFIRE-REMAP"
 #define REMAP_INI_VERSION   2
 
-#define REMAP_SECTION_DATA "Remap*"
+#define REMAP_SECTION_DATA "Remap"
 
 #define REMAP_COLUMN_LIST 0
 #define REMAP_COLUMN_MENU 1
@@ -28,10 +28,10 @@
 	ä÷êî
 =========================================================*/
 void *remapProc( MfMessage message );
-void remapIniLoad( IniUID ini, char *buf, size_t len );
-void remapIniCreate( IniUID ini, char *buf, size_t len );
+void remapIniLoad( InimgrUID ini, char *buf, size_t len );
+void remapIniCreate( InimgrUID ini, char *buf, size_t len );
 void remapMain( MfHookAction action, SceCtrlData *pad, MfHprmKey *hk );
-void remapMenu( MfMenuMessage message );
+int  remapMenu( MfMenuMessage message );
 
 
 #endif

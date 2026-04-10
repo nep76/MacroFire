@@ -23,8 +23,6 @@ void pbInit( void )
 	__pb_internal_params.display        = &(__pb_internal_params.frame0);
 	__pb_internal_params.draw           = &(__pb_internal_params.frame1);
 	__pb_internal_params.options        = 0;
-	__pb_internal_params.blendFactor    = 0;
-	__pb_internal_params.linebreakWidth = 0;
 }
 
 void *__pb_buf_addr( struct pb_frame_buffer *fb, int x, int y )

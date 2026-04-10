@@ -9,7 +9,6 @@
 #define DIRH_H
 
 #include <pspkernel.h>
-#include <stdio.h>
 
 /*=========================================================
 	É}ÉNÉç
@@ -25,20 +24,19 @@ extern "C" {
 typedef intptr_t DirhUID;
 
 typedef enum {
-	DIRH_O_DOPEN_WITH_THREAD = 0x00000001,
-	DIRH_O_ALLOC_HIGH        = 0x00000002
+	DIRH_O_ALLOC_HIGH = 0x00000002
 } DirhOptions;
 
 typedef enum {
-	DIRH_NULL = 0,
+	DIRH_UNK  = 0,
 	DIRH_FILE = FIO_SO_IFREG,
 	DIRH_DIR  = FIO_SO_IFDIR
 } DirhFileType;
 
 typedef enum {
-	DIRH_SEEK_SET = SEEK_SET,
-	DIRH_SEEK_CUR = SEEK_CUR,
-	DIRH_SEEK_END = SEEK_END
+	DIRH_SEEK_SET = PSP_SEEK_SET,
+	DIRH_SEEK_CUR = PSP_SEEK_CUR,
+	DIRH_SEEK_END = PSP_SEEK_END
 } DirhWhence;
 
 typedef struct {
@@ -50,7 +48,7 @@ typedef struct {
 	ä÷êî
 =========================================================*/
 DirhUID dirhNew( size_t pathmax, unsigned int options );
-int dirhChdir( DirhUID uid, const char *dirpath, unsigned int timeout );
+int dirhChdir( DirhUID uid, const char *dirpath, SceUInt timeout );
 void dirhDestroy( DirhUID uid );
 DirhFileInfo *dirhRead( DirhUID uid );
 int dirhTell( DirhUID uid );

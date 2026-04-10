@@ -48,7 +48,6 @@ typedef struct {
 	struct cdialog_dev_base_params base;
 	CdialogDetectbuttonsData data;
 	struct cdialog_detectbuttons_work work;
-	bool showMessage;
 } CdialogDetectbuttonsParams;
 
 /*=========================================================
@@ -58,8 +57,8 @@ int cdialogDetectbuttonsInit( CdialogDetectbuttonsParams *params );
 CdialogDetectbuttonsData *cdialogDetectbuttonsGetData( void );
 CdialogStatus cdialogDetectbuttonsGetStatus( void );
 CdialogResult cdialogDetectbuttonsGetResult( void );
-int cdialogDetectbuttonsStart( unsigned short x, unsigned short y );
-int cdialogDetectbuttonsStartNoLock( unsigned short x, unsigned short y );
+int cdialogDetectbuttonsStart( unsigned int x, unsigned int y );
+int cdialogDetectbuttonsStartNoLock( unsigned int x, unsigned int y );
 int cdialogDetectbuttonsUpdate( void );
 int cdialogDetectbuttonsShutdownStartNoLock( void );
 int cdialogDetectbuttonsShutdownStart( void );

@@ -52,9 +52,9 @@ typedef enum {
 
 typedef struct {
 	char *codes;
-	short width;
-	short letterSpace;
-	short lineHeight;
+	int width;
+	int letterSpace;
+	int lineHeight;
 } CdialogSoskCharTable;
 
 typedef struct {
@@ -75,9 +75,9 @@ struct cdialog_sosk_work_text {
 struct cdialog_sosk_work_chtab {
 	CdialogSoskInputType type;
 	CdialogSoskCharTable *data;
-	short                count;
-	short                pos;
-	short                lastPos;
+	int                  count;
+	int                  pos;
+	int                  lastPos;
 };
 
 struct cdialog_sosk_work {
@@ -102,8 +102,8 @@ int cdialogSoskInit( CdialogSoskParams *params );
 CdialogSoskData *cdialogSoskGetData( void );
 CdialogStatus cdialogSoskGetStatus( void );
 CdialogResult cdialogSoskGetResult( void );
-int cdialogSoskStart( unsigned short x, unsigned short y );
-int cdialogSoskStartNoLock( unsigned short x, unsigned short y );
+int cdialogSoskStart( unsigned int x, unsigned int y );
+int cdialogSoskStartNoLock( unsigned int x, unsigned int y );
 int cdialogSoskUpdate( void );
 int cdialogSoskShutdownStartNoLock( void );
 int cdialogSoskShutdownStart( void );

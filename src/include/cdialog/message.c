@@ -68,7 +68,7 @@ CdialogResult cdialogMessageGetResult( void )
 	return st_params->base.result;
 }
 
-int cdialogMessageStart( unsigned short x, unsigned short y )
+int cdialogMessageStart( unsigned int x, unsigned int y )
 {
 	int ret;
 	
@@ -80,7 +80,7 @@ int cdialogMessageStart( unsigned short x, unsigned short y )
 	return ret;
 }
 
-int cdialogMessageStartNoLock( unsigned short x, unsigned short y )
+int cdialogMessageStartNoLock( unsigned int x, unsigned int y )
 {
 	int ret;
 	unsigned int w, h;
@@ -162,7 +162,7 @@ void cdialogMessageDestroy( void )
 
 static void cdialog_message_count_width_and_height( const char *str, unsigned int *width, unsigned int *height )
 {
-	unsigned short cur_width = 0;
+	unsigned int cur_width = 0;
 	const char *start = str;
 	const char *end   = NULL;
 	
@@ -210,7 +210,7 @@ static void cdialog_message_draw( struct cdialog_dev_base_params *base, CdialogM
 	if( data->callback ) ( data->callback )( base->x + pbOffsetChar( 1 ), base->y + pbOffsetLine( 3 ), base->color );
 	
 	if( data->options & CDIALOG_MESSAGE_ERROR ){
-		snprintf( buf, sizeof( buf ), "(0x%X)", data->errorcode );
+		snprintf( buf, sizeof( buf ), "(%X)", data->errorcode );
 		pbPrintf(
 			base->x + ( base->width >> 1 ) - ( pbMeasureString( buf ) >> 1 ),
 			base->y + + base->height - pbOffsetLine( 4 ),

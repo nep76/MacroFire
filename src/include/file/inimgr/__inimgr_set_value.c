@@ -2,38 +2,39 @@
 
 #include "inimgr_types.h"
 
-int __inimgr_set_value( struct inimgr_params *params, const char *section, const char *key, const char *value )
+int __inimgr_set_value( struct inimgr_params *params, struct inimgr_section *section, const char *key, const char *value )
 {
-	struct inimgr_section *target_section;
-	struct inimgr_entry   *target_entry;
+	struct inimgr_entry *entry;
+	unsigned int keylen = strlen( key ) + 1;
 	
-	if( ! params ) return CG_ERROR_INVALID_ARGUMENT;
-	if( ! section ) section = INIMGR_DEFAULT_SECTION_NAME;
-	
-	target_section = __inimgr_find_section( params, section );
-	if( ! target_section ){
-		int ret = inimgrAddSection( (IniUID)params, section );
-		if( ret < 0 ) return ret;
-		target_section = __inimgr_find_section( params, section );
+	if( ! section ){
+		return CG_ERROR_INI_SECTION_NOT_FOUND;
+	} else if( ! key || ! value ){
+		return CG_ERROR_INVALID_ARGUMENT;
 	}
 	
-	target_entry = __inimgr_find_entry( target_section, key );
-	if( ! target_entry ){
-		struct inimgr_entry *last_entry;
+	if( ! ( entry = __inimgr_find_entry( section, key ) ) ){
+		entry = dmemAlloc( params->dmem, sizeof( struct inimgr_entry ) + INIMGR_ENTRY_LENGTH );
+		if( ! entry ) return CG_ERROR_NOT_ENOUGH_MEMORY;
 		
-		target_entry = __inimgr_create_entry( params, key, value );
-		if( ! target_entry ) return CG_ERROR_NOT_ENOUGH_MEMORY;
+		entry->key   = (char *)( (uintptr_t)entry + sizeof( struct inimgr_entry ) );
+		entry->value = (char *)( (uintptr_t)entry->key + keylen );
 		
-		if( ! target_section->entry ){
-			target_section->entry = target_entry;
+		entry->flags = 0;
+		strcpy( entry->key, key );
+		
+		if( ! section->entry ){
+			entry->prev = NULL;
+			entry->next = NULL;
+			section->entry = entry;
 		} else{
-			for( last_entry = target_section->entry; last_entry->next; last_entry = last_entry->next );
-			last_entry->next = target_entry;
-			target_entry->prev = last_entry;
+			for( entry->prev = section->entry; entry->prev->next; entry->prev = entry->prev->next );
+			entry->prev->next = entry;
+			entry->next       = NULL;
 		}
-	} else{
-		strutilCopy( target_entry->value, value, target_entry->vspace );
 	}
+	
+	strutilCopy( entry->value, value, INIMGR_ENTRY_LENGTH - keylen );
 	
 	return CG_ERROR_OK;
 }
