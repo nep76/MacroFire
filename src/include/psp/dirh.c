@@ -1,475 +1,342 @@
-/*
-	dirh.c
-*/
+/*=========================================================
 
+	dirh.c
+	
+	ディレクトリハンドラ。
+
+=========================================================*/
 #include "dirh.h"
 
-static enum dirh_childthread_stat dirh_childthread_getstat( struct dirh_dopen_params *params );
-static void dirh_childthread_chstat( struct dirh_dopen_params *params, enum dirh_childthread_stat stat );
-static int dirh_childthread_dopen( SceSize args, void *argp );
-static SceUID dirh_get_dirent_thread( const char *dirpath, struct dirh_select_filename *sf );
-//static int dirh_get_dirent( const char *dirpath, struct dirh_select_filename *sf );
-static void dirh_destroy_dirent( struct dirh_dirents *entry );
-static int dirh_error( struct dirh_select_filename *sf, int lerror, int serror );
+/*=========================================================
+	ローカル型宣言
+=========================================================*/
 
-static bool st_thread_worked = false;
+struct dirh_cwd {
+	char  *path;
+	size_t length;
+};
 
-static enum dirh_childthread_stat dirh_childthread_getstat( struct dirh_dopen_params *params )
+struct dirh_entry {
+	DirhFileInfo *list;
+	unsigned int count;
+	int          pos;
+};
+
+struct dirh_thread_dopen_params {
+	SceUID     selfThreadId;
+	const char *path;
+	bool       completed;
+	struct dirh_entry *entry;
+};
+
+struct dirh_params {
+	struct dirh_cwd cwd;
+	struct dirh_entry entry;
+	unsigned int options;
+};
+
+/*=========================================================
+	ローカル関数
+=========================================================*/
+static int dirh_make_entries( const char *dirpath, struct dirh_entry *entry, struct dirh_thread_dopen_params **thdopen, unsigned int timeout );
+static void dirh_clear_entries( struct dirh_entry *entry );
+static int dirh_dopen_wrapper( SceSize args, void *argp );
+static bool dirh_wait_for_dopen_thread( struct dirh_thread_dopen_params *thdopen, enum PspThreadStatus stat );
+static bool dirh_thread_dopen_ready( struct dirh_thread_dopen_params **thdopen );
+static bool dirh_thread_dopen( struct dirh_thread_dopen_params *thdopen, const char *dirpath, unsigned int timeout );
+static void dirh_thread_dopen_exit( struct dirh_thread_dopen_params *thdopen );
+static int dirh_parse_dirent( const char *dirpath, struct dirh_entry *entry );
+static int dirh_default_sort( const void *a, const void *b );
+
+/*=========================================================
+	ローカル変数
+=========================================================*/
+static struct dirh_thread_dopen_params *st_thdopen;
+
+/*=========================================================
+	関数
+=========================================================*/
+DirhUID dirhNew( size_t pathmax, unsigned int options )
 {
-	enum dirh_childthread_stat stat;
+	struct dirh_params *params = (struct dirh_params *)memoryAlloc( sizeof( struct dirh_params ) + pathmax );
+	if( ! params ) return 0;
 	
-	sceKernelWaitSema( params->lock, 1, 0 );
-	stat = params->status;
-	sceKernelSignalSema( params->lock, 1 );
+	/* 初期化 */
+	params->cwd.path    = (char *)( (uintptr_t)params + sizeof( struct dirh_params ) );
+	params->cwd.length  = pathmax;
+	params->entry.list  = NULL;
+	params->entry.count = 0;
+	params->entry.pos   = 0;
+	params->options     = options;
 	
-	return stat;
+	params->cwd.path[0] = '\0';
+	
+	return (DirhUID)params;
 }
 
-static void dirh_childthread_chstat( struct dirh_dopen_params *params, enum dirh_childthread_stat stat )
+int dirhChdir( DirhUID uid, const char *dirpath, unsigned int timeout )
 {
-	sceKernelWaitSema( params->lock, 1, 0 );
-	params->status = stat;
-	sceKernelSignalSema( params->lock, 1 );
-}
-
-static int dirh_childthread_dopen( SceSize args, void *argp )
-{
-	struct dirh_dopen_params *params = (*(struct dirh_dopen_params **)argp);
-	SceIoDirent dirent;
-	int ret;
-	int file_index, dir_index;
+	struct dirh_params *params = (struct dirh_params *)uid;
 	
-	dirh_childthread_chstat( params, DIRH_CHILDTHREAD_INIT );
+	/* パスを展開 */
+	if( ! pathexpandFromCwd( dirpath, params->cwd.path, params->cwd.length ) ) return CG_ERROR_NO_FILE_ENTRY;
 	
-	params->lock = sceKernelCreateSema( "dopen_wrapper_sema", 0, 1, 1, 0 );
-	
-	dirh_childthread_chstat( params, DIRH_CHILDTHREAD_READY );
-	
-	params->fd = sceIoDopen( params->path );
-	if( dirh_childthread_getstat( params ) == DIRH_CHILDTHREAD_ABORT ){
-		goto ABORT;
-	} else if( params->fd < 0 ){
-		dirh_error( params->sf, CG_ERROR_FAILED_TO_DOPEN, params->fd );
-		goto ABORT;
-	}
-	
-	memset( &dirent, 0, sizeof( SceIoDirent ) );
-	
-	dirh_childthread_chstat( params, DIRH_CHILDTHREAD_COUNT );
-	
-	while( ( ret = sceIoDread( params->fd, &dirent ) ) > 0 ){
-		if( dirent.d_stat.st_attr & FIO_SO_IFDIR ){
-			if( strcmp( dirent.d_name, "." ) == 0 ) continue;
-			params->sf->entry.dirCount++;
-		} else if( dirent.d_stat.st_attr & FIO_SO_IFREG ){
-			params->sf->entry.fileCount++;
-		}
-	}
-	
-	sceIoDclose( params->fd );
-	
-	/* sceIoDread()がエラーを返していれば終了 */
-	if( dirh_childthread_getstat( params ) == DIRH_CHILDTHREAD_ABORT ){
-		goto ABORT;
-	} else if( ret < 0 ){
-		dirh_error( params->sf, CG_ERROR_FAILED_TO_DOPEN, ret );
-		goto ABORT;
-	}
-	
-	/* 読み込む準備 */
-	params->sf->entry.dirList = (char **)memsceMalloc( sizeof( char* ) * params->sf->entry.dirCount );
-	if( ! params->sf->entry.dirList ) goto ABORT;
-	params->sf->entry.fileList = (char **)memsceMalloc( sizeof( char* ) * params->sf->entry.fileCount );
-	if( ! params->sf->entry.fileList ) goto ABORT;
-	
-	/* 読み込む */
-	params->fd = sceIoDopen( params->path );
-	if( dirh_childthread_getstat( params ) == DIRH_CHILDTHREAD_ABORT ){
-		goto ABORT;
-	} else if( params->fd < 0 ){
-		dirh_error( params->sf, CG_ERROR_FAILED_TO_DOPEN, params->fd );
-		goto ABORT;
-	}
-	
-	memset( &dirent, 0, sizeof( SceIoDirent ) );
-	
-	dirh_childthread_chstat( params, DIRH_CHILDTHREAD_READ );
-	
-	for( file_index = 0, dir_index = 0; sceIoDread( params->fd, &dirent ) > 0;  ){
-		if( FIO_S_ISDIR( dirent.d_stat.st_mode ) ){
-			if( strcmp( dirent.d_name, "." ) == 0 ) continue;
-			
-			/*
-				NULLとディレクトリを表す"/"のために2バイト多く確保。
-				DIRH_OPT_ADD_DIR_SLASHで"/"を付加する設定になっていなくても関係なしに2バイト多く確保。
-			*/
-			params->sf->entry.dirList[dir_index] = (char *)memsceMalloc( sizeof( char ) * ( strlen( dirent.d_name ) + 2 ) );
-			if( ! params->sf->entry.dirList[dir_index] ) break;
-			
-			strcpy( params->sf->entry.dirList[dir_index], dirent.d_name );
-			if( params->sf->options & DIRH_OPT_ADD_DIR_SLASH ) strcat( params->sf->entry.dirList[dir_index], "/" );
-			
-			dir_index++;
-		} else if( FIO_S_ISREG( dirent.d_stat.st_mode ) ){
-			params->sf->entry.fileList[file_index] = (char *)memsceMalloc( sizeof( char ) * ( strlen( dirent.d_name ) + 1 ) );
-			if( ! params->sf->entry.fileList[file_index] ) break;
-			
-			strcpy( params->sf->entry.fileList[file_index], dirent.d_name );
-			file_index++;
-		}
-	}
-	
-	if( dir_index < params->sf->entry.dirCount || file_index < params->sf->entry.fileCount ){
-		// エントリを漏らさずに読み込むことができなかったとき
-	}
-	
-	sceIoDclose( params->fd );
-	
-	goto QUIT;
-	
-	ABORT:
-		memsceFree( params->sf->entry.fileList );
-		memsceFree( params->sf->entry.dirList );
-		if( params->fd >= 0 ) sceIoDclose( params->fd );
-		goto QUIT;
+	if( params->cwd.path[strlen( params->cwd.path ) - 1] != ':' ){
+		/* 末尾がコロンではない場合はドライブ指定ではないのでパスを解析 */
+		SceIoStat stat;
+		int ret;
 		
-	QUIT:
-		sceKernelDeleteSema( params->lock );
-		memsceFree( params );
-		st_thread_worked = false;
-		return sceKernelExitDeleteThread( 0 );
-}
-
-static int dirh_get_dirent_thread( const char *dirpath, struct dirh_select_filename *sf )
-{
-	struct dirh_dopen_params *params;
-	SceUID thid;
-	time_t start_time;
-	
-	if( ! dirpath || st_thread_worked ) return CG_ERROR_FAILED_TO_DOPEN;
-	
-	/* 
-		子スレッド内でsceIoDopenからディレクトリリストを読み込む作業を行うが、
-		sceIoDopenは、他のスレッドがすでにsceIoDopen中だと(?)自分が開けるまで延々待ち続ける。
+		memset( &stat, 0, sizeof( SceIoStat ) );
 		
-		通常あまり問題はないが、プラグインなどでスレッドを停止した場合、
-		この待機により操作不能になる。
+		/* 指定されたパスの情報を取得 */
+		if( ( ret = sceIoGetstat( params->cwd.path, &stat ) ) < 0 ){
+			return CG_ERROR_FAILED_TO_GETSTAT;
+		}
 		
-		そのため、子スレッドで開くが、スレッドをリジュームした際、
-		子スレッド内で行ったsceIoDopenは待機を続けているため、外から子スレッドを殺すと
-		sceIoDopenされっぱなしになりゲームなどが逆に止まる。
-		
-		そのため、この関数からは読み取りを行えと子スレッドに指示し、
-		規定時間以内に子スレッド実行フラグ(st_thread_worked)が消えない場合は、
-		子スレッドに中断フラグ(DIRH_CHILDTHREAD_ABORT)を設定し、抜ける。
-		
-		このフラグは、子スレッドがsceIoDopenを成功させたあと(他のスレッドがリジュームされた時)、
-		判定されることになるので、これが終わるまでparamsを解放する訳にはいかない。
-		
-		従って、このparama変数に割り当てたメモリは、子スレッドから解放される。
-	*/
-	params = memsceCalloc( 1, sizeof( struct dirh_dopen_params ) + strlen( dirpath ) + 1 );
-	if( ! params ) return CG_ERROR_FAILED_TO_DOPEN;
-	
-	params->fd   = -1;
-	params->path = (char *)( (unsigned int)params + sizeof( struct dirh_dopen_params ) );
-	strcpy( params->path, dirpath );
-	params->sf   = sf;
-	
-	thid = sceKernelCreateThread( "dopen_wrapper", dirh_childthread_dopen, 32, 2048, PSP_THREAD_ATTR_NO_FILLSTACK, NULL );
-	if( thid < 0 || sceKernelStartThread( thid, sizeof( struct dir_dopen_params ** ), &params ) < 0 ) return CG_ERROR_FAILED_TO_DOPEN;
-	
-	st_thread_worked = true;
-	
-	for( ; dirh_childthread_getstat( params ) < DIRH_CHILDTHREAD_READY; sceKernelDelayThread( 50000 ) );
-	
-	sceKernelLibcTime( &start_time );
-	
-	/* sceIoDopenが固まっていないかをチェック */
-	for( ; ; sceKernelDelayThread( 50000 ) ){
-		if( ! st_thread_worked ){
-			break;
-		} else if( sceKernelLibcTime( NULL ) - start_time >= 4 ){
-			dirh_childthread_chstat( params, DIRH_CHILDTHREAD_ABORT );
-			return CG_ERROR_FAILED_TO_DOPEN;
-		}
+		if( ! FIO_S_ISDIR( stat.st_mode ) ) return CG_ERROR_PATH_IS_NOT_DIR;
 	}
 	
-	return 0;
-}
-
-static int dirh_error( struct dirh_select_filename *sf, int lerror, int serror )
-{
-	sf->lError = lerror;
-	sf->sError = serror;
-	return sf->lError;
-}
-
-/* オプションでスレッド使用モードと非使用モードを切り替えられた方がよい?
-static int dirh_get_dirent( const char *dirpath, struct dirh_select_filename *sf )
-{
-	SceUID dfd;
-	SceIoDirent dir;
-	int ret, cnt_file = 0, cnt_dir = 0;
-	int fi = 0, di = 0;
+	if( params->entry.list ) dirh_clear_entries( &(params->entry) );
 	
-	// エントリ数を数える
-	dfd = sceIoDopen( dirpath );
-	if( dfd < 0 ) return dirh_error( sf, CG_ERROR_FAILED_TO_DOPEN, dfd );
-	
-	memset( &dir, 0, sizeof( SceIoDirent ) );
-	
-	while( ( ret = sceIoDread( dfd, &dir ) ) > 0 ){
-		if( dir.d_stat.st_attr & FIO_SO_IFDIR ){
-			if( strcmp( dir.d_name, "." ) == 0 ) continue;
-			cnt_dir++;
-		} else if( dir.d_stat.st_attr & FIO_SO_IFREG ){
-			cnt_file++;
-		}
-	}
-	
-	sceIoDclose( dfd );
-	
-	// sceIoDread()がエラーを返していればfalse
-	if( ret < 0 ) return dirh_error( sf, CG_ERROR_FAILED_TO_DREAD, ret );
-	
-	// 読み込む準備
-	sf->entry.dirList = (char **)memsceMalloc( sizeof( char* ) * cnt_dir );
-	if( ! sf->entry.dirList ) goto DESTROY;
-	sf->entry.fileList = (char **)memsceMalloc( sizeof( char* ) * cnt_file );
-	if( ! sf->entry.fileList ) goto DESTROY;
-	sf->entry.dirCount  = cnt_dir;
-	sf->entry.fileCount = cnt_file;
-	
-	// 読み込む
-	dfd = sceIoDopen( dirpath );
-	if( dfd < 0 ){
-		dirh_error( sf, CG_ERROR_FAILED_TO_DOPEN, dfd );
-		goto DESTROY;
-	}
-	
-	memset( &dir, 0, sizeof( SceIoDirent ) );
-	
-	for( fi = 0, di = 0; sceIoDread( dfd, &dir ) > 0;  ){
-		if( FIO_S_ISDIR( dir.d_stat.st_mode ) ){
-			if( strcmp( dir.d_name, "." ) == 0 ) continue;
-			
-			// NULLとディレクトリを表す"/"のために2バイト多く確保。
-			// DIRH_OPT_ADD_DIR_SLASHで"/"を付加する設定になっていなくても関係なしに2バイト多く確保。
-			sf->entry.dirList[di] = (char *)memsceMalloc( sizeof( char ) * ( strlen( dir.d_name ) + 2 ) );
-			if( ! sf->entry.dirList[di] ) break;
-			
-			strcpy( sf->entry.dirList[di], dir.d_name );
-			if( sf->options & DIRH_OPT_ADD_DIR_SLASH ) strcat( sf->entry.dirList[di], "/" );
-			
-			di++;
-		} else if( FIO_S_ISREG( dir.d_stat.st_mode ) ){
-			sf->entry.fileList[fi] = (char *)memsceMalloc( sizeof( char ) * ( strlen( dir.d_name ) + 1 ) );
-			if( ! sf->entry.fileList[fi] ) break;
-			
-			strcpy( sf->entry.fileList[fi], dir.d_name );
-			fi++;
-		}
-	}
-	
-	if( di < sf->entry.dirCount || fi < sf->entry.fileCount ){
-		// エントリを漏らさずに読み込むことができなかったとき
-	}
-	
-	sceIoDclose( dfd );
-	
-	return 0;
-	
-	DESTROY:
-		memsceFree( sf->entry.fileList );
-		memsceFree( sf->entry.dirList );
-		if( dfd >= 0 ) sceIoDclose( dfd );
-		return sf->lError;
-}
-*/
-
-static void dirh_destroy_dirent( struct dirh_dirents *entry )
-{
-	int i;
-	if( ! entry ) return;
-	
-	if( entry->dirList ){
-		if( entry->dirCount ){
-			for( i = 0; i < entry->dirCount; i++ ) memsceFree( entry->dirList[i] );
-		}
-		memsceFree( entry->dirList );
-	}
-	
-	if( entry->fileList ){
-		if( entry->fileCount ){
-			for( i = 0; i < entry->fileCount; i++ ) memsceFree( entry->fileList[i] );
-		}
-		memsceFree( entry->fileList );
-	}
-	
-	entry->pos        = 0;
-	entry->dirList    = NULL;
-	entry->dirCount   = 0;
-	entry->fileList   = NULL;
-	entry->fileCount  = 0;
-}
-
-DirhUID dirhNew( const char *dirpath, unsigned int options )
-{
-	struct dirh_select_filename *sf = (struct dirh_select_filename *)memsceMalloc( sizeof( struct dirh_select_filename ) );
-	int ret;
-	
-	if( ! sf ) return 0;
-	
-	sf->curDirFullpath[0] = '\0';
-	sf->options           = options;
-	
-	sf->entry.pos       = 0;
-	sf->entry.dirList   = NULL;
-	sf->entry.dirCount  = 0;
-	sf->entry.fileList  = NULL;
-	sf->entry.fileCount = 0;
-	
-	ret = dirhChdir( (DirhUID)sf, dirpath );
-	
-	if( ret < 0 ){
-		memsceFree( sf );
-		return ret;
-	} else{
-		return (DirhUID)sf;
-	}
+	return dirh_make_entries( params->cwd.path, &(params->entry), ( ( params->options & DIRH_OPT_DOPEN_WITH_THREAD ) ? &st_thdopen : NULL ), timeout );
 }
 
 void dirhDestroy( DirhUID uid )
 {
-	dirh_destroy_dirent( &(((struct dirh_select_filename *)uid)->entry) );
-	memsceFree( (struct dirh_select_filename *)uid );
-}
-
-int dirhChdir( DirhUID uid, const char *dirpath )
-{
-	int ret;
-	SceIoStat stat;
-	struct dirh_select_filename *sf = (struct dirh_select_filename *)uid;
+	if( ! uid ) return;
 	
-	dirh_error( sf, CG_ERROR_OK, 0 );
+	if( ((struct dirh_params *)uid)->entry.list ) dirh_clear_entries( &(((struct dirh_params *)uid)->entry) );
 	
-	if( ! pathexpandFromCwd( dirpath, sf->curDirFullpath, DIRH_MAXPATH ) )
-		return dirh_error( sf, CG_ERROR_NO_FILE_ENTRY, 0 );
-	
-	memset( &stat, 0, sizeof( SceIoStat ) );
-	
-	if( sf->curDirFullpath[strlen( sf->curDirFullpath ) - 1] != ':' ){
-		/* 末尾が:じゃなければドライブではないのでGetstat実行 */
-		if( ( ret = sceIoGetstat( sf->curDirFullpath, &stat ) ) < 0 )
-			return dirh_error( sf, CG_ERROR_FAILED_TO_GETSTAT, ret );
-		
-		if( ! FIO_S_ISDIR( stat.st_mode ) )
-			return dirh_error( sf, CG_ERROR_PATH_IS_NOT_DIR, 0 );
+	if( st_thdopen ){
+		dirh_wait_for_dopen_thread( st_thdopen, PSP_THREAD_WAITING );
+		dirh_thread_dopen_exit( st_thdopen );
 	}
 	
-	dirh_destroy_dirent( &(sf->entry) );
-	
-	return dirh_get_dirent_thread( sf->curDirFullpath, sf );
+	memoryFree( (void *)uid );
 }
 
-char* dirhRead( DirhUID uid )
+DirhFileInfo *dirhRead( DirhUID uid )
 {
-	struct dirh_select_filename *sf = (struct dirh_select_filename *)uid;
-	int dircnt = dirhGetDirEntryCount( uid );
-	char *retv;
+	struct dirh_params *params = (struct dirh_params *)uid;
 	
-	if( sf->entry.pos >= dirhGetAllEntryCount( uid ) ) return NULL;
+	if( params->entry.count <= params->entry.pos ) return NULL;
 	
-	if( sf->entry.pos < dircnt ){
-		retv = sf->entry.dirList[sf->entry.pos];
-	} else{
-		retv = sf->entry.fileList[sf->entry.pos - dircnt];
-	}
-	
-	sf->entry.pos++;
-	return retv;
+	return &(params->entry.list[params->entry.pos++]);
 }
 
 int dirhTell( DirhUID uid )
 {
-	return ((struct dirh_select_filename *)uid)->entry.pos;
+	return ((struct dirh_params *)uid)->entry.pos;
 }
 
-void dirhSeek( DirhUID uid, DirhWhence whence, int count )
+char *dirhGetCwd( DirhUID uid )
 {
-	int allent = dirhGetAllEntryCount( uid );
-	struct dirh_select_filename *sf = (struct dirh_select_filename *)uid;
+	return ((struct dirh_params *)uid)->cwd.path;
+}
+
+void dirhSort( DirhUID uid, int ( *compare )( const void*, const void* ) )
+{
+	struct dirh_params *params = (struct dirh_params *)uid;
 	
-	if( whence == DW_SEEK_SET ){
-		sf->entry.pos = 0;
-	} else if( whence == DW_SEEK_END ){
-		sf->entry.pos = allent;
-	} else if( whence == DW_SEEK_DIR ){
-		sf->entry.pos = 0;
-	} else if( whence == DW_SEEK_FILE ){
-		sf->entry.pos = dirhGetDirEntryCount( uid );
+	qsort( params->entry.list, params->entry.count, sizeof( DirhFileInfo ), compare ? compare : dirh_default_sort );
+}
+
+void dirhSeek( DirhUID uid, DirhWhence whence, int offset )
+{
+	struct dirh_params *params = (struct dirh_params *)uid;
+	
+	switch( whence ){
+		case DIRH_SEEK_SET: params->entry.pos = 0; break;
+		case DIRH_SEEK_END: params->entry.pos = params->entry.count; break;
+		case DIRH_SEEK_CUR: break;
 	}
 	
-	sf->entry.pos += count;
+	params->entry.pos += offset;
 	
-	if( sf->entry.pos < 0 ){
-		sf->entry.pos = 0;
-	} else if( sf->entry.pos > allent ){
-		sf->entry.pos = allent;
+	if( params->entry.pos < 0 ){
+		params->entry.pos = 0;
+	} else if( params->entry.pos > params->entry.count ){
+		params->entry.pos = params->entry.count;
 	}
 }
 
-char* dirhGetCwd( DirhUID uid )
+static int dirh_make_entries( const char *dirpath, struct dirh_entry *entry, struct dirh_thread_dopen_params **thdopen, unsigned int timeout )
 {
-	return ((struct dirh_select_filename *)uid)->curDirFullpath;
-}
-
-char* dirhGetFileName( DirhUID uid, int idxnum )
-{
-	int dircnt = dirhGetDirEntryCount( uid );
-	
-	if( idxnum < dircnt ){
-		return ((struct dirh_select_filename *)uid)->entry.dirList[idxnum];
-	} else if( idxnum < dirhGetAllEntryCount( uid ) ){
-		return ((struct dirh_select_filename *)uid)->entry.fileList[idxnum - dircnt];
+	if( thdopen ){
+		if( ! *thdopen ){
+			*thdopen = (struct dirh_thread_dopen_params *)memoryAlloc( sizeof( struct dirh_thread_dopen_params ) );
+			if( *thdopen ){
+				(*thdopen)->selfThreadId = 0;
+				(*thdopen)->path         = NULL;
+				(*thdopen)->completed    = false;
+				(*thdopen)->entry        = entry;
+			} else{
+				return CG_ERROR_NOT_ENOUGH_MEMORY;
+			}
+		}
+		if( *thdopen ){
+			bool ret;
+			
+			if( ! dirh_thread_dopen_ready( thdopen ) ) return CG_ERROR_FAILED_TO_DOPEN;
+			ret = dirh_thread_dopen( *thdopen, dirpath, timeout );
+			
+			return ret ? 0: CG_ERROR_FAILED_TO_DOPEN;
+		} else{
+			return CG_ERROR_FAILED_TO_DOPEN;
+		}
 	} else{
-		return NULL;
+		return dirh_parse_dirent( dirpath, entry );
 	}
 }
 
-unsigned int dirhGetFileType( DirhUID uid, int idxnum )
+static int dirh_parse_dirent( const char *dirpath, struct dirh_entry *entry )
 {
-	if( idxnum < dirhGetDirEntryCount( uid ) ){
-		return FIO_SO_IFDIR;
-	} else if( idxnum < dirhGetAllEntryCount( uid ) ){
-		return FIO_SO_IFREG;
+	SceUID fd;
+	SceIoDirent dirent;
+	size_t require_memsize;
+	int ret;
+	
+	char *strings;
+	unsigned int rest, i, len;
+	
+	fd = sceIoDopen( dirpath );
+	if( ! fd ) return CG_ERROR_FAILED_TO_DOPEN;
+	
+	memset( &dirent, 0, sizeof( SceIoDirent ) );
+	
+	require_memsize = 0;
+	while( ( ret = sceIoDread( fd, &dirent ) ) > 0 ){
+		if( dirent.d_stat.st_attr & ( FIO_SO_IFREG | FIO_SO_IFDIR ) && strcmp( dirent.d_name, "." ) != 0 ){
+			require_memsize += strlen( dirent.d_name ) + 1;
+			entry->count++;
+		}
+	}
+	sceIoDclose( fd );
+	
+	fd = sceIoDopen( dirpath );
+	if( ! fd ) return CG_ERROR_FAILED_TO_DOPEN;
+	
+	entry->list = (DirhFileInfo *)memoryAlloc( sizeof( DirhFileInfo ) * entry->count + require_memsize );
+	if( ! entry->list ) return CG_ERROR_NOT_ENOUGH_MEMORY;
+	strings     = (char *)((uintptr_t)(entry->list) + sizeof( DirhFileInfo ) * entry->count);
+	
+	memset( &dirent, 0, sizeof( SceIoDirent ) );
+	
+	/* ディレクトリリストを作成 */
+	rest = entry->count;
+	i = 0;
+	while( ( ret = sceIoDread( fd, &dirent ) ) > 0 ){
+		if( strcmp( dirent.d_name, "." ) != 0 && rest-- ){
+			if( dirent.d_stat.st_attr & FIO_SO_IFREG ){
+				entry->list[i].type = DIRH_FILE;
+			} else if( dirent.d_stat.st_attr & FIO_SO_IFDIR ){
+				entry->list[i].type = DIRH_DIR;
+			} else{
+				continue;
+			}
+			
+			entry->list[i].name = strings;
+			
+			len = strlen( dirent.d_name ) + 1;
+			strcpy( strings, dirent.d_name );
+			strings += len;
+			
+			i++;
+		}
+	}
+	
+	sceIoDclose( fd );
+	
+	return 0;
+}
+
+static void dirh_clear_entries( struct dirh_entry *entry )
+{
+	memoryFree( entry->list );
+	entry->list  = NULL;
+	entry->count = 0;
+	entry->pos   = 0;
+}
+
+static int dirh_dopen_wrapper( SceSize args, void *argp )
+{
+	struct dirh_thread_dopen_params **thdopen = (*(struct dirh_thread_dopen_params ***)argp);
+	
+	for( ;; ){
+		sceKernelSleepThread();
+		if( ! (*thdopen)->path ) break;
+		dirh_parse_dirent( (*thdopen)->path, (*thdopen)->entry );
+		(*thdopen)->completed = true;
+	}
+	
+	memoryFree( *thdopen );
+	*thdopen = NULL;
+	
+	return sceKernelExitDeleteThread( 0 );
+}
+
+static bool dirh_wait_for_dopen_thread( struct dirh_thread_dopen_params *thdopen, enum PspThreadStatus stat )
+{
+	SceKernelThreadInfo thstat;
+	thstat.size = sizeof( SceKernelThreadInfo );
+	
+	/* Dopenスレッドを待つ */
+	do{
+		if( sceKernelReferThreadStatus( thdopen->selfThreadId, &thstat ) != 0 ) return false;
+		sceKernelDelayThread( 1000 );
+	} while( thstat.status != PSP_THREAD_WAITING );
+	
+	return true;
+}
+
+static bool dirh_thread_dopen_ready( struct dirh_thread_dopen_params **thdopen )
+{
+	if( ! (*thdopen)->selfThreadId ){
+		(*thdopen)->selfThreadId = sceKernelCreateThread( "dirhDopenWrapper", dirh_dopen_wrapper, 32, 0x800, PSP_THREAD_ATTR_NO_FILLSTACK, NULL );
+		if( (*thdopen)->selfThreadId < 0 ) return false;
+		if( sceKernelStartThread( (*thdopen)->selfThreadId, sizeof( struct dirh_thread_dopen_params * ), &thdopen ) < 0 ) return false;
+	}
+	return true;
+}
+
+static bool dirh_thread_dopen( struct dirh_thread_dopen_params *thdopen, const char *dirpath, unsigned int timeout )
+{
+	time_t start_time;
+	int ret;
+	
+	if( ! dirh_wait_for_dopen_thread( thdopen, PSP_THREAD_WAITING ) ) return false;
+	
+	thdopen->path = dirpath;
+	thdopen->completed = false;
+	
+	ret = sceKernelWakeupThread( thdopen->selfThreadId );
+	
+	sceKernelLibcTime( &start_time );
+	
+	/* Dopenに成功するかタイムアウトするまで待つ */
+	for( ; ! thdopen->completed && ( sceKernelLibcTime( NULL ) - start_time < timeout ); sceKernelDelayThread( 10000 ) );
+	
+	return thdopen->completed ? true : false;
+}
+
+static void dirh_thread_dopen_exit( struct dirh_thread_dopen_params *thdopen )
+{
+	if( thdopen->selfThreadId ){
+		thdopen->path = NULL;
+		sceKernelWakeupThread( thdopen->selfThreadId );
+	}
+}
+
+static int dirh_default_sort( const void *a, const void *b )
+{
+	DirhFileInfo *file_a = (DirhFileInfo *)a;
+	DirhFileInfo *file_b = (DirhFileInfo *)b;
+	
+	if( file_a->type == file_b->type ){
+		return strcasecmp( file_a->name, file_b->name );
+	} else if( file_a->type == DIRH_DIR ){
+		return -1;
 	} else{
-		return 0;
+		return 1;
 	}
-}
-
-int dirhGetAllEntryCount( DirhUID uid )
-{
-	return ((struct dirh_select_filename *)uid)->entry.dirCount + ((struct dirh_select_filename *)uid)->entry.fileCount;
-}
-
-int dirhGetDirEntryCount( DirhUID uid )
-{
-	return ((struct dirh_select_filename *)uid)->entry.dirCount;
-}
-
-int dirhGetFileEntryCount( DirhUID uid )
-{
-	return ((struct dirh_select_filename *)uid)->entry.fileCount;
-}
-
-int dirhGetLastError( DirhUID uid )
-{
-	return ((struct dirh_select_filename *)uid)->lError;
-}
-
-int dirhGetLastSystemError( DirhUID uid )
-{
-	return ((struct dirh_select_filename *)uid)->sError;
 }

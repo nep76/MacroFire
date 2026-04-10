@@ -1,4 +1,21 @@
-MacroFire 2.4.1
+MacroFire 3.0.0
+
+目次
+=================================================
+
+  - 設定ファイルの書き方
+  - ボタン定義について
+  - 設定
+      - [Main]セクション
+      - [Menu]セクション
+      - [AlternativeButtons]セクション
+      - [AnalogStick]セクション
+      - [Default]セクション
+  - 起動時に読み込まれる設定ファイルをゲームごとに切り変えるには
+  - MacroFireメニュー上部の[ID: xxx / Loaded: xxx]の意味
+  - 起動時に検索されるセクションの名前と順番
+
+=================================================
 
 
 設定ファイルの書き方
@@ -22,35 +39,41 @@ MacroFire 2.4.1
 
   それぞれのボタンは以下の表の名前と対応しており、
   これらの名前をひとつ、あるいは「+」でつないで複数列挙します。
+  大文字小文字は区別しません。
 
       ------------------------
       ボタン名   | ボタン
       ------------------------
-      SELECT     | セレクトボタン
-      START      | スタートボタン
-      UP         | 十字キー上
-      RIGHT      | 十字キー右
-      DOWN       | 十字キー下
-      LEFT       | 十字キー左
-      LTRIGGER   | Lボタン
-      RTRIGGER   | Rボタン
-      TRIANGLE   | △ボタン
-      CIRCLE     | ○ボタン
-      CROSS      | ×ボタン
-      SQUARE     | □ボタン
+      Select     | セレクトボタン
+      Start      | スタートボタン
+      Up         | 十字キー上
+      Right      | 十字キー右
+      Down       | 十字キー下
+      Left       | 十字キー左
+      LTrigger   | Lボタン
+      RTrigger   | Rボタン
+      Triangle   | △ボタン
+      Circle     | ○ボタン
+      Cross      | ×ボタン
+      Square     | □ボタン
       NOTE       | ♪ボタン
       SCREEN     | 輝度変更ボタン
-      VOLUP      | 音量+ボタン
-      VOLDOWN    | 音量-ボタン
-      ANALOGUP   | アナログスティック上方向
-      ANALOGRIGHT| アナログスティック右方向
-      ANALOGDOWN | アナログスティック下方向
-      ANALOGLEFT | アナログスティック左方向
+      VolUp      | 音量+ボタン
+      VolDown    | 音量-ボタン
+      AnalogUp   | アナログスティック上方向
+      AnalogRight| アナログスティック右方向
+      AnalogDown | アナログスティック下方向
+      AnalogLeft | アナログスティック左方向
+      RPlayPause | リモコンの再生/一時停止ボタン
+      RForward   | リモコンの早送りボタン
+      RBack      | リモコンの巻き戻しボタン
+      RVolUp     | リモコンの音量+ボタン
+      RVolDown   | リモコンの音量-ボタン
       ------------------------
 
   たとえば、スタートボタンとセレクトボタンの同時押しにする場合は
 
-      START + SELECT
+      Start + Select
 
   のように記述します。
   また、単にボタン一つだけ、たとえば♪ボタンだけを設定する場合には、
@@ -61,13 +84,17 @@ MacroFire 2.4.1
 
   ちなみに、いないとは思いますが、
 
-      LEFT + RIGHT
-      UP + DOWN
-      UP + RIGHT + DOWN + LEFT
+      Left + Right
+      Up + Down
+      Up + Right + Down + Left
 
   にような設定も可能です。
-  ですが、普通PSPの十字ボタンは押した方向と逆側のボタンを同時に押すことはできませんので、
+  ですが、通常PSPの十字ボタンは押した方向と逆側のボタンを同時に押すことはできませんので、
   これは意味をなしません。
+
+  それどころか、このような設定をメニュー起動ボタンにしてしまうと、
+  その間メニューを表示できなくなりますのでご注意ください。
+  MacroFireは、このようなあり得ない設定値を修正しません。
 
 
 設定
@@ -87,11 +114,29 @@ MacroFire 2.4.1
       設定値: ボタン定義
 
       デフォルトのButtons to launch the menuを設定します。
+      詳細はreadme.txt参照。
 
     ToggleButtons
       設定値: ボタン定義
 
       デフォルトのButtons to toggle the engine stateを設定します。
+      詳細はreadme.txt参照。
+
+    StatusNotification
+      設定値: ON | OFF
+
+      デフォルトのEngine status notificationを設定します。
+      詳細はreadme.txt参照。
+
+  [Menu]セクション
+  -----------------------------------------------
+    UseVolatimeMemory
+      設定値: ON | OFF
+
+      メニューの表示に4MBのカーネルメモリを使うかどうかを設定します。
+      これを使うと、ユーザメモリが少ない状態でもメニューの速度を低下させずに操作できるようになります。
+      しかし、これはゲームがフリーズする大きな要因であるようなので、
+      今のところはONにしないでください。
 
   [AlternativeButtons]セクション
   -----------------------------------------------
@@ -120,70 +165,148 @@ MacroFire 2.4.1
       スタートボタンを代替ボタンを設定したい場合は、
       Startエントリにのみ、代替ボタンにしたいボタンの組み合わせを設定します。
 
-        Start = LTRIGGER + RTRIGGER + SELECT
+        Start = LTrigger + RTrigger + Select
 
-  [Analogtune]セクション
+  [AnalogStick]セクション
   -----------------------------------------------
-    AnalogStick
+    Movement
       設定値: ON | OFF
 
-      アナログスティックの動作の有効無効を設定します。
-
-    OriginX
-      設定値: 0-255の数値
-
-      アナログスティックの原点とするX座標を設定します。
-      通常は128から変更する必要はありません。
-
-    OriginY
-      設定値: 0-255の数値
-
-      アナログスティックの原点とするY座標を設定します。
-      通常は128から変更する必要はありません。
+      デフォルトのAnalog stick movementを設定します。
+      詳細はmanual_analogsens.txt参照。
 
     Deadzone
       設定値: 0-128の数値
 
-      アナログスティックの入力を破棄する原点からの半径を設定します。
-      この円の中でのアナログスティックの入力は全て破棄され、
-      ゲーム側へはOriginX,OriginYの値が常に返されることになります。
+      デフォルトのDeadzone radiusを設定します。
+      詳細はmanual_analogsens.txt参照。
 
     Sensitivity
       設定値: 0-200の数値
 
-      アナログスティックの感度の設定します。
-      増加させるほど、すぐに移動距離が増え、
-      減少させるほど、移動距離の増加が緩慢になります。
+      デフォルトのSensitivityを設定します。
+      詳細はmanual_analogsens.txt参照。
 
-  [Remap]セクション
+    OriginX
+      設定値: 0-255の数値
+
+      デフォルトのOrigin X-coordinateを設定します。
+      詳細はmanual_analogsens.txt参照。
+
+    OriginY
+      設定値: 0-255の数値
+
+      デフォルトのOrigin Y-coordinateを設定します。
+      詳細はmanual_analogsens.txt参照。
+
+
+  [Default]セクション
   -----------------------------------------------
-    Default
+    Remap
       設定値: ファイルパス(ms0:/～)
 
       起動時に読み込ませるボタン再割り当て設定ファイルを指定します。
 
-  [Rapidfire]セクション
-  -----------------------------------------------
-    Default
+    Rapidfire
       設定値: ファイルパス(ms0:/～)
 
       起動時に読み込ませる連射設定ファイルを指定します。
 
-  [Macro]セクション
-  -----------------------------------------------
-    Default1
-    Default2
-    Default3
-    Default4
-    Default5
-    Default6
-    Default7
-    Default8
-    Default9
-    Default10
+    Macro1
+    Macro2
+    Macro3
+    Macro4
+    Macro5
+    Macro6
+    Macro7
+    Macro8
+    Macro9
+    Macro10
       設定値: ファイルパス(ms0:/～)
 
       起動時に読み込ませるマクロファイルを指定します。
+
+
+起動時に読み込まれる設定ファイルをゲームごとに切り変えるには
+-------------------------------------------------
+  macrofire.iniにゲームIDのセクション名を記入し、そこに設定を書き込みます。
+  たとえば以下のように:
+  
+      [ULJM-05325]
+      Remap = analog_to_dpad.ini
+      Rapidfire = SOSE_rf.ini
+      Macro1 = SOSE_auto_creation_shippitsu.ini
+      Macro2 = SOSE_auto_creation_art.ini
+  
+  このように設定することで、ゲームIDがULJM-05325のゲームを起動したときのみ
+  設定されているファイルを読み込みます。
+  
+  このゲームIDは、ゲームを起動した状態でMacroFireのメニューを表示させると、
+  最上部に表示されています。
+  
+  必要のないエントリは省略できます。
+  この場合、Macro3～10は使用していないので、書いていません。
+
+  書き込めるエントリは、[Default]セクションと同じです。
+
+
+MacroFireメニュー上部の[ID: xxx / Loaded: xxx]の意味
+-------------------------------------------------
+  MacroFireのメニューを表示させると、最上部に
+  
+      [ID: xxx / Loaded: xxx]
+  
+  あるいは、単純に
+  
+      [ID: xxx]
+  
+  と表示される場合があります。
+  
+  これは、MacroFireが読み込もうとした設定ファイルのセクション名と、
+  実際に読み込んだセクション名を表しています。
+  
+  例えば、
+
+      ゲームが起動され[ULJM-05325]というセクションを読み込もうとしたが、
+      そのセクションがINIファイルに設定されていないため、最終的に[Default]セクションを読み込んだ
+
+  という場合は、
+
+      [ID: ULJM-05325 / Loaded: Default]
+
+  と表示されます。
+
+  逆に、[ULJM-05325]を読み込もうとし、それが成功した場合は、
+
+      [ID: ULJM-05325]
+
+  と表示されます。
+
+  このように、MacroFireは目的のセクションが見つからない場合、
+  何段階かに分かれて別のセクションを探します。
+
+  また、目的のセクションが見つかった場合は、それより下位のセクションは読みません。
+  例えば目的のセクションが[ULJM-05325]だった時、
+
+      [ULJM-05325]セクションのMacro1-10には何も設定されていないが、
+      [Default]セクションにはMacro1-5が設定されている
+
+  という場合、Macro1-10すべてに何も設定されません。
+  [ULMJ-05325]セクションのMacro1-5が空だからといって、
+  それを[Default]セクションから引っ張ってきたりはしません。
+
+
+起動時に検索されるセクションの名前と順番
+-------------------------------------------------
+  XMB:
+    [VSH] -> [Default]
+
+  POPS (今のところPOPS上でPSゲームのゲームIDを取得できない):
+    [POPS] -> [Default]
+
+  GAME:
+    [<ゲームID (あれば)>] -> [GAME] -> [Default]
+
 
 -------------------------------------------------
 pen@ClassG

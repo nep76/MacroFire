@@ -1,5 +1,7 @@
 /*
 	gb.c
+	
+	*フォント関連をなんとかする。
 */
 
 #include "gb.h"
@@ -7,7 +9,7 @@
 /*-----------------------------------------------
 	フォント読み込み
 -----------------------------------------------*/
-#include "fonts/pspsdk_ascii.c"
+#include "fonts/cg_ascii.c"
 #include "fonts/pspsdk_cp432.c"
 #include "fonts/pspsym.c"
 
@@ -24,9 +26,9 @@ static inline void gb_put_pixel( void *addr, uint32_t color, size_t len );
 -----------------------------------------------*/
 static GbParams st_gb;
 static struct gb_font st_font[] = {
-	{ font_pspsdk_ascii, sizeof( font_pspsdk_ascii ) },
+	{ font_cg_ascii,     sizeof( font_cg_ascii ) },
 	{ font_pspsdk_cp432, sizeof( font_pspsdk_cp432 ) },
-	{ font_pspsym,       sizeof( font_pspsym ) }
+	{ font_pspsym,       sizeof( font_pspsym ) },
 };
 static GbFontId st_font_8bit = GB_FONT_CP432;
 static GbColorConverter st_cconv;
@@ -403,13 +405,13 @@ int gbPrint( int x, int y, uint32_t fgcolor, uint32_t bgcolor, const char *str )
 		
 		/* グリフ取得 */
 		if( (unsigned int)str[i] < 0x80 ){
-			glyph = &(st_font[GB_FONT_ASCII].glyphset[str[i] * 8]);
+			glyph = &(st_font[GB_FONT_ASCII].glyphset[str[i] * line_height]);
 		} else{
-			unsigned int gi = ( str[i] & 0x7F ) * 8;
+			unsigned int gi = ( str[i] & 0x7F ) * line_height;
 			if( gi < st_font[st_font_8bit].count ){
 				glyph = &(st_font[st_font_8bit].glyphset[gi]);
 			} else{
-				glyph = &(st_font[GB_FONT_ASCII].glyphset['?' * 8]);
+				glyph = &(st_font[GB_FONT_ASCII].glyphset['?' * line_height]);
 			}
 		}
 		

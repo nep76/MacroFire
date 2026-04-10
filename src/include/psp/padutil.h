@@ -1,65 +1,229 @@
-/*
-	PSPのコントローラデータを処理する。
-*/
+/*=========================================================
 
+	padutil.c
+
+	パッドデータ処理。
+
+=========================================================*/
 #ifndef PADUTIL_H
 #define PADUTIL_H
 
 #include <pspkernel.h>
 #include <pspctrl.h>
+#include <psphprm.h>
 #include <stdlib.h>
 #include <math.h>
-#include "psp/memsce.h"
+#include "psp/memory.h"
 #include "utils/strutil.h"
 
-/*-----------------------------------------------
+/*=========================================================
 	マクロ
------------------------------------------------*/
+=========================================================*/
 #define PADUTIL_CENTER_X   127
 #define PADUTIL_CENTER_Y   127
 #define PADUTIL_MAX_COORD  255
 #define PADUTIL_MAX_RADIUS 182 /* 辺の長さ * 2の平方根 (小数点以下切り上げ) */
 
-#define PADUTIL_INVALID_RIGHT_TRIANGLE_DEGREE 45
-#define PADUTIL_DEGREE_TO_RADIAN( d )         ( ( d ) *  (3.14 / 180 ) )
-#define PADUTIL_SQUARE( x )                   ( ( x ) * ( x ) )
-#define PADUTIL_IN_DEADZONE( x, y, r )        ( PADUTIL_SQUARE( x ) + PADUTIL_SQUARE( y ) <= ( PADUTIL_SQUARE( r ) ) )
+#define PADUTIL_PAD_NORMAL_BUTTONS (\
+	PSP_CTRL_START    |\
+	PSP_CTRL_SELECT   |\
+	PSP_CTRL_UP       |\
+	PSP_CTRL_RIGHT    |\
+	PSP_CTRL_DOWN     |\
+	PSP_CTRL_LEFT     |\
+	PSP_CTRL_LTRIGGER |\
+	PSP_CTRL_RTRIGGER |\
+	PSP_CTRL_TRIANGLE |\
+	PSP_CTRL_CIRCLE   |\
+	PSP_CTRL_CROSS    |\
+	PSP_CTRL_SQUARE   |\
+	PSP_CTRL_HOME     |\
+	PSP_CTRL_NOTE     |\
+	PSP_CTRL_SCREEN   |\
+	PSP_CTRL_VOLUP    |\
+	PSP_CTRL_VOLDOWN  \
+)
+
+#define PADUTIL_PAD_TOGGLE_BUTTONS (\
+	PSP_CTRL_HOLD    |\
+	PSP_CTRL_WLAN_UP |\
+	PSP_CTRL_REMOTE  |\
+	PSP_CTRL_DISC    |\
+	PSP_CTRL_MS      \
+)
+
+#define PADUTIL_PAD_ANALOGDIR_BUTTONS (\
+	PADUTIL_CTRL_ANALOG_UP    |\
+	PADUTIL_CTRL_ANALOG_RIGHT |\
+	PADUTIL_CTRL_ANALOG_DOWN  |\
+	PADUTIL_CTRL_ANALOG_LEFT  \
+)
+
+#define PADUTIL_HPRM_NORMAL_KEYS (\
+	PSP_HPRM_PLAYPAUSE |\
+	PSP_HPRM_FORWARD   |\
+	PSP_HPRM_BACK      |\
+	PSP_HPRM_VOL_UP    |\
+	PSP_HPRM_VOL_DOWN  \
+)
+
+#define PADUTIL_HPRM_TOGGLE_KEYS (\
+	PSP_HPRM_HOLD \
+)
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-/*-----------------------------------------------
+
+/*=========================================================
 	型宣言
------------------------------------------------*/
+=========================================================*/
+typedef uint64_t      PadutilButtons;
+typedef unsigned char PadutilCoord;
+typedef float         PadutilSensitivity;
+
 typedef struct {
-	unsigned int button;
+	PadutilCoord       originX;
+	PadutilCoord       originY;
+	PadutilCoord       deadzone;
+	PadutilSensitivity sensitivity;
+} PadutilAnalogStick;
+
+typedef struct PadutilRemap {
+	PadutilButtons realButtons;
+	PadutilButtons remapButtons;
+	struct PadutilRemap *prev;
+	struct PadutilRemap *next;
+} PadutilRemap;
+
+typedef struct {
+	PadutilButtons button;
 	char *name;
-} PadutilButtons;
+} PadutilButtonName;
 
 /*
 	アナログパッドの方向を格納。
 	ボタンコードとして使用し、enum PspCtrlButtonsが使用していない空きビットを使用。
 */
-enum padutil_analog_direction {
+typedef enum {
 	PADUTIL_CTRL_ANALOG_UP    = 0x00000002,
 	PADUTIL_CTRL_ANALOG_RIGHT = 0x00000004,
 	PADUTIL_CTRL_ANALOG_DOWN  = 0x00000400,
 	PADUTIL_CTRL_ANALOG_LEFT  = 0x00000800
-};
+} PadutilAnalogDirection;
 
-enum padutil_options {
+typedef enum {
 	PADUTIL_OPT_TOKEN_SP  = 0x00000001,
 	PADUTIL_OPT_IGNORE_SP = 0x00000002,
 	PADUTIL_OPT_CASE_SENS = 0x00000004,
-};
+} PadutilOption;
+
+/*=========================================================
+	関数
+=========================================================*/
+PadutilButtonName *padutilCreateButtonSymbols( void );
+PadutilButtonName *padutilCreateButtonNames( void );
+void padutilDestroyButtonList( PadutilButtonName *name );
 
 /*-----------------------------------------------
-	関数
+	padutilGetButtonNamesByCode
+	
+	指定されたボタンコードをボタン名リストとデリミタに従って文字列化する。
 -----------------------------------------------*/
-char *padutilGetButtonNamesByCode( PadutilButtons *availbtn, unsigned int buttons, const char *delim, unsigned int opt, char *buf, size_t len );
-unsigned int padutilGetButtonCodeByNames( PadutilButtons *availbtn, const char *names, const char *delim, unsigned int opt );
-unsigned int padutilGetAnalogDirection( int x, int y, int deadzone );
-void padutilSetAnalogDirection( unsigned int analog_direction, unsigned char *x, unsigned char *y );
+char *padutilGetButtonNamesByCode( PadutilButtonName *availbtn, PadutilButtons buttons, const char *delim, unsigned int opt, char *buf, size_t len );
+
+/*-----------------------------------------------
+	padutilGetButtonCodeByNames
+	
+	ボタンの組み合わせを示す文字列をデリミタで区切ってボタン名リストと照合し、ボタンコードに変換する。
+	ボタン名を示す文字列を直接操作するため、元の文字列は破壊される。
+	元の文字列が必要である場合は、コピーを渡すこと。
+-----------------------------------------------*/
+PadutilButtons padutilGetButtonCodeByNames( PadutilButtonName *availbtn, char *names, const char *delim, unsigned int opt );
+
+/*-----------------------------------------------
+	padutilGetAnalogStickDirection
+	
+	アナログスティックの上下左右を、独自定義したアナログスティック方向コードで返す。
+	アナログスティック方向コードは、通常のPSPボタンコードが使用していない隙間を使用している。
+-----------------------------------------------*/
+unsigned int padutilGetAnalogStickDirection( PadutilCoord x, PadutilCoord y, PadutilCoord deadzone );
+
+/*-----------------------------------------------
+	padutilSetAnalogStickDirection
+	
+-----------------------------------------------*/
+void padutilSetAnalogStickDirection( unsigned int analog_direction, PadutilCoord *x, PadutilCoord *y );
+
+/*-----------------------------------------------
+	padutilCreateRemapArray
+	
+	リマップ定義用の配列を作成する。
+	PadutilRemapは双方向リンクリストであるが、
+	これを使うことにより、next/prevが前後の要素を指す配列を作成できる。
+	全ての要素は配列のように隣り合っているため、forやポインタ演算で簡単に回せる。
+	
+	要素を初期化する目的でmemsetなどでゼロクリアしてはいけない。
+	あらかじめ設定されたnext/prevまでゼロクリアされてしまう。
+	要素のrealButtons/remapButtonsは自動的にに0で初期化されるため、
+	改めて初期化する必要はない。
+-----------------------------------------------*/
+PadutilRemap *padutilCreateRemapArray( size_t count );
+
+/*-----------------------------------------------
+	padutilDestroyRemapArray
+	
+	PadutilCreateRemapArray()で作成した配列を解放する。
+-----------------------------------------------*/
+void padutilDestroyRemapArray( PadutilRemap *remap );
+
+void padutilAdjustAnalogStick( PadutilAnalogStick *analogstick, SceCtrlData *pad );
+void padutilRemap( PadutilRemap *remap, PadutilButtons src, SceCtrlData *pad, u32 *hprmkey, bool redefine );
+
+/*-----------------------------------------------
+	padutilSetPad
+	padutilSetHprm
+	
+	PadutilButtons型にはこのマクロをつかってボタンをセットする。
+	
+	padutilSetPadはボタンデータをセットする。とはいえ、
+	今のところ実際には何もしていない。
+	
+	padutilSetHprmはリモコンのキーデータをセットする。
+	ビットをずらしてボタンデータと重ならないようにしているため、必ずこのマクロを通さなければいけない。
+	
+	PadutilButtons型へ、パッドボタンとリモコンキーを組み合わせてセットする場合は、
+	それぞれの返り値の論理和を渡す。
+	    PadutilButtons buttons = padutilSetPad( PSP_CTRL_START ) | padutilSetHprm( PSP_HPRM_PLAYPAUSE );
+	
+	@param: uint32_t btn
+		enum PspCtrlButtonsかenum PspHprmKeysの値。
+	
+	@return uint64_t
+		変換された値。
+-----------------------------------------------*/
+#define padutilSetPad( btn )  ( (PadutilButtons)( btn ) )
+#define padutilSetHprm( btn ) ( (PadutilButtons)( (PadutilButtons)( btn ) << 32 ) )
+
+/*-----------------------------------------------
+	padutilGetPad
+	padutilGetHprm
+	
+	PadutilButtons型にはこれらのマクロをつかってデータを抽出する。
+	
+	padutilGetPadはボタンデータを取り出す。
+	
+	padutilGetHprmはリモコンのキーデータを取り出す。
+		
+	@param: uint64_t btn
+		padutilButtons()マクロで生成した値。
+	
+	@return uint32_t
+		取り出された値。
+-----------------------------------------------*/
+#define padutilGetPad( btn )  ( (unsigned int)btn )
+#define padutilGetHprm( btn ) ( (u32)( (PadutilButtons)( btn ) >> 32 ) )
+
 
 #ifdef __cplusplus
 }

@@ -79,12 +79,12 @@ void **hookFindSyscallAddr( void **addr )
 
 void hookFunc( void **addr, void *hookfunc )
 {
-	unsigned int interrupt_mask;
+	unsigned int intc;
 	
 	if( ! addr || ! hookfunc ) return;
 	
-	/* 割り込みをすべて禁止 */
-	interrupt_mask = pspSdkDisableInterrupts();
+	/* セマフォで排他処理 */
+	intc = pspSdkDisableInterrupts();
 	
 	/* 関数を変更 */
 	*addr = hookfunc;
@@ -93,6 +93,5 @@ void hookFunc( void **addr, void *hookfunc )
 	sceKernelDcacheWritebackInvalidateRange( addr, sizeof( addr ) );
 	sceKernelIcacheInvalidateRange( addr, sizeof( addr ) );
 	
-	/* 割り込み許可ビットを復元 */
-	pspSdkEnableInterrupts( interrupt_mask );
+	pspSdkEnableInterrupts( intc );
 }

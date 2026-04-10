@@ -80,13 +80,13 @@ bool pathexpandFromBase( const char* basepath, const char *path, char *resolved_
 	if( ! path || ! resolved_path || ! len ) return false;
 	
 	/* pathをコピー */
-	char *rel_path = (char *)memsceMalloc( strlen( path ) + 1 );
+	char *rel_path = (char *)memoryAlloc( strlen( path ) + 1 );
 	if( ! rel_path ) return false;
 	strcpy( rel_path, path );
 	
 	if( pathexpand_get_drive_offset( path ) ){
 		/* パスがドライブ部を含む場合は既に絶対パスなのでコピー */
-		strutilSafeCopy( resolved_path, rel_path, len );
+		strutilCopy( resolved_path, rel_path, len );
 	} else{
 		/* ドライブ部が無い場合は、basepathの存在によって分岐 */
 		if( ! basepath ){
@@ -94,22 +94,22 @@ bool pathexpandFromBase( const char* basepath, const char *path, char *resolved_
 			getcwd( resolved_path, len );
 		} else{
 			/* basepathとresolved_pathのポインタが重なっている可能性を考慮してbasepathを退避 */
-			char *base = (char *)memsceMalloc( strlen( basepath ) + 1 );
+			char *base = (char *)memoryAlloc( strlen( basepath ) + 1 );
 			if( ! base ){
-				memsceFree( rel_path );
+				memoryFree( rel_path );
 				return false;
 			}
 			strcpy( base, basepath );
 			if( pathexpand_get_drive_offset( base ) ){
 				/* basepathがドライブ部を含む場合は、絶対パスなのでコピー */
-				strutilSafeCopy( resolved_path, base, len );
+				strutilCopy( resolved_path, base, len );
 			} else{
 				/* basepathがドライブ部を含まない場合は、それも相対パスなのでカレントディレクトリを取得 */
 				getcwd( resolved_path, len );
-				strutilSafeCat( resolved_path, "/", len );
-				strutilSafeCat( resolved_path, base, len );
+				strutilCat( resolved_path, "/", len );
+				strutilCat( resolved_path, base, len );
 			}
-			memsceFree( base );
+			memoryFree( base );
 		}
 		
 		if( path[0] == '/' ){
@@ -118,10 +118,10 @@ bool pathexpandFromBase( const char* basepath, const char *path, char *resolved_
 			resolved_path[drive_offset] = '\0';
 		}
 		
-		strutilSafeCat( resolved_path, "/", len );
-		strutilSafeCat( resolved_path, rel_path, len );
+		strutilCat( resolved_path, "/", len );
+		strutilCat( resolved_path, rel_path, len );
 	}
-	memsceFree( rel_path );
+	memoryFree( rel_path );
 	
 	pathexpand_normalize_abspath( resolved_path );
 	

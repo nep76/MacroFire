@@ -12,9 +12,7 @@
 #include <stdbool.h>
 #include <ctype.h>
 #include "utils/strutil.h"
-#include "psp/memsce.h"
-
-#define PE_PATH_MAX 255
+#include "psp/memory.h"
 
 #ifdef __cplusplus
 extern "C" {

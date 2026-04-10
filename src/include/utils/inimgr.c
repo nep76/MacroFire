@@ -5,18 +5,38 @@
 #include "inimgr.h"
 
 /*-----------------------------------------------
+	マクロ
+-----------------------------------------------*/
+
+/* INIMGR_SECTION_BUFFER - 1 以下でなければならない */
+#define INIMGR_DEFAULT_SECTION_NAME "__default"
+
+/* シグネチャ、バージョン 合わせて INIMGR_ENTRY_BUFFER - 2 以下でなければならない */
+#define INIMGR_SIGNATURE_BUFFER ( INIMGR_ENTRY_BUFFER - 66 )
+#define INIMGR_VERSION_BUFFER   ( INIMGR_ENTRY_BUFFER - INIMGR_SIGNATURE_BUFFER - 2 )
+
+/*-----------------------------------------------
+	ローカル宣言
+-----------------------------------------------*/
+enum inimgr_line_type {
+	INIMGR_LINE_NULL = 0,
+	INIMGR_LINE_SECTION,
+	INIMGR_LINE_ENTRY
+};
+
+/*-----------------------------------------------
 	ローカル関数
 -----------------------------------------------*/
 static enum inimgr_line_type inimgr_parse_line( const char *line, char **start );
 static char *inimgr_get_value( struct inimgr_params *params, const char *section, const char *key );
 static int inimgr_set_value( struct inimgr_params *params, const char *section, const char *key, const char *value );
-static struct inimgr_section *inimgr_search_section( struct inimgr_params *params, const char *section );
-static struct inimgr_entry *inimgr_search_entry( struct inimgr_section *section, const char *key );
-static struct inimgr_callback *inimgr_search_callback( struct inimgr_params *params, const char *section );
-static struct inimgr_section *inimgr_create_section( const char *section );
-static struct inimgr_entry *inimgr_create_entry( const char *key, const char *value );
+static struct inimgr_section *inimgr_find_section( struct inimgr_params *params, const char *section );
+static struct inimgr_entry *inimgr_find_entry( struct inimgr_section *section, const char *key );
+static struct inimgr_callback *inimgr_find_callback( struct inimgr_params *params, const char *section );
+static struct inimgr_section *inimgr_create_section( struct inimgr_params *params, const char *section );
+static struct inimgr_entry *inimgr_create_entry( struct inimgr_params *params, const char *key, const char *value );
 static void inimgr_delete_section( struct inimgr_params *params, struct inimgr_section *section );
-static void inimgr_delete_entry( struct inimgr_section *section, struct inimgr_entry *entry );
+static void inimgr_delete_entry( struct inimgr_params *params, struct inimgr_section *section, struct inimgr_entry *entry );
 
 /*-----------------------------------------------
 	ローカル変数
@@ -27,17 +47,25 @@ static void inimgr_delete_entry( struct inimgr_section *section, struct inimgr_e
 
 IniUID inimgrNew( void )
 {
-	struct inimgr_params *params = (struct inimgr_params *)memsceMalloc( sizeof( struct inimgr_params ) );
+	struct inimgr_params *params;
+	DmemUID dmem = dmemNew( 0 );
+	
+	if( ! dmem ) return CG_ERROR_NOT_ENOUGH_MEMORY;
+	
+	params = (struct inimgr_params *)dmemAlloc( dmem, sizeof( struct inimgr_params ) );
 	if( ! params ) return CG_ERROR_NOT_ENOUGH_MEMORY;
 	
+	params->dmem      = dmem;
 	params->callbacks = NULL;
 	
 	/* エントリの有無にかかわらず、デフォルトセクションは作成 */
-	params->index = (struct inimgr_section *)memsceMalloc( sizeof( struct inimgr_section ) );
+	params->index = (struct inimgr_section *)dmemAlloc( params->dmem, sizeof( struct inimgr_section ) + strlen( INIMGR_DEFAULT_SECTION_NAME ) + 1 );
 	if( ! params->index ){
-		memsceFree( params );
+		dmemDestroy( params->dmem );
 		return CG_ERROR_NOT_ENOUGH_MEMORY;
 	}
+	params->index->name = (char *)( (uintptr_t)(params->index) + sizeof( struct inimgr_section ) );
+	
 	
 	strcpy( params->index->name, INIMGR_DEFAULT_SECTION_NAME );
 	params->index->entry = NULL;
@@ -48,14 +76,32 @@ IniUID inimgrNew( void )
 	return (IniUID)params;
 }
 
-int inimgrSetCallback( IniUID uid, const char *section, InimgrCallback cb )
+int inimgrSetCallback( IniUID uid, const char *section, InimgrCallback cb, void *arg )
 {
+	unsigned short section_len;
 	struct inimgr_params   *params = (struct inimgr_params *)uid;
-	struct inimgr_callback *new_cb = (struct inimgr_callback *)memsceMalloc( sizeof( struct inimgr_callback ) );
+	struct inimgr_callback *new_cb;
+	
+	if( ! section || *section == '\0' ) section = INIMGR_DEFAULT_SECTION_NAME;
+	section_len = strlen( section );
+	
+	if( section_len + 1 > INIMGR_SECTION_BUFFER ) return CG_ERROR_OUT_OF_BUFFER;
+	
+	new_cb = (struct inimgr_callback *)dmemAlloc( params->dmem, sizeof( struct inimgr_callback ) + section_len + 1 );
 	if( ! new_cb ) return CG_ERROR_NOT_ENOUGH_MEMORY;
 	
-	strutilSafeCopy( new_cb->section, section, INIMGR_SECTION_BUFFER );
-	new_cb->cb = cb;
+	new_cb->section = (char *)( (uintptr_t)new_cb + sizeof( struct inimgr_callback ) );
+	
+	strcpy( new_cb->section, section );
+	
+	if( new_cb->section[section_len - 1] == '*' ){
+		new_cb->cmplen = section_len - 1;
+	} else{
+		new_cb->cmplen = -1;
+	}
+	new_cb->cb       = cb;
+	new_cb->arg      = arg;
+	new_cb->infoList = NULL;
 	
 	if( params->callbacks ){
 		struct inimgr_callback *last_cb;
@@ -67,34 +113,71 @@ int inimgrSetCallback( IniUID uid, const char *section, InimgrCallback cb )
 		params->callbacks = new_cb;
 	}
 	
-	return 0;
+	return CG_ERROR_OK;
 }
 
-int inimgrLoad( IniUID uid, const char *inipath )
+int inimgrLoad( IniUID uid, const char *inipath, const char *sig, unsigned char major, unsigned char minor, unsigned char rev )
 {
-	FilehUID fuid;
-	char     buf[INIMGR_ENTRY_BUFFER];
-	bool     callback_section = false;
-	struct   inimgr_params    *params = (struct inimgr_params *)uid;
-	struct   inimgr_section   *current_section = NULL;
-	struct   inimgr_entry     *current_entry   = NULL;
-	struct   inimgr_callback  *callback        = NULL;
+	FiomgrHandle fh;
+	char   buf[INIMGR_ENTRY_BUFFER];
+	struct inimgr_callback_info *callback_info    = NULL;
+	struct inimgr_params        *params           = (struct inimgr_params *)uid;
+	struct inimgr_section       *current_section  = NULL;
+	struct inimgr_entry         *current_entry    = NULL;
+	struct inimgr_callback      *callback         = NULL;
 	
-	fuid = filehOpen( inipath, PSP_O_RDONLY, 0777 );
+	fh = fiomgrOpen( inipath, FH_O_RDONLY, 0777 );
+	if( fh < 0 ) return CG_ERROR_INVALID_ARGUMENT;
 	
-	if( ! fuid ){
-		return CG_ERROR_NOT_ENOUGH_MEMORY;
-	} else if( filehGetLastError( fuid ) < 0 ){
-		unsigned int ferror = filehGetLastError( fuid );
-		filehDestroy( fuid );
+	/* シグネチャとバージョンをチェック */
+	if( sig ){
+		char *ini_version;
 		
-		return ferror;
+		if( strchr( sig, '\x20' ) ){
+			fiomgrClose( fh );
+			return CG_ERROR_INVALID_ARGUMENT;
+		}
+		
+		while( fiomgrReadln( fh, buf, sizeof( buf ) ) ){
+			if( buf[0] != ';' && buf[0] != '\0' ) break;
+		}
+		
+		ini_version = strchr( buf, '\x20' );
+		if( ini_version ){
+			*ini_version = '\0';
+			for( ini_version++; *ini_version != '\0' && ( *ini_version == '\x20' || *ini_version == '=' ); ini_version++ );
+		}
+		
+		/* シグネチャ比較 */
+		if( strcasecmp( sig, buf ) != 0 ) goto EXCEPTION_INVALID_SIGNATURE;
+		
+		if( major || minor || rev ){
+			char *tmp, *save_ptr;
+			unsigned char num;
+			
+			if( *ini_version == '\0' ) goto EXCEPTION_INVALID_VERSION;
+			
+			/* メジャー番号 */
+			tmp = strtok_r( ini_version, ".", &save_ptr );
+			num = (unsigned char)( tmp ? strtoul( tmp, NULL, 10 ) : 0 );
+			if( major > num ) goto EXCEPTION_INVALID_VERSION;
+			
+			/* マイナー番号 */
+			tmp = strtok_r( NULL, ".", &save_ptr );
+			num = (unsigned char)( tmp ? strtoul( tmp, NULL, 10 ) : 0 );
+			if( minor > num ) goto EXCEPTION_INVALID_VERSION;
+			
+			/* リビジョン番号 */
+			tmp = strtok_r( NULL, ".", &save_ptr );
+			num = (unsigned char)( tmp ? strtoul( tmp, NULL, 10 ) : 0 );
+			if( rev > num ) goto EXCEPTION_INVALID_VERSION;
+		}
 	}
 	
 	current_section = params->index;
 	
 	/* データ読み込み */
-	while( filehReadln( fuid, buf, sizeof( buf ) ) ){
+	while( fiomgrReadln( fh, buf, sizeof( buf ) ) ){
 		struct inimgr_section  *new_section;
 		struct inimgr_entry    *new_entry;
 		char *line_start = NULL, *key = NULL, *value = NULL;
@@ -103,17 +186,32 @@ int inimgrLoad( IniUID uid, const char *inipath )
 			case INIMGR_LINE_NULL:
 				break;
 			case INIMGR_LINE_SECTION:
-				if( callback_section ){
-					callback->length = ( filehTell( fuid ) - strlen( buf ) ) - callback->offset;
-					callback_section = false;
+				if( callback_info ){
+					callback_info->length = ( fiomgrTell( fh ) - strlen( buf ) ) - callback_info->offset;
+					callback_info = NULL;
 				}
 				
-				if( ( callback = inimgr_search_callback( params, line_start ) ) ){
-					callback->offset = filehTell( fuid );
-					callback_section = true;
+				if( ( callback = inimgr_find_callback( params, line_start ) ) ){
+					if( ! callback->infoList ){
+						callback->infoList = dmemAlloc( params->dmem, sizeof( struct inimgr_callback_info ) );
+						callback_info = callback->infoList;
+					} else{
+						for( callback_info = callback->infoList; callback_info->next; callback_info = callback_info->next );
+						callback_info->next = dmemAlloc( params->dmem, sizeof( struct inimgr_callback_info ) );
+						callback_info = callback_info->next;
+					}
+					if( callback->cmplen >= 0 ){
+						callback_info->section = dmemAlloc( params->dmem, strlen( line_start ) + 1 );
+						strcpy( callback_info->section, line_start );
+					} else{
+						callback_info->section = NULL;
+					}
+					callback_info->offset = fiomgrTell( fh );
+					callback_info->length = 0;
+					callback_info->next   = NULL;
 				}
 				
-				new_section = inimgr_create_section( line_start );
+				new_section = inimgr_create_section( params, line_start );
 				if( ! new_section ) goto EXCEPTION_NOT_ENOUGH_MEMORY;
 				
 				new_section->prev = current_section;
@@ -124,80 +222,109 @@ int inimgrLoad( IniUID uid, const char *inipath )
 				
 				break;
 			case INIMGR_LINE_ENTRY:
-				if( callback_section || ! current_section || ! inimgrParseEntry( line_start, &key, &value ) ) break;
+				if( callback_info || ! current_section || ! inimgrParseEntry( line_start, &key, &value ) ) break;
 				
-				new_entry = inimgr_create_entry( key, value );
+				new_entry = inimgr_create_entry( params, key, value );
 				if( ! new_entry ) goto EXCEPTION_NOT_ENOUGH_MEMORY;
 				
 				new_entry->prev = current_entry;
-				
 				if( current_entry ){
 					current_entry->next = new_entry;
 				} else{
 					current_section->entry = new_entry;
 				}
 				current_entry = new_entry;
+				
 				break;
 		}
 	}
-	if( callback_section ) callback->length = filehTell( fuid ) - callback->offset;
+	if( callback_info ) callback_info->length = fiomgrTell( fh ) - callback_info->offset;
 	
-	/* スペシャルセクションの処理 */
+	/* コールバックセクションの処理 */
 	for( callback = params->callbacks; callback; callback = callback->next ){
 		InimgrCallbackParams cb_params;
 		
 		if( ! callback->cb ) continue;
 		
-		filehSeek( fuid, callback->offset, FW_SEEK_SET );
-		buf[0] = '\0';
-		
 		cb_params.uid    = uid;
-		cb_params.ini    = fuid;
-		cb_params.cbinfo = callback;
+		cb_params.ini    = fh;
 		
-		( (InimgrCallback)callback->cb )( INIMGR_CB_LOAD, &cb_params, buf, sizeof( buf ) );
+		for( callback_info = callback->infoList; callback_info; callback_info = callback_info->next ){
+			cb_params.cbinfo = callback_info;
+			
+			fiomgrSeek( fh, callback_info->offset, FH_SEEK_SET );
+			buf[0] = '\0';
+			
+			( (InimgrCallback)callback->cb )( INIMGR_CB_LOAD, &cb_params, buf, sizeof( buf ), callback->arg );
+		}
 	}
 	
-	filehClose( fuid );
+	fiomgrClose( fh );
 	
-	return 0;
+	return CG_ERROR_OK;
+	
+	/* シグネチャ異常 */
+	EXCEPTION_INVALID_SIGNATURE:
+		fiomgrClose( fh );
+		return INIMGR_ERROR_INVALID_SIGNATURE;
+	
+	EXCEPTION_INVALID_VERSION:
+		fiomgrClose( fh );
+		return INIMGR_ERROR_INVALID_VERSION;
 	
 	/* メモリ不足の際に飛ばすgotoラベル */
 	EXCEPTION_NOT_ENOUGH_MEMORY:
-		filehClose( fuid );
+		fiomgrClose( fh );
 		return CG_ERROR_NOT_ENOUGH_MEMORY;
 }
 
-int inimgrSave( IniUID uid, const char *inipath )
+int inimgrSave( IniUID uid, const char *inipath, const char *sig, unsigned char major, unsigned char minor, unsigned char rev )
 {
-	FilehUID fuid;
+	FiomgrHandle fh;
 	char     buf[INIMGR_ENTRY_BUFFER];
 	struct   inimgr_params   *params = (struct inimgr_params *)uid;
 	struct   inimgr_section  *section;
 	struct   inimgr_entry    *entry;
 	struct   inimgr_callback *callback;
 	
-	fuid = filehOpen( inipath, PSP_O_WRONLY | PSP_O_CREAT | PSP_O_TRUNC, 0777 );
+	fh = fiomgrOpen( inipath, FH_O_WRONLY | FH_O_CREAT | FH_O_TRUNC, 0777 );
+	if( fh < 0 ) return CG_ERROR_INVALID_ARGUMENT;
 	
-	if( ! fuid ){
-		return CG_ERROR_NOT_ENOUGH_MEMORY;
-	} else if( filehGetLastError( fuid ) < 0 ){
-		unsigned int ferror = filehGetLastError( fuid );
-		filehDestroy( fuid );
+	/* シグネチャ */
+	if( sig ){
+		unsigned short len;
+		char *version = &(buf[INIMGR_SIGNATURE_BUFFER]);
+		if( strchr( sig, '\x20' ) ) return CG_ERROR_INVALID_ARGUMENT;
 		
-		return ferror;
+		len = strutilCopy( buf, sig, INIMGR_SIGNATURE_BUFFER );
+		
+		if( major || minor || rev ){
+			if( ! major || rev ){
+				snprintf( version, INIMGR_VERSION_BUFFER, " %d.%d.%d", major, minor, rev );
+			} else if( minor ){
+				snprintf( version, INIMGR_VERSION_BUFFER, " %d.%d", major, minor );
+			} else{
+				snprintf( version, INIMGR_VERSION_BUFFER, " %d", major );
+			}
+			len = strutilCat( buf, version, sizeof( buf ) );
+		}
+		
+		fiomgrWriteln( fh, (void *)buf, --len );
 	}
 	
 	/* セクションを書き込み */
 	for( section = params->index; section; section = section->next ){
 		
-		/* デフォルトセクションはセクション名を書き込まない */
-		if( strcasecmp( section->name, INIMGR_DEFAULT_SECTION_NAME ) != 0 ){
-			if( filehTell( fuid ) != 0 ) filehWrite( fuid, "\x0D\x0A", 2 );
-			filehWritef( fuid, buf, INIMGR_SECTION_BUFFER + 5, "[%s]\x0D\x0A", section->name );
+		callback = inimgr_find_callback( params, section->name );
+		
+		/* デフォルトセクションはセクション名を書き込まない, セクション名に"*"サフィックスがなければセクション名を書き込む */
+		if( strcasecmp( section->name, INIMGR_DEFAULT_SECTION_NAME ) != 0 && ( ! callback || ! callback->cmplen ) ){
+			int len = inimgrMakeSection( buf, sizeof( buf ), section->name );
+			
+			if( fiomgrTell( fh ) != 0 ) fiomgrWriteln( fh, "", 0 );
+			fiomgrWriteln( fh, (void *)buf, len );
 		}
 		
-		callback = inimgr_search_callback( params, section->name );
 		if( callback && callback->cb ){
 			InimgrCallbackParams cb_params;
 			
@@ -206,73 +333,73 @@ int inimgrSave( IniUID uid, const char *inipath )
 			buf[0] = '\0';
 			
 			cb_params.uid    = uid;
-			cb_params.ini    = fuid;
-			cb_params.cbinfo = callback;
+			cb_params.ini    = fh;
+			cb_params.cbinfo = NULL;
 			
-			( (InimgrCallback)callback->cb )( INIMGR_CB_SAVE, &cb_params, buf, sizeof( buf ) );
+			( (InimgrCallback)callback->cb )( INIMGR_CB_SAVE, &cb_params, buf, sizeof( buf ), callback->arg );
 		} else{
 			for( entry = section->entry; entry; entry = entry->next ){
-				filehWritef( fuid, buf, INIMGR_ENTRY_BUFFER, "%s = %s\x0D\x0A", entry->key, entry->value );
+				int len = inimgrMakeEntry( buf, sizeof( buf ), entry->key, entry->value );
+				fiomgrWriteln( fh, (void *)buf, len );
 			}
 		}
 	}
 	
-	filehClose( fuid );
+	fiomgrClose( fh );
 	
-	return 0;
+	return CG_ERROR_OK;
 }
 
 void inimgrDestroy( IniUID uid )
 {
-	struct inimgr_params   *params = (struct inimgr_params *)uid;
-	struct inimgr_section  *current_section, *next_section;
-	struct inimgr_callback *current_cb, *next_cb;
+	struct inimgr_params *params = (struct inimgr_params *)uid;
 	
 	if( ! params ) return;
 	
-	for( current_cb = params->callbacks; current_cb; current_cb = next_cb ){
-		next_cb = current_cb->next;
-		memsceFree( current_cb );
-	}
-	
-	for( current_section = params->index; current_section; current_section = next_section ){
-		next_section = current_section->next;
-		inimgr_delete_section( params, current_section );
-	}
-	memsceFree( params );
+	dmemDestroy( params->dmem );
 }
 
 int inimgrAddSection( IniUID uid, const char *section )
 {
+	struct inimgr_params  *params = (struct inimgr_params *)uid;
 	struct inimgr_section *last_section;
 	struct inimgr_section *new_section;
+	size_t section_buf;
+	
+	if( ! section || strcasecmp( section, INIMGR_DEFAULT_SECTION_NAME ) == 0 ) return CG_ERROR_INVALID_ARGUMENT;
+	
+	section_buf = strlen( section ) + 1;
+	if( section_buf > INIMGR_SECTION_BUFFER ) return CG_ERROR_OUT_OF_BUFFER;
 	
 	for( last_section = ((struct inimgr_params *)uid)->index; last_section->next; last_section = last_section->next );
 	
-	new_section = (struct inimgr_section *)memsceMalloc( sizeof( struct inimgr_section ) );
+	new_section = inimgr_create_section( params, section );
 	if( ! new_section ) return CG_ERROR_NOT_ENOUGH_MEMORY;
 	
-	strutilSafeCopy( new_section->name, section, INIMGR_SECTION_BUFFER );
-	new_section->entry = NULL;
-	new_section->next  = NULL;
+	new_section->name = (char *)( (uintptr_t)new_section + sizeof( struct inimgr_section ) );
 	new_section->prev  = last_section;
 	last_section->next = new_section;
 	
-	return 0;
+	return CG_ERROR_OK;
 }
 
 void inimgrDeleteSection( IniUID uid, const char *section )
 {
 	/* デフォルトセクションは削除させない */
-	if( strcasecmp( section, INIMGR_DEFAULT_SECTION_NAME ) == 0 ) return;
+	if( ! section || strcasecmp( section, INIMGR_DEFAULT_SECTION_NAME ) == 0 ) return;
 	
-	inimgr_delete_section( (struct inimgr_params *)uid, inimgr_search_section( (struct inimgr_params *)uid, section ) );
+	inimgr_delete_section( (struct inimgr_params *)uid, inimgr_find_section( (struct inimgr_params *)uid, section ) );
 }
 
-bool inimgrGetInt( IniUID uid, const char *section, const char *key, long *var )
+bool inimgrExistSection( IniUID uid, const char *section )
+{
+	if( ! section || strcasecmp( section, INIMGR_DEFAULT_SECTION_NAME ) == 0 || inimgr_find_section( (struct inimgr_params *)uid, section ) ) return true;
+	return false;
+}
+
+bool inimgrGetInt( IniUID uid, const char *section, const char *key, int *var )
 {
 	char *value = inimgr_get_value( (struct inimgr_params *)uid, section, key );
-	
 	
 	if( value ){
 		*var = strtol( value, NULL, 10 );
@@ -287,7 +414,7 @@ int inimgrGetString( IniUID uid, const char *section, const char *key, char *buf
 	char *value = inimgr_get_value( (struct inimgr_params *)uid, section, key );
 	
 	if( value ){
-		strutilSafeCopy( buf, value, bufsize );
+		strutilCopy( buf, value, bufsize );
 		return strlen( buf );
 	} else {
 		return -1;
@@ -299,10 +426,10 @@ bool inimgrGetBool( IniUID uid, const char *section, const char *key, bool *var 
 	char *value = inimgr_get_value( (struct inimgr_params *)uid, section, key );
 	
 	if( value ){
-		strutilToUpper( value );
-		if( strcasecmp( value, "ON" ) == 0 ){
+		strupr( value );
+		if( strcasecmp( value, "On" ) == 0 ){
 			*var = true;
-		} else if( strcasecmp( value, "OFF" ) == 0 ){
+		} else if( strcasecmp( value, "Off" ) == 0 ){
 			*var = false;
 		}
 		return true;
@@ -331,9 +458,9 @@ int inimgrSetBool( IniUID uid, const char *section, const char *key, const bool 
 	char value[4];
 	
 	if( on ){
-		strcpy( value, "ON" );
+		strcpy( value, "On" );
 	} else{
-		strcpy( value, "OFF" );
+		strcpy( value, "Off" );
 	}
 	
 	return inimgr_set_value( (struct inimgr_params *)uid, section, key, value );
@@ -342,28 +469,33 @@ int inimgrSetBool( IniUID uid, const char *section, const char *key, const bool 
 /*-------------------------------------
 	コールバック関数用API
 --------------------------------------*/
+inline IniUID inimgrCbGetIniHandle( InimgrCallbackParams *params )
+{
+	return params->uid;
+}
+
 int inimgrCbReadln( InimgrCallbackParams *params, char *buf, size_t buflen )
 {
-	if( filehTell( params->ini ) >= params->cbinfo->offset + params->cbinfo->length ) return 0;
-	return filehReadln( params->ini, buf, buflen );
+	if( fiomgrTell( params->ini ) >= ( params->cbinfo->offset + params->cbinfo->length ) ) return 0;
+	return fiomgrReadln( params->ini, buf, buflen );
 }
 
 int inimgrCbSeekSet( InimgrCallbackParams *params, SceOff offset )
 {
 	if( offset > 0 ){
 		if( offset <= params->cbinfo->length ){
-			return filehSeek( params->ini, params->cbinfo->offset + offset, FW_SEEK_SET );
+			return fiomgrSeek( params->ini, params->cbinfo->offset + offset, FH_SEEK_SET );
 		} else{
-			return filehSeek( params->ini, params->cbinfo->offset + params->cbinfo->length, FW_SEEK_SET );
+			return fiomgrSeek( params->ini, params->cbinfo->offset + params->cbinfo->length, FH_SEEK_SET );
 		}
 	} else{
-		return filehSeek( params->ini, params->cbinfo->offset, FW_SEEK_SET );
+		return fiomgrSeek( params->ini, params->cbinfo->offset, FH_SEEK_SET );
 	}
 }
 
 int inimgrCbSeekCur( InimgrCallbackParams *params, SceOff offset )
 {
-	SceOff pos = filehTell( params->ini ) - params->cbinfo->offset;
+	SceOff pos = fiomgrTell( params->ini ) - params->cbinfo->offset;
 	
 	if( pos < 0 ){
 		pos = 0;
@@ -379,7 +511,7 @@ int inimgrCbSeekCur( InimgrCallbackParams *params, SceOff offset )
 		pos = params->cbinfo->length;
 	}
 	
-	return filehSeek( params->ini, params->cbinfo->offset + pos, FW_SEEK_SET );
+	return fiomgrSeek( params->ini, params->cbinfo->offset + pos, FH_SEEK_SET );
 }
 
 int inimgrCbSeekEnd( InimgrCallbackParams *params, SceOff offset )
@@ -388,32 +520,23 @@ int inimgrCbSeekEnd( InimgrCallbackParams *params, SceOff offset )
 	
 	if( offset < 0 ){
 		if( abs( offset ) <= params->cbinfo->length ){
-			return filehSeek( params->ini, endpos + offset, FW_SEEK_SET );
+			return fiomgrSeek( params->ini, endpos + offset, FH_SEEK_SET );
 		} else{
-			return filehSeek( params->ini, params->cbinfo->offset, FW_SEEK_SET );
+			return fiomgrSeek( params->ini, params->cbinfo->offset, FH_SEEK_SET );
 		}
 	} else{
-		return filehSeek( params->ini, endpos, FW_SEEK_SET );
+		return fiomgrSeek( params->ini, endpos, FH_SEEK_SET );
 	}
 }
 
 int inimgrCbTell( InimgrCallbackParams *params )
 {
-	return params->cbinfo->offset - filehTell( params->ini );
+	return params->cbinfo->offset - fiomgrTell( params->ini );
 }
 
 int inimgrCbWriteln( InimgrCallbackParams *params, char *buf, size_t buflen )
 {
-	int ret;
-	
-	if( buflen < 0 ){
-		ret = filehWrite( params->ini, buf, strlen( buf ) );
-	} else{
-		ret = filehWrite( params->ini, buf, buflen );
-	}
-	if( ret >= 0 ) filehWrite( params->ini, "\x0D\x0A", 2 );
-	
-	return ret;
+	return fiomgrWriteln( params->ini, buf, buflen );
 }
 
 bool inimgrParseEntry( char *entry, char **key, char **value )
@@ -426,9 +549,7 @@ bool inimgrParseEntry( char *entry, char **key, char **value )
 	*value = delim + 1;
 	
 	delim = strutilCounterReversePbrk( *key, "\t\x20" );
-	if( ! delim ){
-		return false;
-	} else{
+	if( delim ){
 		*(delim + 1) = '\0';
 	}
 	
@@ -440,10 +561,20 @@ bool inimgrParseEntry( char *entry, char **key, char **value )
 	return true;
 }
 
-bool inimgrMakeEntry( char *entry, char *key, char *value )
+int inimgrMakeEntry( char *buf, size_t len, char *key, char *value )
 {
-	snprintf( entry, INIMGR_ENTRY_BUFFER, "%s = %s", key, value );
-	return true;
+	int ret = snprintf( buf, len, "%s = %s", key, value );
+	
+	len--;
+	return ( ret > len ? len : ret );
+}
+
+int inimgrMakeSection( char *buf, size_t len, char *section )
+{
+	int ret = snprintf( buf, len, "[%s]", section );
+	
+	len--;
+	return ( ret > len ? len : ret );
 }
 
 /*-------------------------------------
@@ -474,12 +605,13 @@ static char *inimgr_get_value( struct inimgr_params *params, const char *section
 {
 	struct inimgr_section *target_section;
 	
-	if( ! params ) return NULL;
+	if( ! params  ) return NULL;
+	if( ! section ) section = INIMGR_DEFAULT_SECTION_NAME;
 	
-	target_section = inimgr_search_section( params, section );
+	target_section = inimgr_find_section( params, section );
 	
 	if( target_section ){
-		struct inimgr_entry *target_entry = inimgr_search_entry( target_section, key );
+		struct inimgr_entry *target_entry = inimgr_find_entry( target_section, key );
 		if( target_entry ){
 			return target_entry->value;
 		}
@@ -493,20 +625,21 @@ static int inimgr_set_value( struct inimgr_params *params, const char *section, 
 	struct inimgr_section *target_section;
 	struct inimgr_entry   *target_entry;
 	
-	if( ! params ) return 0;
+	if( ! params ) return CG_ERROR_INVALID_ARGUMENT;
+	if( ! section ) section = INIMGR_DEFAULT_SECTION_NAME;
 	
-	target_section = inimgr_search_section( params, section );
+	target_section = inimgr_find_section( params, section );
 	if( ! target_section ){
 		int ret = inimgrAddSection( (IniUID)params, section );
 		if( ret < 0 ) return ret;
-		target_section = inimgr_search_section( params, section );
+		target_section = inimgr_find_section( params, section );
 	}
 	
-	target_entry = inimgr_search_entry( target_section, key );
+	target_entry = inimgr_find_entry( target_section, key );
 	if( ! target_entry ){
 		struct inimgr_entry *last_entry;
 		
-		target_entry = inimgr_create_entry( key, value );
+		target_entry = inimgr_create_entry( params, key, value );
 		if( ! target_entry ) return CG_ERROR_NOT_ENOUGH_MEMORY;
 		
 		if( ! target_section->entry ){
@@ -517,13 +650,13 @@ static int inimgr_set_value( struct inimgr_params *params, const char *section, 
 			target_entry->prev = last_entry;
 		}
 	} else{
-		strutilSafeCopy( target_entry->value, value, target_entry->vspace );
+		strutilCopy( target_entry->value, value, target_entry->vspace );
 	}
 	
-	return 0;
+	return CG_ERROR_OK;
 }
 
-static struct inimgr_section *inimgr_search_section( struct inimgr_params *params, const char *section )
+static struct inimgr_section *inimgr_find_section( struct inimgr_params *params, const char *section )
 {
 	struct inimgr_section *current_section;
 	
@@ -538,7 +671,7 @@ static struct inimgr_section *inimgr_search_section( struct inimgr_params *param
 	return current_section;
 }
 
-static struct inimgr_entry *inimgr_search_entry( struct inimgr_section *section, const char *key )
+static struct inimgr_entry *inimgr_find_entry( struct inimgr_section *section, const char *key )
 {
 	struct inimgr_entry *current_entry;
 	
@@ -550,23 +683,35 @@ static struct inimgr_entry *inimgr_search_entry( struct inimgr_section *section,
 	return current_entry;
 }
 
-static struct inimgr_callback *inimgr_search_callback( struct inimgr_params *params, const char *section )
+static struct inimgr_callback *inimgr_find_callback( struct inimgr_params *params, const char *section )
 {
 	struct inimgr_callback *current_callback;
 	
 	for( current_callback = params->callbacks; current_callback; current_callback = current_callback->next ){
-		if( strcasecmp( current_callback->section, section ) == 0 ) break;
+		if(
+			( current_callback->cmplen < 0 && strcasecmp( current_callback->section, section ) == 0 ) ||
+			( current_callback->cmplen == 0 ) ||
+			( strncasecmp( current_callback->section, section, current_callback->cmplen ) == 0 )
+		){
+			break;
+		}
 	}
 	
 	return current_callback;
 }
 
-static struct inimgr_section *inimgr_create_section( const char *section )
+static struct inimgr_section *inimgr_create_section( struct inimgr_params *params, const char *section )
 {
-	struct inimgr_section *new_section = (struct inimgr_section *)memsceMalloc( sizeof( struct inimgr_section ) );
+	struct inimgr_section *new_section;
+	size_t section_buf = strlen( section ) + 1;
+	
+	if( section_buf > INIMGR_SECTION_BUFFER ) return NULL;
+	
+	new_section = (struct inimgr_section *)dmemAlloc( params->dmem, sizeof( struct inimgr_section ) + section_buf );
 	if( ! new_section ) return NULL;
 	
-	strutilSafeCopy( new_section->name, section, INIMGR_SECTION_BUFFER );
+	new_section->name = (char *)( (uintptr_t)new_section + sizeof( struct inimgr_section ) );
+	strcpy( new_section->name, section );
 	new_section->entry = NULL;
 	new_section->prev  = NULL;
 	new_section->next  = NULL;
@@ -574,13 +719,13 @@ static struct inimgr_section *inimgr_create_section( const char *section )
 	return new_section;
 }
 
-static struct inimgr_entry *inimgr_create_entry( const char *key, const char *value )
+static struct inimgr_entry *inimgr_create_entry( struct inimgr_params *params, const char *key, const char *value )
 {
 	int keylen;
-	struct inimgr_entry *new_entry = (struct inimgr_entry *)memsceMalloc( sizeof( struct inimgr_entry ) );
+	struct inimgr_entry *new_entry = (struct inimgr_entry *)dmemAlloc( params->dmem, sizeof( struct inimgr_entry ) );
 	if( ! new_entry ) return NULL;
 	
-	new_entry->key = (char *)memsceMalloc( INIMGR_ENTRY_BUFFER );
+	new_entry->key = (char *)dmemAlloc( params->dmem, INIMGR_ENTRY_BUFFER );
 	if( ! new_entry->key ) return NULL;
 	keylen = strlen( key );
 	
@@ -590,7 +735,7 @@ static struct inimgr_entry *inimgr_create_entry( const char *key, const char *va
 	new_entry->next   = NULL;
 	
 	strcpy( new_entry->key, key );
-	strutilSafeCopy( new_entry->value, value, new_entry->vspace );
+	strutilCopy( new_entry->value, value, new_entry->vspace );
 	
 	return new_entry;
 }
@@ -609,13 +754,13 @@ static void inimgr_delete_section( struct inimgr_params *params, struct inimgr_s
 	
 	for( current_entry = section->entry; current_entry; current_entry = next_entry ){
 		next_entry = current_entry->next;
-		inimgr_delete_entry( section, current_entry );
+		inimgr_delete_entry( params, section, current_entry );
 	}
 	
-	memsceFree( section );
+	dmemFree( params->dmem, section );
 }
 
-static void inimgr_delete_entry( struct inimgr_section *section, struct inimgr_entry *entry )
+static void inimgr_delete_entry( struct inimgr_params *params, struct inimgr_section *section, struct inimgr_entry *entry )
 {
 	if( ! entry ) return;
 	
@@ -624,6 +769,6 @@ static void inimgr_delete_entry( struct inimgr_section *section, struct inimgr_e
 	if( entry->next ) entry->next->prev = entry->prev;
 	if( section->entry == entry ) section->entry = entry->next;
 	
-	memsceFree( entry->key );
-	memsceFree( entry );
+	dmemFree( params->dmem, entry->key );
+	dmemFree( params->dmem, entry );
 }

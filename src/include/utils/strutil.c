@@ -4,31 +4,50 @@
 
 #include "strutil.h"
 
-char *strutilSafeCopy( char *dest, const char *src, size_t max )
+int strutilCopy( char *dest, const char *src, size_t max )
 {
-	if( max <= 0 ) return NULL;
+	int workmax;
+	
+	if( max <= 0 ) return 0;
 	
 	max--;
-	while( max-- > 0 && *src != '\0' ) *dest++ = *src++;
+	workmax = max;
+	while( workmax-- && *src != '\0' ){
+		*dest++ = *src++;
+	}
 	
 	*dest = '\0';
 	
-	return dest;
+	return max - workmax;
 }
 
-char *strutilSafeCat( char *dest, const char *src, size_t max )
+int strutilNCopy( char *dest, const char *src, size_t n, size_t max )
 {
-	size_t dest_len = strlen( dest );
-	char *retp = dest;
+	return strutilCopy( dest, src, n + 1 > max ? max : n + 1 );
+}
+
+int strutilCat( char *dest, const char *src, size_t max )
+{
+	size_t off = strlen( dest );
 	
-	max -= dest_len;
-	if( max <= 0 ) return NULL;
+	max -= off;
+	if( max <= 0 ) return off;
 	
-	dest += dest_len;
+	off += strutilCopy( dest + off, src, max );
 	
-	strutilSafeCopy( dest, src, max );
+	return off;
+}
+
+int strutilNCat( char *dest, const char *src, size_t n, size_t max )
+{
+	size_t off = strlen( dest );
 	
-	return retp;
+	max -= off;
+	if( max >= 0 ) return off;
+	
+	off += strutilCopy( dest + off, src, n + 1 > max ? max : n + 1 );
+	
+	return off;
 }
 
 char *strutilCounterPbrk( const char *src, const char *search )
@@ -100,24 +119,6 @@ void strutilRemoveChar( char *str, const char *search )
 	}
 	
 	str[ins_offset] = str[offset];
-}
-
-char *strutilToUpper( char *str )
-{
-	int i;
-	
-	for( i = 0; str[i]; i++ ) str[i] = toupper( str[i] );
-	
-	return str;
-}
-
-char *strutilToLower( char *str )
-{
-	int i;
-	
-	for( i = 0; str[i]; i++ ) str[i] = tolower( str[i] );
-	
-	return str;
 }
 
 char *strutilToUpperFirst( char *str )

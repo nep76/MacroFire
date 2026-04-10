@@ -1,186 +1,167 @@
-/*
-	グローバルヘッダー
-*/
-
+/*==========================================================
+	
+	MacroFire v3
+	
+	MacroFire API。
+	
+==========================================================*/
 #ifndef MACROFIRE_H
 #define MACROFIRE_H
 
-#include <pspdebug.h>
-#include <stdbool.h>
-#include "utils/inimgr.h"
-#include "psp/padutil.h"
+#include "pspapi.h"
+#include "mftypes.h"
+#include "mftab.h"
 
-#ifdef GLOBAL_VARIABLES_DEFINE
+/*==========================================================
+	定数
+==========================================================*/
+#define MF_TITLE        "MacroFire %s In-game menu"
+#define MF_VERSION      "3.0.0"
+#define MF_AUTHOR       "ClassG (http://classg.sytes.net)"
+
+#define MF_INI_FILENAME        "ms0:/seplugins/macrofire.ini"
+#define MF_INI_SECTION_DEFAULT "Default"
+#define MF_INI_SECTION_VSH     "VSH"
+#define MF_INI_SECTION_POPS    "POPS"
+#define MF_INI_SECTION_GAME    "GAME"
+
+#define MF_COLOR_TRANSPARENT GB_TRANSPARENT
+#define MF_COLOR_TEXT_FG     0xffffffff
+#define MF_COLOR_TEXT_BG     MF_COLOR_TRANSPARENT
+#define MF_COLOR_TEXT_FC     0xff0000ff
+#define MF_COLOR_TEXT_INACT  0x44ffffff
+#define MF_COLOR_TEXT_LABEL  0x88ccffff
+#define MF_COLOR_BG          0xbb000000
+#define MF_COLOR_TITLE_BAR   0x44aaaaaa
+#define MF_COLOR_TITLE       0xffffffff
+#define MF_COLOR_INFO_BAR    0x44aaaaaa
+#define MF_COLOR_INFO        0xffffffff
+#define MF_COLOR_EX1         0xffff0000
+#define MF_COLOR_EX2         0xffffff00
+#define MF_COLOR_EX3         0xffff00ff
+
+/*==========================================================
+	マクロ
+==========================================================*/
+/*-----------------------------------------------
+	デバッグ用。
+	DEBUGが真の場合、dbgprint/dbgprintfが有効になる。
+	
+	MakefileのCFLAGSに -DDEBUG=X
+	
+	X
+	0: デバッグ無効
+	1: デバッグメッセージを標準出力へ
+	   ファイルへ出力する場合は明示的にmfDebugPrintf()を使用するが、
+	   DEBUG=0にしても自動で削除されないため一時的な使用に限る。
+	2: デバッグメッセージをms0:/mfdebug.txtへ
+-----------------------------------------------*/
+#if DEBUG >= 1
+#define DEBUG_ENABLED
+#endif
+
+#ifdef MF_FIRST_INCLUDE
 #define GLOBAL
-#define INIT_VALUE( x ) = ( x ) /* define */
+#define INIT( x ) = x
+#ifdef DEBUG_ENABLED
+int mfDebugPrintf( const char *format, ... )
+{
+	SceUID fd;
+	va_list ap;
+	char buf[255];
+	unsigned short len = 0;
+	
+	va_start( ap, format );
+	vsnprintf( buf, 255, format, ap );
+	va_end( ap );
+	
+	fd = sceIoOpen( "ms0:/mfdebug.txt", PSP_O_WRONLY | PSP_O_CREAT | PSP_O_APPEND, 0777);
+	if( fd > 0 ){
+		len = strlen( buf );
+		sceIoWrite( fd, buf, len );
+		sceIoClose( fd );
+	}
+	
+	return len;
+}
+#endif
 #else
 #define GLOBAL extern
-#define INIT_VALUE( x ) /* extern */
+#define INIT( x )
+#ifdef DEBUG_ENABLED
+int mfDebugPrintf( const char *format, ... );
 #endif
-#define MF_ARRAY_NUM( x )  sizeof( x ) / sizeof( x[0] )
+#endif
 
-//#define DEBUG
+#if DEBUG >= 2
+#define DEBUG_PRINTF mfDebugPrintf
+#elif DEBUG >= 1
+#define DEBUG_PRINTF printf
+#endif
 
-/*-----------------------------------------------
-	定数
------------------------------------------------*/
-#define MF_VERSION           "2.4.1"
-#define MF_INI_FILENAME      "ms0:/seplugins/macrofire.ini"
-#define MF_INI_BTNLIST_DELIM "+"
+#ifdef DEBUG_ENABLED
+#define dbgprintf( fmt, ... ) \
+	DEBUG_PRINTF( "(%s():%s:%d): ", __func__, __FILE__, __LINE__ );\
+	DEBUG_PRINTF( fmt, __VA_ARGS__ );\
+	DEBUG_PRINTF( "\n" );
+#define dbgprint( str ) \
+	DEBUG_PRINTF( "(%s():%s:%d): ", __func__, __FILE__, __LINE__ );\
+	DEBUG_PRINTF( str );\
+	DEBUG_PRINTF( "\n" );
+#else
+#define dbgprintf( fmt, ... )
+#define dbgprint( str )
+#endif
 
-#define MF_UNUSED_BUTTONS ( PSP_CTRL_WLAN_UP | PSP_CTRL_REMOTE | PSP_CTRL_DISC | PSP_CTRL_MS )
-#define MF_KERNEL_BUTTONS ( PSP_CTRL_NOTE | PSP_CTRL_SCREEN | PSP_CTRL_VOLUP | PSP_CTRL_VOLDOWN | MFM_UNUSED_BUTTONS )
-
-/*-----------------------------------------------
-	型宣言
------------------------------------------------*/
-typedef enum {
-	MF_CALL_INTERNAL,
-	MF_CALL_READ,
-	MF_CALL_LATCH
-} MfCallMode;
-
-typedef enum {
-	MF_RUNENV_VSH,
-	MF_RUNENV_GAME,
-	MF_RUNENV_POPS
-} MfRunEnv;
-
-/*-----------------------------------------------
-	グローバル関数 (main.c)
-	
-	MacroFire Engineと実際のAPIのフック状態を変更/参照する。
------------------------------------------------*/
-
-/*
-	mfIsApiHooked
-	
-	APIが現在フックされているかどうかを調べる。
-	
-	@return: bool
-		true : フック済み
-		false: 未フック
-*/
-bool mfIsApiHooked( void );
-
-/*
-	mfHookApi
-	
-	APIのフックを実行する。
-*/
-void mfHookApi    ( void );
-
-/*
-	mfRestoreApi
-	
-	APIのフックを解除する。
-*/
-void mfRestoreApi ( void );
-
-/*
-	mfEnable
-	
-	MacroFire EngineをONにする。
-	これをONにしても、その場でAPIがフックされるわけではない。
-	言うなれば、APIのフックを予約するようなもので、
-	ON状態でメインルーチンに戻ったときにフックが実行される。
-*/
-void mfEnable     ( void );
-
-/*
-	mfDisable
-	
-	MacroFireEngineをOFFにする。
-	mfEnable()と同様に、OFFにしてもその場でAPIのフックが解除されるわけではない。
-*/
-void mfDisable    ( void );
-
-/*
-	mfIsEnabled
-	
-	MacroFire Engineの状態を返す。
-	
-	@return: bool
-		true : MacroFire Engine = ON
-		false: MacroFire Engine = OFF
-*/
-bool mfIsEnabled  ( void );
-
-/*
-	mfIsDisabled
-	
-	MacroFire Engineの状態を返す。
-	
-	@return: bool
-		true : MacroFire Engine = OFF
-		false: MacroFire Engine = ON
-*/
-
-bool mfIsDisabled ( void );
-
-/*
-	mfRunEnv
-	
-	MacroFireがVSH/GAME/POPSのどこで動作しているかを返す。
-	
-	@return: MfRunEnv
-		MF_RUNENV_VSH : VSH上で動作中。
-		MF_RUNENV_GAME: GAME上で動作中。
-		MF_RUNENV_POPS: POPS上で動作中。
-*/
-MfRunEnv mfRunEnv( void );
-
-/*
-	mfButtonsMask
-	
-	ボタンデータから指定したボタン以外を取り除く。
-	
-	@param: unsigned int buttons
-		ボタンデータ。
-	
-	@param: unsigned int umask
-		取り除くボタンデータ。
-	
-	@return: unsigned int
-		処理されたボタン。
-*/
-unsigned int mfButtonsMask( unsigned int buttons, unsigned int mask );
-
-/*
-	mfButtonsMask
-	
-	ボタンデータから指定したボタンを取り除く。
-	
-	@param: unsigned int buttons
-		ボタンデータ。
-	
-	@param: unsigned int umask
-		取り除くボタンデータ。
-	
-	@return: unsigned int
-		処理されたボタン。
-*/
-unsigned int mfButtonsUmask( unsigned int buttons, unsigned int umask );
-
-void mfIniConvertButtonCodeToNames( unsigned int buttons, char *str, size_t len );
-unsigned int mfIniConvertButtonNamesToCode( char *buttons );
-
-/*-----------------------------------------------
+/*==========================================================
 	グローバル変数
------------------------------------------------*/
-GLOBAL bool         gRunning  INIT_VALUE( true );
-GLOBAL bool         gMfEngine INIT_VALUE( false );
-GLOBAL unsigned int gMfMenu   INIT_VALUE( 0 );
-GLOBAL unsigned int gMfToggle INIT_VALUE( 0 );
+==========================================================*/
+GLOBAL bool gRunning INIT( true );
 
-#undef GLOBAL
-#undef VALUE
+/*=========================================================
+	MacroFire API
+=========================================================*/
+void mfHook( void );
+void mfUnhook( void );
+void mfEnable( void );
+void mfDisable( void );
+bool mfIsEnabled( void );
+void mfSetMenuButtons( PadutilButtons buttons );
+void mfSetToggleButtons( PadutilButtons buttons );
+PadutilButtons mfGetMenuButtons( void );
+PadutilButtons mfGetToggleButtons( void );
+bool mfConvertButtonReady( void );
+void mfConvertButtonFinish( void );
+char *mfConvertButtonC2N( PadutilButtons buttons, char *buf, size_t len );
+PadutilButtons mfConvertButtonN2C( char *buttons );
+const char *mfGetGameId( void );
+const char *mfGetIniRequestSection( void );
+const char *mfGetIniTargetSection( void );
+unsigned int mfGetWorld( void );
+bool mfIsRunningApp( MfAppId app );
+int mfOverlayMessageStart( void );
+void mfOverlayMessageExit( void );
+bool mfOverlayMessageIsRunning( void );
+bool mfOverlayMessagePrintf( const char *format, ... );
 
-/*-----------------------------------------------
-	MFAPI
------------------------------------------------*/
-#include "menu.h"
-#include "analogtune.h"
-#include "rapidfire.h"
+#ifndef MFEXCLUDE_DIALOG
+#include "mfdialog.h"
+#endif
+
+#ifndef MFEXCLUDE_MENU
+#include "mfmenu.h"
+#endif
+
+#ifndef MFEXCLUDE_CTRL
+#include "mfctrl.h"
+#endif
+
+#ifndef MFEXCLUDE_ANALOGSTICK
+#include "mfanalogstick.h"
+#endif
+
+#ifndef MFEXCLUDE_RAPIDFIRE
+#include "mfrapidfire.h"
+#endif
 
 #endif

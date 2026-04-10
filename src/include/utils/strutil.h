@@ -18,7 +18,7 @@ extern "C" {
 -----------------------------------------------*/
 
 /*
-	strutilSafeCopy
+	strutilCopy
 	
 	標準ライブラリのstrncpy()に似ているが、必ず末尾にNULLを付加する。
 	
@@ -33,15 +33,17 @@ extern "C" {
 	@param: size_t max
 		コピーする最大文字数。
 		NULL文字を含む。
-		1では常にNULLのみを、0以下ではなにもしない。
+		1では常にNULLのみを、0ではなにもしない。
 	
 	@return: char*
-		destを返す
+		コピーした文字数を返す。
+		ヌル文字も数える。
 */
-char *strutilSafeCopy( char *dest, const char *src, size_t max );
+int strutilCopy( char *dest, const char *src, size_t max );
+int strutilNCopy( char *dest, const char *src, size_t n, size_t max );
 
 /*
-	strutilSafeCat
+	strutilCat
 	
 	標準ライブラリのstrncat()に似ているが、必ず末尾にNULLを付加する。
 	また、サイズはsrcの文字数ではなく、結合後の最大文字数。
@@ -59,9 +61,11 @@ char *strutilSafeCopy( char *dest, const char *src, size_t max );
 		destは必ずこの長さ以下になる。
 	
 	@return: char*
-		destを返す。
+		結合後の文字数を返す。
+		ヌル文字も数える。
 */
-char *strutilSafeCat( char *dest, const char *src, size_t max );
+int strutilCat( char *dest, const char *src, size_t max );
+int strutilNCat( char *dest, const char *src, size_t n, size_t max );
 
 /*
 	strutilCounterPbrk
@@ -109,32 +113,6 @@ char *strutilCounterReversePbrk( const char *src, const char *search );
 		文字列で指定するが、取り除きたい文字を全て書き出す。
 */
 void strutilRemoveChar( char *str, const char *search );
-
-/*
-	strutilToUpper
-	
-	文字列に含まれるアルファベットをすべて大文字に変換する。
-	
-	@param: char *str
-		変換対象文字列。
-	
-	@return: char*
-		strを返す。
-*/
-char *strutilToUpper( char *str );
-
-/*
-	strutilToLower
-	
-	文字列に含まれるアルファベットをすべて小文字に変換する。
-	
-	@param: char *str
-		変換対象文字列。
-	
-	@return: char*
-		strを返す。
-*/
-char *strutilToLower( char *str );
 
 /*
 	strutilToUpperFirst

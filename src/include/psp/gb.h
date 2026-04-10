@@ -282,7 +282,9 @@ void gbRmvOpt( unsigned int opt );
 	gbSetDisplayBuf
 	
 	表示バッファを設定する。
-	この設定は必須で、これを設定せずに図形描画系の関数を使用した場合はNull Pointer Exception。
+	この設定は必須で、これを設定せずに図形描画系の関数を使用した場合は未定義。
+	
+	設定するアドレスは16バイト境界にアライメントされている必要がある。
 	
 	@param: const void *addr
 		表示バッファとして使用するメモリの先頭アドレス。
@@ -304,6 +306,7 @@ void *gbGetCurrentDisplayBuf( void );
 	gbSetDrawBuf
 	
 	描画バッファを設定する。
+	設定するアドレスは16バイト境界にアライメントされている必要がある。
 	
 	@param: const void *addr
 		描画バッファとして使用するメモリの先頭アドレス。
@@ -329,6 +332,10 @@ void *gbGetCurrentDrawBuf( void );
 	
 	表示バッファと描画バッファを切り替える。
 	イメージ的には、sceGuSwapBuffers()とやっていることは同じ。
+	
+	内部でsceDisplaySetFrameBuf()を呼んでいるため、
+	表示バッファ、NULLでない描画バッファのいずれかが、16バイト境界にアライメントされていない場合は失敗する。
+	失敗した場合、エラー等を返すように作っていないので注意。
 	
 	返り値にgbGetCurrentDrawBuf()の返り値を返す。
 	

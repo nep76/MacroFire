@@ -1,108 +1,65 @@
-/*
-	Directory Handler
-*/
+/*=========================================================
 
+	dirh.h
+	
+	ディレクトリハンドラ。
+
+=========================================================*/
 #ifndef DIRH_H
 #define DIRH_H
 
 #include <pspkernel.h>
-#include <pspsdk.h>
-#include "psp/memsce.h"
+#include <stdlib.h>
+#include "psp/memory.h"
 #include "psp/pathexpand.h"
-#include "psp/gb.h"
 #include "cgerrs.h"
 
-#define DIRH_MAXPATH 256
+/*=========================================================
+	マクロ
+=========================================================*/
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-typedef int DirhUID;
-
-struct dirh_dirents {
-	int pos;
-	char **dirList;
-	int dirCount;
-	char **fileList;
-	int fileCount;
-};
+/*=========================================================
+	型宣言
+=========================================================*/
+typedef intptr_t DirhUID;
 
 typedef enum {
-	DIRH_OPT_ADD_DIR_SLASH = 0x00000001,
+	DIRH_OPT_DOPEN_WITH_THREAD = 0x00000001,
 } DirhOptions;
 
-struct dirh_select_filename {
-	char curDirFullpath[DIRH_MAXPATH];
-	DirhOptions options;
-	struct dirh_dirents entry;
-	int lError;
-	int sError;
-};
-
-enum dirh_childthread_stat {
-	DIRH_CHILDTHREAD_INIT = 0,
-	DIRH_CHILDTHREAD_READY,
-	DIRH_CHILDTHREAD_COUNT,
-	DIRH_CHILDTHREAD_READ,
-	DIRH_CHILDTHREAD_ABORT
-};
-
-struct dirh_dopen_params {
-	enum dirh_childthread_stat status;
-	int    lock;
-	SceUID fd;
-	char   *path;
-	struct dirh_select_filename *sf;
-};
-
 typedef enum {
-	DFT_ERR,
-	DFT_REG,
-	DFT_DIR
+	DIRH_NULL = 0,
+	DIRH_FILE = FIO_SO_IFREG,
+	DIRH_DIR  = FIO_SO_IFDIR
 } DirhFileType;
 
 typedef enum {
-	DW_SEEK_SET,
-	DW_SEEK_CUR,
-	DW_SEEK_END,
-	DW_SEEK_DIR,
-	DW_SEEK_FILE,
+	DIRH_SEEK_SET = SEEK_SET,
+	DIRH_SEEK_CUR = SEEK_CUR,
+	DIRH_SEEK_END = SEEK_END
 } DirhWhence;
 
-/* 相対パス、あるいは絶対パスで指定されたディレクトリのリストを取得 */
-DirhUID dirhNew( const char *dirpath, unsigned int options );
+typedef struct {
+	char *name;
+	DirhFileType type;
+} DirhFileInfo;
 
-/* オプションをそのままに別にディレクトリを相対パス、あるいは絶対パス再取得 */
-int dirhChdir( DirhUID uid, const char *dirpath );
-
-/* 取得したデータを全て破棄 */
+/*=========================================================
+	関数
+=========================================================*/
+DirhUID dirhNew( size_t pathmax, unsigned int options );
+int dirhChdir( DirhUID uid, const char *dirpath, unsigned int timeout );
 void dirhDestroy( DirhUID uid );
-
-/* ディレクトリエントリを読み出す */
-char* dirhRead( DirhUID uid );
-
-/* 現在のディレクトリエントリ位置を先頭からのインデックス番号で返す */
+DirhFileInfo *dirhRead( DirhUID uid );
 int dirhTell( DirhUID uid );
-
-/* ディレクトリエントリ位置を移動する */
-void dirhSeek( DirhUID uid, DirhWhence whence, int count );
-
-/* 現在開いているディレクトリのフルパスを返す */
-char* dirhGetCwd( DirhUID uid );
-
-/* ディレクトリエントリ内のインデックス番号にあるファイルの名前を返す */
-char* dirhGetFileName( DirhUID uid, int idxnum );
-
-/* ディレクトリエントリ内のインデックス番号にあるファイルの属性を返す */
-unsigned int dirhGetFileType( DirhUID uid, int idxnum );
-
-int dirhGetAllEntryCount( DirhUID uid );
-int dirhGetDirEntryCount( DirhUID uid );
-int dirhGetFileEntryCount( DirhUID uid );
-
-int dirhGetLastError( DirhUID uid );
-int dirhGetLastSystemError( DirhUID uid );
+char *dirhGetCwd( DirhUID uid );
+void dirhSeek( DirhUID uid, DirhWhence whence, int offset );
+void dirhSort( DirhUID uid, int ( *compare )( const void*, const void* ) );
+DirhFileInfo *dirhGetFileInfo( DirhUID uid, int num );
 
 #ifdef __cplusplus
 }
