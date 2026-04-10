@@ -167,7 +167,7 @@ void macroIniLoad( InimgrUID ini, char *buf, size_t len )
 		
 		if( CG_IS_OK( mfIniGetString( ini, entryname, buf, len ) ) ){
 			if( macro_add( &st_params ) ){
-				if( macro_load( st_params.menu.selectedData, buf ) != CG_ERROR_OK ) macro_remove( &st_params );
+				if( CG_IS_ERROR( macro_load( st_params.menu.selectedData, buf ) ) ) macro_remove( &st_params );
 			}
 		} else{
 			break;
@@ -818,7 +818,6 @@ static int macro_load( struct macro_data *macro, const char *path )
 		ret = inimgrLoad( ini, path, MACRO_INI_SIGNATURE, inimgrMakeVersion( MACROMGR_MACRO_VERSION, 0, 0 ) );
 		
 		if( CG_IS_ERROR( ret ) ){
-			macro_clear( macro );
 			inimgrDestroy( ini );
 			return ret;
 		} else{

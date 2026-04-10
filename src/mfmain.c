@@ -580,6 +580,7 @@ static void mf_ini_load( InimgrUID ini )
 	dbgprint( "Sending message MF_MS_INI_LOAD to all functions..." );
 	for( i = 0; i < gMftabEntryCount; i++ ){
 		if( gMftab[i].proc ){
+			dbgprintf( "Find load-function and to run for %s", gMftab[i].name );
 			inifunc = ( gMftab[i].proc )( MF_MS_INI_LOAD );
 			if( inifunc ) inifunc( ini, buf, sizeof( buf ) );
 		}
@@ -967,29 +968,31 @@ bool mfNotificationPrintf( const char *format, ... )
 
 int mfIniGetInt( InimgrUID ini, const char *key, int *data )
 {
-	int i, ret = -1;
+	int i;
 	for( i = 0; i < sizeof( st_ini_sections ) >> 2; i++ ){
-		if( st_ini_sections[i] && ( ( ret = inimgrGetInt( ini, st_ini_sections[i], key, data ) ) == CG_OK ) ) return CG_OK;
+		if( st_ini_sections[i] && inimgrGetInt( ini, st_ini_sections[i], key, data ) == CG_OK ) return CG_OK;
 	}
-	return ret;
+	return -1;
 }
 
 int mfIniGetString( InimgrUID ini, const char *key, char *buf, size_t buflen )
 {
-	int i, ret = -1;
+	int i;
 	for( i = 0; i < sizeof( st_ini_sections ) >> 2; i++ ){
-		if( st_ini_sections[i] && ( ( ret = inimgrGetString( ini, st_ini_sections[i], key, buf, buflen ) ) > 0 ) ) return CG_OK;
+		if( st_ini_sections[i] && inimgrGetString( ini, st_ini_sections[i], key, buf, buflen ) > 0 ){
+			return CG_OK;
+		}
 	}
-	return ret;
+	return -1;
 }
 
 int mfIniGetBool( InimgrUID ini, const char *key, bool *bl )
 {
-	int i, ret = -1;
+	int i;
 	for( i = 0; i < sizeof( st_ini_sections ) >> 2; i++ ){
-		if( st_ini_sections[i] && ( ( ret = inimgrGetBool( ini, st_ini_sections[i], key, bl ) ) == CG_OK ) ) return CG_OK;
+		if( st_ini_sections[i] && inimgrGetBool( ini, st_ini_sections[i], key, bl ) == CG_OK ) return CG_OK;
 	}
-	return ret;
+	return -1;
 }
 
 /*-----------------------------------------------

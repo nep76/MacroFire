@@ -79,7 +79,7 @@ void rapidfireIniLoad( InimgrUID ini, char *buf, size_t len )
 			st_mode[i].mode   = rfdata.mode;
 		}
 		
-		if( mfIniGetString( ini, "Rapidfire", buf, len ) > 0 ){
+		if( CG_IS_OK( mfIniGetString( ini, "Rapidfire", buf, len ) ) ){
 			rapidfire_load( buf, st_mode, &st_delay );
 			rapidfire_apply( st_mode, &st_delay );
 		}

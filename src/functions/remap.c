@@ -70,7 +70,7 @@ void *remapProc( MfMessage message )
 
 void remapIniLoad( InimgrUID ini, char *buf, size_t len )
 {
-	if( mfIniGetString( ini, "Remap", buf, len ) > 0 ){
+	if( CG_IS_OK( mfIniGetString( ini, "Remap", buf, len ) ) ){
 		remap_load( &st_params, (const char *)buf );
 	}
 }
@@ -452,7 +452,7 @@ static int remap_ini_handle( MfCtrlDefIniAction action, const char *path )
 		case MF_CTRL_INI_LOAD:
 			remap_clear( &st_params );
 			ret = remap_load( &st_params, path );
-			if( ret != CG_ERROR_OK ) remap_clear( &st_params );
+			if( CG_IS_ERROR( ret ) ) remap_clear( &st_params );
 			return ret;
 		case MF_CTRL_INI_SAVE:
 			return remap_save( &st_params, path );
