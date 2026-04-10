@@ -12,10 +12,10 @@ static void mf_indicator( void );
 static void mf_threads_stat_change( enum mf_thread_chstat stat, SceUID thlist[], int thnum );
 static void mf_emerg_menu( void );
 static void mf_menu_create_home_menu( MfMenuItem *menu, int menu_num, MfMenuCallback *mf_menu );
-static void mf_backup_fbstat( struct mf_fbstat *fbstat );
-static void mf_restore_fbstat( struct mf_fbstat *fbstat );
-static bool mf_alloc_buffers( struct mf_buffers *buf, void *orig_buffer );
-static void mf_free_buffers( struct mf_buffers *buf );
+static void mf_backup_fbstat( struct mf_menu_fbstat *fbstat );
+static void mf_restore_fbstat( struct mf_menu_fbstat *fbstat );
+static bool mf_alloc_buffers( struct mf_menu_buffers *buf, void *orig_buffer );
+static void mf_free_buffers( struct mf_menu_buffers *buf );
 static void mf_ready_to_draw( void );
 static void mf_draw_base( void );
 
@@ -32,6 +32,24 @@ static int           st_thnum_first;
 static SceCtrlData   st_pad_data;
 static CtrlpadParams st_cp_params;
 static void          *st_vrambase;
+
+static bool st_altbtn_enable = false;
+static CtrlpadAltBtn st_altbtn[] = {
+	{ 0, PSP_CTRL_TRIANGLE },
+	{ 0, PSP_CTRL_CIRCLE   },
+	{ 0, PSP_CTRL_CROSS    },
+	{ 0, PSP_CTRL_SQUARE   },
+	{ 0, PSP_CTRL_UP       },
+	{ 0, PSP_CTRL_RIGHT    },
+	{ 0, PSP_CTRL_DOWN     },
+	{ 0, PSP_CTRL_LEFT     },
+	{ 0, PSP_CTRL_LTRIGGER },
+	{ 0, PSP_CTRL_RTRIGGER },
+	{ 0, PSP_CTRL_START    },
+	{ 0, PSP_CTRL_SELECT   },
+	{ 0, PSP_CTRL_HOME     },
+	{ 0, 0 }
+};
 
 static char          st_label[MFM_ITEM_LENGTH];
 static char          st_usage[MFM_ITEM_LENGTH];
@@ -82,7 +100,7 @@ bool mfMenuInit( void )
 	return true;
 }
 
-static void mf_backup_fbstat( struct mf_fbstat *fbstat )
+static void mf_backup_fbstat( struct mf_menu_fbstat *fbstat )
 {
 	fbstat->mode        = gbGetMode();
 	fbstat->width       = gbGetWidth();
@@ -92,17 +110,17 @@ static void mf_backup_fbstat( struct mf_fbstat *fbstat )
 	fbstat->pixelFormat = gbGetPixelFormat();
 }
 
-static void mf_restore_fbstat( struct mf_fbstat *fbstat )
+static void mf_restore_fbstat( struct mf_menu_fbstat *fbstat )
 {
 	sceDisplaySetMode( fbstat->mode, fbstat->width, fbstat->height );
 	sceDisplaySetFrameBuf( fbstat->frameBuffer, fbstat->bufferWidth, fbstat->pixelFormat, PSP_DISPLAY_SETBUF_IMMEDIATE );
 }
 
-static bool mf_alloc_buffers( struct mf_buffers *buf, void *orig_buffer )
+static bool mf_alloc_buffers( struct mf_menu_buffers *buf, void *orig_buffer )
 {
 	int backup_vram_size;
 	
-	memset( buf, 0, sizeof( struct mf_buffers ) );
+	memset( buf, 0, sizeof( struct mf_menu_buffers ) );
 	
 	buf->frame.size = gbGetDataFrameSize();
 	backup_vram_size = buf->frame.size * 3;
@@ -140,7 +158,7 @@ static bool mf_alloc_buffers( struct mf_buffers *buf, void *orig_buffer )
 	return true;
 };
 
-static void mf_free_buffers( struct mf_buffers *buf )
+static void mf_free_buffers( struct mf_menu_buffers *buf )
 {
 	if( buf->backup.vram ){
 		sceDmacMemcpy( st_vrambase, buf->backup.vram, buf->frame.size * 3 );
@@ -168,7 +186,7 @@ static void mf_draw_base( void )
 }
 
 #ifdef DEBUG
-void mfDebug( struct mf_buffers *buf )
+void mfDebug( struct mf_menu_buffers *buf )
 {
 	static int fps = 0;
 	static int st_fps = 0;
@@ -185,7 +203,7 @@ void mfDebug( struct mf_buffers *buf )
 
 	
 	gbPrintf( gbOffsetChar( 45 ), gbOffsetLine( 5 ), MFM_TITLE_TEXT_COLOR, MFM_TRANSPARENT,
-		""
+		"%d", fps
 	);
 		
 	gbPrintf( gbOffsetChar( 1 ), gbOffsetLine( 2 ), MFM_TITLE_TEXT_COLOR, MFM_TRANSPARENT,
@@ -201,6 +219,37 @@ void mfDebug( struct mf_buffers *buf )
 }
 #endif
 
+void mfMenuLoadIni( IniUID ini, char *buf, size_t len )
+{
+	PadutilButtons btn_name[] = { MFM_ALT_BUTTON_NAMES };
+	unsigned int i, j;
+	
+	for( i = 0; btn_name[i].button || btn_name[i].name; i++ ){
+		if( inimgrGetString( ini, "AlternativeButtons", btn_name[i].name, buf, len ) ){
+			for( j = 0; st_altbtn[j].realButtons || st_altbtn[j].altButtons; j++ ){
+				if( st_altbtn[j].altButtons == btn_name[i].button ){
+					st_altbtn[j].realButtons = mfIniConvertButtonNamesToCode( buf );
+					if( st_altbtn[j].realButtons ) st_altbtn_enable = true;
+				}
+			}
+		}
+	}
+}
+
+void mfMenuCreateIni( IniUID ini, char *buf, size_t len )
+{
+	PadutilButtons btn_name[] = { MFM_ALT_BUTTON_NAMES };
+	unsigned int i;
+	
+	for( i = 0; btn_name[i].button || btn_name[i].name; i++ ){
+		/* 先頭のみ大文字に */
+		strutilToLower( btn_name[i].name );
+		btn_name[i].name[0] = toupper( btn_name[i].name[0] );
+		
+		inimgrSetString( ini, "AlternativeButtons", btn_name[i].name, "" );
+	}
+}
+
 void mfMenu( void )
 {
 	SceUID thlist[MFM_MAX_NUMBER_OF_THREADS];
@@ -211,9 +260,9 @@ void mfMenu( void )
 	MfMenuCallback mf_menu;
 	int            menu_num, menu_selected;
 	
-	bool mf_api_hooked = false;//mfIsApiHooked();
-	struct mf_fbstat  fbstat;
-	struct mf_buffers buf;
+	bool mf_api_hooked = mfIsApiHooked();
+	struct mf_menu_fbstat  fbstat;
+	struct mf_menu_buffers buf;
 	
 	/* 他のスレッドをサスペンド */
 	sceKernelGetThreadmanIdList( SCE_KERNEL_TMID_Thread, thlist, MFM_MAX_NUMBER_OF_THREADS, &thnum );
@@ -272,6 +321,12 @@ void mfMenu( void )
 	/* パッドのキーリピート計算機を初期化 */
 	ctrlpadInit( &st_cp_params );
 	ctrlpadSetRepeatButtons( &st_cp_params, PSP_CTRL_UP | PSP_CTRL_RIGHT | PSP_CTRL_DOWN | PSP_CTRL_LEFT );
+	
+	/* ダイアログに対して再割り当て設定 */
+	if( st_altbtn_enable ){
+		ctrlpadSetRemap( &st_cp_params, st_altbtn, MF_ARRAY_NUM( st_altbtn ) );
+		cmndlgSetAlternativeButtons( st_altbtn, MF_ARRAY_NUM( st_altbtn ) );
+	}
 	
 	st_update_screen = true;
 	
@@ -355,6 +410,9 @@ void mfMenu( void )
 		
 		/* バッファを解放 */
 		mf_free_buffers( &buf );
+		
+		/* 再割り当て解除 */
+		cmndlgClearAlternativeButtons();
 		
 		goto QUIT;
 	
@@ -490,25 +548,28 @@ unsigned int mfMenuScroll( int selected, unsigned int viewlines, unsigned int ma
 	return line_number;
 }
 
-void mfMenuButtonsSymStr( unsigned int buttons, char *str, size_t len )
+void mfMenuCreateButtonSymbolList( unsigned int buttons, char *str, size_t len )
 {
-	if( buttons & PSP_CTRL_CIRCLE   ) strutilSafeCat( str, "\x85 "  , len );
-	if( buttons & PSP_CTRL_CROSS    ) strutilSafeCat( str, "\x86 "  , len );
-	if( buttons & PSP_CTRL_SQUARE   ) strutilSafeCat( str, "\x87 "  , len );
-	if( buttons & PSP_CTRL_TRIANGLE ) strutilSafeCat( str, "\x84 "  , len );
-	if( buttons & PSP_CTRL_UP       ) strutilSafeCat( str, "\x80 "  , len );
-	if( buttons & PSP_CTRL_RIGHT    ) strutilSafeCat( str, "\x81 "  , len );
-	if( buttons & PSP_CTRL_DOWN     ) strutilSafeCat( str, "\x82 "  , len );
-	if( buttons & PSP_CTRL_LEFT     ) strutilSafeCat( str, "\x83 "  , len );
-	if( buttons & PSP_CTRL_LTRIGGER ) strutilSafeCat( str, "L "     , len );
-	if( buttons & PSP_CTRL_RTRIGGER ) strutilSafeCat( str, "R "     , len );
-	if( buttons & PSP_CTRL_SELECT   ) strutilSafeCat( str, "SELECT ", len );
-	if( buttons & PSP_CTRL_START    ) strutilSafeCat( str, "START " , len );
-	
-	if( buttons & CTRLPAD_CTRL_ANALOG_UP    ) strutilSafeCat( str, "A\x80 " , len );
-	if( buttons & CTRLPAD_CTRL_ANALOG_RIGHT ) strutilSafeCat( str, "A\x81 " , len );
-	if( buttons & CTRLPAD_CTRL_ANALOG_DOWN  ) strutilSafeCat( str, "A\x82 " , len );
-	if( buttons & CTRLPAD_CTRL_ANALOG_LEFT  ) strutilSafeCat( str, "A\x83 " , len );
+	PadutilButtons btndef[] = {
+		{ PSP_CTRL_TRIANGLE,         "\x84" },
+		{ PSP_CTRL_CIRCLE,           "\x85" },
+		{ PSP_CTRL_CROSS,            "\x86" },
+		{ PSP_CTRL_SQUARE,           "\x87" },
+		{ PSP_CTRL_UP,               "\x80" },
+		{ PSP_CTRL_RIGHT,            "\x81" },
+		{ PSP_CTRL_DOWN,             "\x82" },
+		{ PSP_CTRL_LEFT,             "\x83" },
+		{ PSP_CTRL_LTRIGGER,         "L" },
+		{ PSP_CTRL_RTRIGGER,         "R" },
+		{ PSP_CTRL_SELECT,           "SELECT" },
+		{ PSP_CTRL_START,            "START" },
+		{ PADUTIL_CTRL_ANALOG_UP,    "A\x80" },
+		{ PADUTIL_CTRL_ANALOG_RIGHT, "A\x81" },
+		{ PADUTIL_CTRL_ANALOG_DOWN,  "A\x82" },
+		{ PADUTIL_CTRL_ANALOG_LEFT,  "A\x83" },
+		{ 0, NULL }
+	};
+	padutilGetButtonNamesByCode( btndef, buttons, " ", 0, str, len );
 }
 
 static void mf_emerg_menu( void )

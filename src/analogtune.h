@@ -13,16 +13,13 @@
 /*-----------------------------------------------
 	íËêî/É}ÉNÉç
 -----------------------------------------------*/
-#define ANALOGTUNE_INIT_X     128
-#define ANALOGTUNE_INIT_Y     128
-#define ANALOGTUNE_INIT_R      40
-#define ANALOGTUNE_INIT_SENS  100
+#define ANALOGTUNE_INIT_MOVEMENT true
+#define ANALOGTUNE_INIT_R         40
+#define ANALOGTUNE_INIT_SENS     100
 
-#define ANALOGTUNE_MAX_COORD  255
-#define ANALOGTUNE_MAX_RADIUS 128
-#define ANALOGTUNE_MAX_SENS   200
+#define ANALOGTUNE_MAX_SENS      200
 
-#define ANALOGTUNE_SQUARE( x )     ( ( x ) * ( x ) )
+#define ANALOGTUNE_SQUARE( x )   ( ( x ) * ( x ) )
 
 /*-----------------------------------------------
 	å^êÈåæ

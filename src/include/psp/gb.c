@@ -14,9 +14,10 @@
 /*-----------------------------------------------
 	スタティック関数
 -----------------------------------------------*/
-static void *gb_calc_pos( unsigned int x, unsigned int y );
-static void gb_swap( unsigned int *a, unsigned int *b );
+static void *gb_calc_pos( int x, int y );
+static void gb_swap( int *a, int *b );
 static void gb_set_data( void );
+static inline void gb_put_pixel( void *addr, uint32_t color, size_t len );
 
 /*-----------------------------------------------
 	スタティック変数
@@ -33,14 +34,14 @@ static bool             st_draw = true;
 
 /*=============================================*/
 
-static void *gb_calc_pos( unsigned int x, unsigned int y )
+static void *gb_calc_pos( int x, int y )
 {
-	return (void *)( (unsigned int)( gbGetCurrentDrawBuf() ) + ( ( x + ( y * st_gb.bufferWidth ) ) * st_gb.data.pixelBytes ) );
+	return (void *)( (unsigned int)( gbGetCurrentDrawBuf() ) + ( x + y * st_gb.bufferWidth ) * st_gb.data.pixelBytes );
 }
 
-static void gb_swap( unsigned int *a, unsigned int *b )
+static void gb_swap( int *a, int *b )
 {
-	unsigned int c = *a;
+	int c = *a;
 	*a = *b;
 	*b = c;
 }
@@ -50,6 +51,17 @@ static void gb_set_data( void )
 	st_gb.data.pixelBytes = gbGetBytesPerPixel( st_gb.pixelFormat );
 	st_gb.data.lineBytes  = st_gb.data.pixelBytes * st_gb.bufferWidth;
 	st_gb.data.frameBytes = st_gb.data.lineBytes * st_gb.height;
+}
+
+static inline void gb_put_pixel( void *addr, uint32_t color, size_t len )
+{
+	unsigned int drawbuf = (unsigned int)gbGetCurrentDrawBuf();
+	uint32_t     pixel;
+	
+	if( (unsigned int)addr >= drawbuf && (unsigned int)addr <= drawbuf + gbGetDataFrameSize() ){
+		pixel = st_cconv ? ( st_cconv )( color, addr ) : color;
+		memcpy( addr, (void *)&pixel, len );
+	}
 }
 
 unsigned int gbGetBytesPerPixel( enum PspDisplayPixelFormats pxformat )
@@ -363,15 +375,15 @@ unsigned int gbGetDataFrameSize( void )
 	return st_gb.data.frameBytes;
 }
 
-int gbPrint( unsigned int x, unsigned int y, uint32_t fgcolor, uint32_t bgcolor, const char *str )
+int gbPrint( int x, int y, uint32_t fgcolor, uint32_t bgcolor, const char *str )
 {
 	unsigned int addr, drawstart;
 	unsigned int i, char_off, char_x_off, char_y_off;
 	const char   *glyph;
 	char         glyphline;
-	uint32_t     drawcolor;
 	unsigned int char_width;
 	unsigned int line_height;
+	uint32_t     color;
 	
 	char_width  = gbOffsetChar( 1 );
 	line_height = gbOffsetLine( 1 );
@@ -408,12 +420,8 @@ int gbPrint( unsigned int x, unsigned int y, uint32_t fgcolor, uint32_t bgcolor,
 			glyphline = glyph[char_y_off];
 			
 			for( char_x_off = 0; char_x_off < char_width; char_x_off++, glyphline <<= 1, addr += st_gb.data.pixelBytes ){
-				drawcolor = glyphline & 0x80 ? fgcolor : bgcolor;
-				
-				if( drawcolor != GB_TRANSPARENT ){
-					if( st_cconv ) drawcolor = ( st_cconv )( drawcolor, (void *)addr );
-					memcpy( (void *)addr, (void *)&drawcolor, st_gb.data.pixelBytes );
-				}
+				color = glyphline & 0x80 ? fgcolor : bgcolor;
+				if( color != GB_TRANSPARENT ) gb_put_pixel( (void *)addr, color, st_gb.data.pixelBytes );
 			}
 		}
 		char_off += char_width;
@@ -421,13 +429,13 @@ int gbPrint( unsigned int x, unsigned int y, uint32_t fgcolor, uint32_t bgcolor,
 	return i;
 }
 
-int gbPutChar( unsigned int x, unsigned int y, unsigned int fgcolor, unsigned int bgcolor, const char chr )
+int gbPutChar( int x, int y, uint32_t fgcolor, uint32_t bgcolor, const char chr )
 {
 	char putchr[] = { chr, '\0' };
 	return gbPrint( x, y, fgcolor, bgcolor, putchr );
 }
 
-int gbPrintf( unsigned int x, unsigned int y, unsigned int fgcolor, unsigned int bgcolor, const char *format, ... )
+int gbPrintf( int x, int y, uint32_t fgcolor, uint32_t bgcolor, const char *format, ... )
 {
 	char str[255];
 	va_list ap;
@@ -439,23 +447,21 @@ int gbPrintf( unsigned int x, unsigned int y, unsigned int fgcolor, unsigned int
 	return gbPrint( x, y, fgcolor, bgcolor, str );
 }
 
-void gbPoint( unsigned int x, unsigned int y, uint32_t color )
+void gbPoint( int x, int y, uint32_t color )
 {
 	unsigned int drawpos;
-	uint32_t     drawcolor;
 	
 	if( ! st_draw || color == GB_TRANSPARENT ) return;
 	
 	drawpos   = (unsigned int)gb_calc_pos( x, y );
-	drawcolor = st_cconv ? ( st_cconv )( color, (void *)drawpos ) : color;
-	memcpy( (void *)drawpos, (void *)&drawcolor, st_gb.data.pixelBytes );
+	gb_put_pixel( (void *)drawpos, color, st_gb.data.pixelBytes );
 }
 
-void gbLine( unsigned int sx, unsigned int sy, unsigned int ex, unsigned int ey, uint32_t color )
+/* ブレゼンハムの線分描画アルゴリズム */
+void gbLine( int sx, int sy, int ex, int ey, uint32_t color )
 {
 	unsigned int drawpos;
-	unsigned int e, dx, dy;
-	uint32_t     drawcolor;
+	int          e, dx, dy;
 	
 	if( ! st_draw || color == GB_TRANSPARENT ) return;
 	
@@ -469,31 +475,29 @@ void gbLine( unsigned int sx, unsigned int sy, unsigned int ex, unsigned int ey,
 	drawpos = (unsigned int)gb_calc_pos( sx, sy );
 	
 	if( dx > dy ){
-		unsigned int x;
+		int x;
 		for( x = sx; x <= ex; x++, drawpos += st_gb.data.pixelBytes ){
 			e += dy;
 			if( e > dx ){
 				e -= dx;
 				drawpos += st_gb.data.lineBytes;
 			}
-			drawcolor = st_cconv ? ( st_cconv )( color, (void *)drawpos ) : color;
-			memcpy( (void *)drawpos, (void *)&drawcolor, st_gb.data.pixelBytes );
+			gb_put_pixel( (void *)drawpos, color, st_gb.data.pixelBytes );
 		}
 	} else{
-		unsigned int y;
+		int y;
 		for( y = sy; y <= ey; y++, drawpos += st_gb.data.lineBytes ){
 			e += dx;
 			if( e > dy ){
 				e -= dy;
 				drawpos += st_gb.data.pixelBytes;
 			}
-			drawcolor = st_cconv ? ( st_cconv )( color, (void *)drawpos ) : color;
-			memcpy( (void *)drawpos, (void *)&drawcolor, st_gb.data.pixelBytes );
+			gb_put_pixel( (void *)drawpos, color, st_gb.data.pixelBytes );
 		}
 	}
 }
 
-void gbLineRect( unsigned int sx, unsigned int sy, unsigned int ex, unsigned int ey, uint32_t color )
+void gbLineRect( int sx, int sy, int ex, int ey, uint32_t color )
 {
 	if( ! st_draw || color == GB_TRANSPARENT ) return;
 	
@@ -503,11 +507,10 @@ void gbLineRect( unsigned int sx, unsigned int sy, unsigned int ex, unsigned int
 	gbLine( sx, ey, sx, sy, color );
 }
  
-void gbFillRect( unsigned int sx, unsigned int sy, unsigned int ex, unsigned int ey, uint32_t color )
+void gbFillRect( int sx, int sy, int ex, int ey, uint32_t color )
 {
 	unsigned int drawstart, offset;
-	unsigned int w, h, x;
-	uint32_t     drawcolor;
+	int          w, h, x;
 	
 	if( ! st_draw || color == GB_TRANSPARENT ) return;
 	
@@ -522,8 +525,39 @@ void gbFillRect( unsigned int sx, unsigned int sy, unsigned int ex, unsigned int
 	for( ; h; h--, drawstart += st_gb.data.lineBytes ){
 		offset = 0;
 		for( x = 0; x < w; x++, offset += st_gb.data.pixelBytes ){
-			drawcolor = st_cconv ? ( st_cconv )( color, (void *)( drawstart + offset ) ) : color;
-			memcpy( (void *)( drawstart + offset ), (void *)&drawcolor, st_gb.data.pixelBytes );
+			gb_put_pixel( (void *)( drawstart + offset ), color, st_gb.data.pixelBytes );
 		}
+	}
+}
+
+/* ミッチェナーの円弧描画アルゴリズム */
+void gbLineCircle( int x, int y, unsigned int radius, uint32_t color )
+{
+	int cx = 0, cy = radius;
+	int d = 3 - 2 * radius;
+	
+	if( ! st_draw || color == GB_TRANSPARENT || ! radius ) return;
+	
+	/* 開始点 */
+	gbPoint( x, y + radius, color ); /* ( 0, R) */
+	gbPoint( x, y - radius, color ); /* ( 0,-R) */
+	gbPoint( x + radius, y, color ); /* ( R, 0) */
+	gbPoint( x - radius, y, color ); /* (-R, 0) */
+	
+	for( cx = 0; cx <= cy; cx++ ){
+		if( d >= 0 ){
+			d += 10 + 4 * cx - 4 * cy--;
+		} else{
+			d += 6 + 4 * cx;
+		}
+		
+		gbPoint( x + cy, y + cx, color ); /*   0-45  度 */
+		gbPoint( x + cx, y + cy, color ); /*  45-90  度 */
+		gbPoint( x - cx, y + cy, color ); /*  90-135 度 */
+		gbPoint( x - cy, y + cx, color ); /* 135-180 度 */
+		gbPoint( x - cy, y - cx, color ); /* 180-225 度 */
+		gbPoint( x - cx, y - cy, color ); /* 225-270 度 */
+		gbPoint( x + cx, y - cy, color ); /* 270-315 度 */
+		gbPoint( x + cy, y - cx, color ); /* 315-360 度 */
 	}
 }

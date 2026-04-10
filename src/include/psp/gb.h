@@ -437,10 +437,10 @@ unsigned int gbGetOpt( void );
 	
 	描画バッファに文字列を書き込む。
 	
-	@param: unsigned int x
+	@param: int x
 		書き込む位置のX座標。
 	
-	@param: unsigned int y
+	@param: int y
 		書き込む位置のY座標。
 	
 	@param: uint32_t fgcolor
@@ -455,17 +455,17 @@ unsigned int gbGetOpt( void );
 	@return: int
 		書き込んだ文字数。
 */
-int gbPrint( unsigned int x, unsigned int y, uint32_t fgcolor, uint32_t bgcolor, const char *str );
+int gbPrint( int x, int y, uint32_t fgcolor, uint32_t bgcolor, const char *str );
 
 /*
 	guPutChar
 	
 	描画バッファに文字を書き込む。
 	
-	@param: unsigned int x
+	@param: int x
 		書き込む位置のX座標。
 	
-	@param: unsigned int y
+	@param: int y
 		書き込む位置のY座標。
 	
 	@param: uint32_t fgcolor
@@ -480,17 +480,17 @@ int gbPrint( unsigned int x, unsigned int y, uint32_t fgcolor, uint32_t bgcolor,
 	@return: int
 		書き込んだ文字数。
 */
-int gbPutChar( unsigned int x, unsigned int y, unsigned int fgcolor, unsigned int bgcolor, const char chr );
+int gbPutChar( int x, int y, uint32_t fgcolor, uint32_t bgcolor, const char chr );
 
 /*
 	gbPrintf
 	
 	描画バッファにフォーマット文字列を書き込む。
 	
-	@param: unsigned int x
+	@param: int x
 		書き込む位置のX座標。
 	
-	@param: unsigned int y
+	@param: int y
 		書き込む位置のY座標。
 	
 	@param: uint32_t fgcolor
@@ -507,89 +507,89 @@ int gbPutChar( unsigned int x, unsigned int y, unsigned int fgcolor, unsigned in
 	@return: int
 		書き込んだ文字数。
 */
-int gbPrintf( unsigned int x, unsigned int y, unsigned int fgcolor, unsigned int bgcolor, const char *format, ... );
+int gbPrintf( int x, int y, unsigned int fgcolor, unsigned int bgcolor, const char *format, ... );
 
 /*
 	gbPoint
 	
 	描画バッファに点を描き込む。
 	
-	@param: unsigned int x
+	@param: int x
 		点を打つX座標。
 	
-	@param: unsigned int y
+	@param: int y
 		点を打つY座標。
 	
 	@param: uint32_t color
 		点の色。
 */
-void gbPoint( unsigned int x, unsigned int y, uint32_t color );
+void gbPoint( int x, int y, uint32_t color );
 
 /*
 	gbLine
 	
 	描画バッファに線を引く。
 	
-	@param: unsigned int sx
+	@param: int sx
 		線の始点X座標。
 	
-	@param: unsigned int sy
+	@param: int sy
 		線の始点Y座標。
 	
-	@param: unsigned int ex
+	@param: int ex
 		線の終点X座標。
 	
-	@param:	unsigned int ey
+	@param:	int ey
 		線の終点Y座標。
 	
 	@param: uint32_t color
 		線の色。
 */
-void gbLine( unsigned int sx, unsigned int sy, unsigned int ex, unsigned int ey, uint32_t color );
+void gbLine( int sx, int sy, int ex, int ey, uint32_t color );
 
 /*
 	gbLineRect
 	
 	描画バッファに矩形を描き込む。
 	
-	@param: unsigned int sx
+	@param: int sx
 		矩形の左上の角のX座標。
 	
-	@param: unsigned int sy
+	@param: int sy
 		矩形の左上の角のY座標。
 	
-	@param: unsigned int ex
+	@param: int ex
 		矩形の右下の角のX座標。
 	
-	@param: unsigned int ey
+	@param: int ey
 		矩形の右下の角のY座標。
 	
 	@param: uint32_t color
 		矩形の色。
 */		
-void gbLineRect( unsigned int sx, unsigned int sy, unsigned int ex, unsigned int ey, uint32_t color );
+void gbLineRect( int sx, int sy, int ex, int ey, uint32_t color );
 
 /*
 	gbFillRect
 	
 	描画バッファに塗りつぶし矩形を描き込む。
 	
-	@param: unsigned int sx
+	@param: int sx
 		矩形の左上の角のX座標。
 	
-	@param: unsigned int sy
+	@param: int sy
 		矩形の左上の角のY座標。
 	
-	@param: unsigned int ex
+	@param: int ex
 		矩形の右下の角のX座標。
 	
-	@param: unsigned int ey
+	@param: int ey
 		矩形の右下の角のY座標。
 	
 	@param: uint32_t color
 		塗りつぶす色。
 */
-void gbFillRect( unsigned int sx, unsigned int sy, unsigned int ex, unsigned int ey, uint32_t color );
+void gbFillRect( int sx, int sy, int ex, int ey, uint32_t color );
 
 /*
 	gbOffsetChar
@@ -685,6 +685,25 @@ void gbFillRect( unsigned int sx, unsigned int sy, unsigned int ex, unsigned int
 		塗りつぶす色。
 */
 #define gbFillRectRel( x, y, w, h, c ) gbFillRect( x, y, ( x ) + ( w ), ( y ) + ( h ), c )
+
+/*
+	gbLineCircle
+	
+	描画バッファに円弧を描き込む。
+		
+	@param: int x
+		円の中心のX座標。
+	
+	@param: int y
+		円の中心のY座標。
+	
+	@param: unsigned int radius
+		半径。
+	
+	@param: c
+		円の色。
+*/
+void gbLineCircle( int x, int y, unsigned int radius, uint32_t color );
 
 #ifdef __cplusplus
 }

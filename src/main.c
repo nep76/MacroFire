@@ -68,18 +68,19 @@ static void mf_loadstore_ini( const char *inipath )
 	ini = inimgrNew();
 	if( ini > 0 ){
 		int i;
-		char buttons[128];
+		char buf[255];
 		if( inimgrLoad( ini, MF_INI_FILENAME ) != 0 ){
 			inimgrSetBool( ini, "Main", "Startup", MF_INIDEF_MAIN_STARTUP );
-			ctrlpadUtilButtonsToString( MF_INIDEF_MAIN_MENUBUTTONS, buttons, sizeof( buttons ) );
-			inimgrSetString( ini, "Main", "MenuButtons", buttons );
-			ctrlpadUtilButtonsToString( MF_INIDEF_MAIN_TOGGLEBUTTONS, buttons, sizeof( buttons ) );
-			inimgrSetString( ini, "Main", "ToggleButtons", buttons );
+			mfIniConvertButtonCodeToNames( MF_INIDEF_MAIN_MENUBUTTONS, buf, sizeof( buf ) );
+			inimgrSetString( ini, "Main", "MenuButtons", buf );
+			mfIniConvertButtonCodeToNames( MF_INIDEF_MAIN_TOGGLEBUTTONS, buf, sizeof( buf ) );
+			inimgrSetString( ini, "Main", "ToggleButtons",buf );
 			
+			mfMenuCreateIni( ini, buf, sizeof( buf ) );
 			analogtuneCreateIni( ini );
 			
 			for( i = 0; i < mftableEntry; i++ ){
-				if( mftable[i].ciFunc ) ( mftable[i].ciFunc )( ini );
+				if( mftable[i].ciFunc ) ( mftable[i].ciFunc )( ini, buf, sizeof( buf ) );
 			}
 			
 			inimgrSave( ini, MF_INI_FILENAME );
@@ -87,22 +88,23 @@ static void mf_loadstore_ini( const char *inipath )
 		
 		inimgrGetBool( ini, "Main", "Startup", &gMfEngine );
 		
-		if( inimgrGetString( ini, "Main", "MenuButtons", buttons, sizeof( buttons ) ) < 0 ){
+		if( inimgrGetString( ini, "Main", "MenuButtons", buf, sizeof( buf ) ) < 0 ){
 			gMfMenu = MF_INIDEF_MAIN_MENUBUTTONS;
 		} else{
-			gMfMenu = ctrlpadUtilStringToButtons( buttons );
+			gMfMenu = mfIniConvertButtonNamesToCode( buf );
 		}
 		
-		if( inimgrGetString( ini, "Main", "ToggleButtons", buttons, sizeof( buttons ) ) < 0 ){
+		if( inimgrGetString( ini, "Main", "ToggleButtons", buf, sizeof( buf ) ) < 0 ){
 			gMfToggle = MF_INIDEF_MAIN_TOGGLEBUTTONS;
 		} else{
-			gMfToggle = ctrlpadUtilStringToButtons( buttons );
+			gMfToggle = mfIniConvertButtonNamesToCode( buf );
 		}
 		
+		mfMenuLoadIni( ini, buf, sizeof( buf ) );
 		analogtuneLoadIni( ini );
 		
 		for( i = 0; i < mftableEntry; i++ ){
-			if( mftable[i].liFunc ) ( mftable[i].liFunc )( ini );
+			if( mftable[i].liFunc ) ( mftable[i].liFunc )( ini, buf, sizeof( buf ) );
 		}
 		inimgrDestroy( ini );
 	}
@@ -286,6 +288,16 @@ void mfRestoreApi( void )
 	st_apihooked = false;
 }
 
+void mfIniConvertButtonCodeToNames( unsigned int buttons, char *str, size_t len )
+{
+	padutilGetButtonNamesByCode( NULL, buttons, MF_INI_BTNLIST_DELIM, PADUTIL_OPT_TOKEN_SP, str, len );
+}
+
+unsigned int mfIniConvertButtonNamesToCode( char *buttons )
+{
+	return padutilGetButtonCodeByNames( NULL, buttons, MF_INI_BTNLIST_DELIM, PADUTIL_OPT_IGNORE_SP );
+}
+
 int main_thread( SceSize arglen, void *argp )
 {
 	bool wait_toggle_button_release = false;
@@ -305,11 +317,10 @@ int main_thread( SceSize arglen, void *argp )
 		} else{
 			sceCtrlPeekBufferPositive( &st_pad_data, 1 );
 			analogtuneTune( &st_pad_data, NULL );
-			st_pad_data.Buttons |= ctrlpadUtilGetAnalogDirection( st_pad_data.Lx, st_pad_data.Ly, 0 );
 		}
 		
 		st_pad_data.Buttons =  mfButtonsUmask( st_pad_data.Buttons, MF_UNUSED_BUTTONS );
-		st_pad_data.Buttons |= ctrlpadUtilGetAnalogDirection( st_pad_data.Lx, st_pad_data.Ly, 0 );
+		st_pad_data.Buttons |= padutilGetAnalogDirection( st_pad_data.Lx, st_pad_data.Ly, 0 );
 		
 		if( gMfToggle ){
 			if( ( st_pad_data.Buttons & (~( ~0 ^ gMfToggle )) ) == gMfToggle ){

@@ -65,6 +65,8 @@ typedef struct {
 /*-----------------------------------------------
 	ä÷êî
 -----------------------------------------------*/
+void rapidfireLoadIni( IniUID ini, char *buf, size_t len );
+void rapidfireCreateIni( IniUID ini, char *buf, size_t len );
 MfMenuRc rapidfireMenu( SceCtrlData *pad_data, void *argp );
 void     rapidfireApply( void );
 

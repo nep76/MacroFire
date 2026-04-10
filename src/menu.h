@@ -15,6 +15,7 @@
 #include "psp/cmndlg.h"
 #include "psp/ctrlpad.h"
 #include "utils/strutil.h"
+#include "utils/inimgr.h"
 
 #define MFM_TOP_MESSAGE "MacroFire %s In-game menu [ClassG: http://classg.sytes.net]"
 
@@ -46,9 +47,26 @@
 	PSP_CTRL_UP       | PSP_CTRL_RIGHT    | PSP_CTRL_DOWN   | PSP_CTRL_LEFT     | \
 	PSP_CTRL_LTRIGGER | PSP_CTRL_RTRIGGER | PSP_CTRL_SELECT | PSP_CTRL_START    | \
 	PSP_CTRL_NOTE     | PSP_CTRL_SCREEN   | PSP_CTRL_VOLUP  | PSP_CTRL_VOLDOWN  | \
-	CTRLPAD_CTRL_ANALOG_UP   | CTRLPAD_CTRL_ANALOG_RIGHT | \
-	CTRLPAD_CTRL_ANALOG_DOWN | CTRLPAD_CTRL_ANALOG_LEFT \
+	PADUTIL_CTRL_ANALOG_UP   | PADUTIL_CTRL_ANALOG_RIGHT | \
+	PADUTIL_CTRL_ANALOG_DOWN | PADUTIL_CTRL_ANALOG_LEFT \
 )
+
+#define MFM_ALT_BUTTON_NAMES \
+	{ PSP_CTRL_SELECT,   "SELECT"   },\
+	{ PSP_CTRL_START,    "START"    },\
+	{ PSP_CTRL_UP,       "UP"       },\
+	{ PSP_CTRL_RIGHT,    "RIGHT"    },\
+	{ PSP_CTRL_DOWN,     "DOWN"     },\
+	{ PSP_CTRL_LEFT,     "LEFT"     },\
+	{ PSP_CTRL_LTRIGGER, "LTRIGGER" },\
+	{ PSP_CTRL_RTRIGGER, "RTRIGGER" },\
+	{ PSP_CTRL_TRIANGLE, "TRIANGLE" },\
+	{ PSP_CTRL_CIRCLE,   "CIRCLE"   },\
+	{ PSP_CTRL_CROSS,    "CROSS"    },\
+	{ PSP_CTRL_SQUARE,   "SQUARE"   },\
+	{ PSP_CTRL_HOME,     "HOME"     },\
+	{ 0, NULL }
+
 
 /*-----------------------------------------------
 	プロトタイプのないAPI
@@ -85,7 +103,7 @@ enum mf_thread_chstat {
 };
 
 
-struct mf_fbstat {
+struct mf_menu_fbstat {
 	int mode;
 	int width;
 	int height;
@@ -94,7 +112,7 @@ struct mf_fbstat {
 	enum PspDisplayPixelFormats pixelFormat;
 };
 
-struct mf_buffers {
+struct mf_menu_buffers {
 	struct {
 		void *vram;
 		void *origAddr;
@@ -108,6 +126,11 @@ struct mf_buffers {
 	} frame;
 	
 	bool useVolatileMem;
+};
+
+struct mf_menu_altbtn {
+	unsigned int button;
+	unsigned int alt;
 };
 
 typedef enum {
@@ -163,6 +186,8 @@ typedef struct {
 -----------------------------------------------*/
 bool mfMenuInit( void );
 void mfMenu( void );
+void mfMenuLoadIni( IniUID ini, char *buf, size_t len );
+void mfMenuCreateIni( IniUID ini, char *buf, size_t len );
 
 /*-----------------------------------------------
 	メニュー用API
@@ -245,7 +270,7 @@ void mfMenuLabel( const char *format, ... );
 void mfMenuUsage( const char *format, ... );
 
 unsigned int mfMenuScroll( int selected, unsigned int viewlines, unsigned int maxlines );
-void mfMenuButtonsSymStr( unsigned int buttons, char *str, size_t len );
+void mfMenuCreateButtonSymbolList( unsigned int buttons, char *str, size_t len );
 
 /* デフォルトプロシージャ */
 MfMenuRc mfMenuDefAnchorProc( MfMenuCtrlSignal signal, SceCtrlData *pad, void *var, MfMenuItemValue value[], const void *arg );

@@ -8,6 +8,7 @@
 #include <pspdebug.h>
 #include <stdbool.h>
 #include "utils/inimgr.h"
+#include "psp/padutil.h"
 
 #ifdef GLOBAL_VARIABLES_DEFINE
 #define GLOBAL
@@ -23,8 +24,9 @@
 /*-----------------------------------------------
 	定数
 -----------------------------------------------*/
-#define MF_VERSION      "2.4.0"
-#define MF_INI_FILENAME "ms0:/seplugins/macrofire.ini"
+#define MF_VERSION           "2.4.1"
+#define MF_INI_FILENAME      "ms0:/seplugins/macrofire.ini"
+#define MF_INI_BTNLIST_DELIM "+"
 
 #define MF_UNUSED_BUTTONS ( PSP_CTRL_WLAN_UP | PSP_CTRL_REMOTE | PSP_CTRL_DISC | PSP_CTRL_MS )
 #define MF_KERNEL_BUTTONS ( PSP_CTRL_NOTE | PSP_CTRL_SCREEN | PSP_CTRL_VOLUP | PSP_CTRL_VOLDOWN | MFM_UNUSED_BUTTONS )
@@ -159,6 +161,9 @@ unsigned int mfButtonsMask( unsigned int buttons, unsigned int mask );
 		処理されたボタン。
 */
 unsigned int mfButtonsUmask( unsigned int buttons, unsigned int umask );
+
+void mfIniConvertButtonCodeToNames( unsigned int buttons, char *str, size_t len );
+unsigned int mfIniConvertButtonNamesToCode( char *buttons );
 
 /*-----------------------------------------------
 	グローバル変数

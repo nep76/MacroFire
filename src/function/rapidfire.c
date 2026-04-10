@@ -11,6 +11,8 @@ static char *rapidfire_mode_to_string( int mode );
 static int rapidfire_string_to_mode( char *mode );
 static MfMenuRc rapidfire_load( void );
 static MfMenuRc rapidfire_save( void );
+static bool rapidfire_ini_verck( IniUID ini );
+static void rapidfire_ini_load( IniUID ini );
 
 /*-----------------------------------------------
 	ƒ[ƒJƒ‹•Ï”‚Æ’è”
@@ -117,24 +119,11 @@ static MfMenuRc rapidfire_load( void )
 				if( ini > 0 ){
 					unsigned int err;
 					if( ( err = inimgrLoad( ini, inipath ) ) == 0 ){
-						int version;
-						if( ! inimgrGetInt( ini, "default", RAPIDFIRE_DATA_SIGNATURE, (long *)&version ) || version <= RAPIDFIRE_DATA_REFUSE_VERSION ){
+						if( ! rapidfire_ini_verck( ini ) ){
 							gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FCCOLOR, "Initialization file is invalid or too lower version." );
 							mfMenuWait( MFM_DISPLAY_MICROSEC_ERROR );
 						} else{
-							int i;
-							char mode[16];
-							for( i = 0; i < MF_ARRAY_NUM( st_rfconf ); i++ ){
-								if( inimgrGetString( ini, RAPIDFIRE_DATA_MODE_SECTION, st_rfconf[i].name, mode, sizeof( mode ) ) ){
-									st_rfconf[i].mode = rapidfire_string_to_mode( mode );
-								} else{
-									st_rfconf[i].mode = RAPIDFIRE_MODE_NORMAL;
-								}
-							}
-							st_release_delay = RAPIDFIRE_DEFAULT_RELEASE_DELAY;
-							st_press_delay   = RAPIDFIRE_DEFAULT_PRESS_DELAY;
-							inimgrGetInt( ini, RAPIDFIRE_DATA_DELAY_SECTION, RAPIDFIRE_DID_RDELAY, (long *)&st_release_delay );
-							inimgrGetInt( ini, RAPIDFIRE_DATA_DELAY_SECTION, RAPIDFIRE_DID_PDELAY, (long *)&st_press_delay );
+							rapidfire_ini_load( ini );
 							
 							gbPrintf( gbOffsetChar( 3 ), gbOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FGCOLOR, "Loaded from %s.", inipath );
 							mfMenuWait( MFM_DISPLAY_MICROSEC_INFO );
@@ -192,6 +181,24 @@ static MfMenuRc rapidfire_save( void )
 		}
 		return MR_CONTINUE;
 	}
+}
+
+void rapidfireLoadIni( IniUID ini, char *buf, size_t len )
+{
+	IniUID rfini;
+	
+	if( inimgrGetString( ini, "Rapidfire", "Default", buf, len ) <= 0 ) return;
+	if( ( rfini = inimgrNew() ) > 0 ){
+		if( inimgrLoad( rfini, buf ) == 0 && rapidfire_ini_verck( rfini ) ){
+			rapidfire_ini_load( rfini );
+		}
+	}
+	inimgrDestroy( rfini );
+}
+
+void rapidfireCreateIni( IniUID ini, char *buf, size_t len )
+{
+	inimgrSetString( ini, "Rapidfire", "Default", "" );
 }
 
 MfMenuRc rapidfireMenu( SceCtrlData *pad_data, void *argp )
@@ -267,4 +274,31 @@ void rapidfireApply( void )
 	mfRapidfireSet( 0, buttons_autorapid, MF_RAPIDFIRE_MODE_AUTORAPID, st_press_delay, st_release_delay );
 	mfRapidfireSet( 0, buttons_hold,      MF_RAPIDFIRE_MODE_HOLD,      0, 0 );
 	mfRapidfireSet( 0, buttons_autohold,  MF_RAPIDFIRE_MODE_AUTOHOLD,  0, 0 );
+}
+
+static bool rapidfire_ini_verck( IniUID ini )
+{
+	int version;
+	if( ! inimgrGetInt( ini, "default", RAPIDFIRE_DATA_SIGNATURE, (long *)&version ) || version <= RAPIDFIRE_DATA_REFUSE_VERSION ){
+		return false;
+	} else{
+		return true;
+	}
+}
+
+static void rapidfire_ini_load( IniUID ini )
+{
+	int i;
+	char mode[16];
+	for( i = 0; i < MF_ARRAY_NUM( st_rfconf ); i++ ){
+		if( inimgrGetString( ini, RAPIDFIRE_DATA_MODE_SECTION, st_rfconf[i].name, mode, sizeof( mode ) ) ){
+			st_rfconf[i].mode = rapidfire_string_to_mode( mode );
+		} else{
+				st_rfconf[i].mode = RAPIDFIRE_MODE_NORMAL;
+			}
+	}
+	st_release_delay = RAPIDFIRE_DEFAULT_RELEASE_DELAY;
+	st_press_delay   = RAPIDFIRE_DEFAULT_PRESS_DELAY;
+	inimgrGetInt( ini, RAPIDFIRE_DATA_DELAY_SECTION, RAPIDFIRE_DID_RDELAY, (long *)&st_release_delay );
+	inimgrGetInt( ini, RAPIDFIRE_DATA_DELAY_SECTION, RAPIDFIRE_DID_PDELAY, (long *)&st_press_delay );
 }

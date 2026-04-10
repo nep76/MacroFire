@@ -45,6 +45,7 @@ OBJS = exports.o \
        $(CLASSG_LIBS)/utils/strutil.o \
        $(CLASSG_LIBS)/utils/inimgr.o \
        $(CLASSG_LIBS)/psp/hook.o \
+       $(CLASSG_LIBS)/psp/padutil.o \
        $(CLASSG_LIBS)/psp/ctrlpad.o \
        $(CLASSG_LIBS)/psp/gb.o \
        $(CLASSG_LIBS)/psp/memsce.o \

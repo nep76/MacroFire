@@ -14,6 +14,7 @@ static MfMenuRc     macroeditor_edit_analog( SceCtrlData *pad_data, MacroData *m
 static MfMenuRc     macroeditor_edit_rapid( SceCtrlData *pad_data, MacroData *macro );
 static MfMenuRc     macroeditor_edit_data( SceCtrlData *pad_data, MacroData *macro );
 static MfMenuRc     macroeditor_ch_type( SceCtrlData *pad_data, MacroData *macro );
+static void         macroeditor_cat_btnlist( unsigned int buttons, char *buf, size_t len );
 
 /*-----------------------------------------------
 	ƒ[ƒJƒ‹•Ï”‚Æ’è”
@@ -83,21 +84,21 @@ MfMenuRc macroeditorMain( SceCtrlData *pad_data, MacroData *macro )
 			snprintf( command, sizeof( command ), "%4d: Delay -----------> %llu ms", line_number, macro->data );
 		} else if( macro->action == MA_BUTTONS_PRESS ){
 			snprintf( command, sizeof( command ), "%4d: Buttons press ---> ", line_number );
-			mfMenuButtonsSymStr( macro->data, command, sizeof( command ) );
+			macroeditor_cat_btnlist( macro->data, command, sizeof( command ) );
 		} else if( macro->action == MA_BUTTONS_RELEASE ){
 			snprintf( command, sizeof( command ), "%4d: Buttons release -> ", line_number );
-			mfMenuButtonsSymStr( macro->data, command, sizeof( command ) );
+			macroeditor_cat_btnlist( macro->data, command, sizeof( command ) );
 		} else if( macro->action == MA_BUTTONS_CHANGE ){
 			snprintf( command, sizeof( command ), "%4d: Buttons change --> ", line_number );
-			mfMenuButtonsSymStr( macro->data, command, sizeof( command ) );
+			macroeditor_cat_btnlist( macro->data, command, sizeof( command ) );
 		} else if( macro->action == MA_ANALOG_MOVE ){
 			snprintf( command, sizeof( command ), "%4d: Analog(x,y)------> %d, %d", line_number, (int)MACROMGR_GET_ANALOG_X( macro->data ), (int)MACROMGR_GET_ANALOG_Y( macro->data ) );
 		} else if( macro->action == MA_RAPIDFIRE_START ){
 			snprintf( command, sizeof( command ), "%4d: Rapidfire start -> PD:%u RD:%u ", line_number, MACROMGR_GET_RAPIDPDELAY( macro->sub ), MACROMGR_GET_RAPIDRDELAY( macro->sub ) );
-			mfMenuButtonsSymStr( macro->data, command, sizeof( command ) );
+			macroeditor_cat_btnlist( macro->data, command, sizeof( command ) );
 		} else if( macro->action == MA_RAPIDFIRE_STOP ){
 			snprintf( command, sizeof( command ), "%4d: Rapidfire stop --> ", line_number );
-			mfMenuButtonsSymStr( macro->data, command, sizeof( command ) );
+			macroeditor_cat_btnlist( macro->data, command, sizeof( command ) );
 		}
 		
 		if( line_number - 1 == st_selected_macro_num ){
@@ -326,4 +327,10 @@ static MfMenuRc macroeditor_ch_type( SceCtrlData *pad_data, MacroData *macro )
 	}
 	
 	return MR_BACK;
+}
+
+void macroeditor_cat_btnlist( unsigned int buttons, char *buf, size_t len )
+{
+	int buflen = strlen( buf );
+	mfMenuCreateButtonSymbolList( buttons, &buf[buflen], len - buflen );
 }

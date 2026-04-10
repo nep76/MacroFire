@@ -2,7 +2,6 @@
 	cmndlg.h
 	
 	ダイアログ表示。
-	表示すると、終了まで呼び出し元に制御が戻らない。
 */
 
 #ifndef CMNDLG_H
@@ -12,6 +11,7 @@
 #include <pspctrl.h>
 #include <pspdisplay.h>
 #include <stdbool.h>
+#include "psp/ctrlpad.h"
 #include "cgerrs.h"
 
 #define CMNDLG_DEFAULT_FGCOLOR 0xffffffff
@@ -21,6 +21,11 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+struct cmndlg_ctrl_remap{
+	CtrlpadAltBtn *list;
+	unsigned int  num;
+};
 
 typedef enum {
 	CMNDLG_NONE = 0,
@@ -58,6 +63,10 @@ void cmndlgInit( void );
 void cmndlgShutdown( void );
 void cmndlgLock( void );
 void cmndlgUnlock( void );
+void cmndlgSetAlternativeButtons( CtrlpadAltBtn *altbtn, unsigned int num );
+CtrlpadAltBtn *cmndlgGetAlternativeButtonsList( void );
+unsigned int cmndlgGetAlternativeButtonsListCount( void );
+void cmndlgClearAlternativeButtons( void );
 
 bool cmndlgErrorCodeIsSce( int errcode );
 

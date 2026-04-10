@@ -27,7 +27,7 @@
 	å^êÈåæ
 -----------------------------------------------*/
 typedef void     ( *MfFuncInit )( void );
-typedef void     ( *MfFuncIni  )( IniUID );
+typedef void     ( *MfFuncIni  )( IniUID, char*, size_t );
 typedef void     ( *MfFuncTerm )( void );
 typedef void     ( *MfFuncHook )( MfCallMode, SceCtrlData*, void* );
 typedef MfMenuRc ( *MfFuncMenu )( SceCtrlData*, void* );
@@ -62,8 +62,8 @@ EXPORT MfEntry mftable[]
 = {
 	{
 		"Remap settings",
-		NULL, NULL,
- 		NULL, NULL,
+		NULL, remapTerm,
+ 		remapCreateIni, remapLoadIni,
 		{ remapMain, NULL },
 		{ remapMenu, NULL }
 	},
@@ -71,7 +71,7 @@ EXPORT MfEntry mftable[]
 	{
 		"Rapidfire settings",
 		NULL, NULL,
- 		NULL, NULL,
+ 		rapidfireCreateIni, rapidfireLoadIni,
 		{ NULL, NULL },
 		{ rapidfireMenu, rapidfireApply }
 	},
@@ -79,7 +79,7 @@ EXPORT MfEntry mftable[]
 	{
 		"Macro settings",
 		macroInit, macroTerm,
-		NULL, NULL,
+		macroCreateIni, macroLoadIni,
 		{ macroMain, macroIntr },
 		{ macroMenu, NULL }
 	},

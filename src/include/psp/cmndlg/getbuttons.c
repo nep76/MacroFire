@@ -39,10 +39,10 @@ static struct cmndlg_get_buttons_buttonstat st_btnstat[] = {
 	{ "Hold         ", PSP_CTRL_HOLD,     false },
 	{ "WLAN-SwitchUp", PSP_CTRL_WLAN_UP,  false },
 	{ "HOME         ", PSP_CTRL_HOME,     false },
-	{ "AnalogUp     ", CTRLPAD_CTRL_ANALOG_UP,    false },
-	{ "AnalogRight  ", CTRLPAD_CTRL_ANALOG_RIGHT, false },
-	{ "AnalogDown   ", CTRLPAD_CTRL_ANALOG_DOWN,  false },
-	{ "AnalogLeft   ", CTRLPAD_CTRL_ANALOG_LEFT,  false }
+	{ "AnalogUp     ", PADUTIL_CTRL_ANALOG_UP,    false },
+	{ "AnalogRight  ", PADUTIL_CTRL_ANALOG_RIGHT, false },
+	{ "AnalogDown   ", PADUTIL_CTRL_ANALOG_DOWN,  false },
+	{ "AnalogLeft   ", PADUTIL_CTRL_ANALOG_LEFT,  false }
 };
 
 /*=============================================*/
@@ -89,6 +89,8 @@ int cmndlgGetButtonsStart( CmndlgGetButtonsParams *params )
 	st_reload = true;
 	ctrlpadInit( &st_cp_params );
 	ctrlpadSetRepeatButtons( &st_cp_params, PSP_CTRL_UP | PSP_CTRL_RIGHT | PSP_CTRL_DOWN | PSP_CTRL_LEFT );
+	ctrlpadSetRemap( &st_cp_params, cmndlgGetAlternativeButtonsList(), cmndlgGetAlternativeButtonsListCount() );
+	ctrlpadUpdateData( &st_cp_params );
 	
 	params->base.state = CMNDLG_VISIBLE;
 	
@@ -101,6 +103,7 @@ int cmndlgGetButtonsUpdate( void )
 	CmndlgGetButtonsData *selected_data          = &(st_params->data[st_params->selectDataNumber]);
 	struct cmndlg_get_buttons_tempdata *tempdata = &(((struct cmndlg_get_buttons_tempdata *)(st_params->base.tempBuffer))[st_params->selectDataNumber]);
 	SceCtrlData pad_data;
+	
 	pad_data.Buttons = ctrlpadGetData( &st_cp_params, &pad_data, CTRLPAD_IGNORE_ANALOG_DIRECTION );
 	
 	if( st_reload ){

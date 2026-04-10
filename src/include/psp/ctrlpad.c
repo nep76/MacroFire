@@ -7,124 +7,13 @@
 /*-----------------------------------------------
 	ローカル関数プロトタイプ
 -----------------------------------------------*/
+static unsigned int ctrlpad_remap_button( unsigned int buttons, CtrlpadAltBtn *altbtn, unsigned int num );
 
 /*-----------------------------------------------
 	ローカル変数
 -----------------------------------------------*/
-struct ctrlpad_button st_button_names[] = {
-	{ PSP_CTRL_SELECT,           "SELECT"      },
-	{ PSP_CTRL_START,            "START"       },
-	{ PSP_CTRL_UP,               "UP"          },
-	{ PSP_CTRL_RIGHT,            "RIGHT"       },
-	{ PSP_CTRL_DOWN,             "DOWN"        },
-	{ PSP_CTRL_LEFT,             "LEFT"        },
-	{ PSP_CTRL_LTRIGGER,         "LTRIGGER"    },
-	{ PSP_CTRL_RTRIGGER,         "RTRIGGER"    },
-	{ PSP_CTRL_TRIANGLE,         "TRIANGLE"    },
-	{ PSP_CTRL_CIRCLE,           "CIRCLE"      },
-	{ PSP_CTRL_CROSS,            "CROSS"       },
-	{ PSP_CTRL_SQUARE,           "SQUARE"      },
-	{ PSP_CTRL_HOME,             "HOME"        },
-	{ PSP_CTRL_HOLD,             "HOLD"        },
-	{ PSP_CTRL_NOTE,             "NOTE"        },
-	{ PSP_CTRL_SCREEN,           "SCREEN"      },
-	{ PSP_CTRL_VOLUP,            "VOLUP"       },
-	{ PSP_CTRL_VOLDOWN,          "VOLDOWN"     },
-	{ PSP_CTRL_WLAN_UP,          "WLANUP"      },
-	{ PSP_CTRL_REMOTE,           "REMOTE"      },
-	{ PSP_CTRL_DISC,             "DISC"        },
-	{ PSP_CTRL_MS,               "MS"          },
-	{ CTRLPAD_CTRL_ANALOG_UP,    "ANALOGUP"    },
-	{ CTRLPAD_CTRL_ANALOG_RIGHT, "ANALOGRIGHT" },
-	{ CTRLPAD_CTRL_ANALOG_DOWN,  "ANALOGDOWN"  },
-	{ CTRLPAD_CTRL_ANALOG_LEFT,  "ANALOGLEFT"  }
-};
+
 /*=============================================*/
-
-char *ctrlpadUtilButtonsToString( unsigned int buttons, char *str, size_t max )
-{
-	int i;
-	
-	*str = '\0';
-	
-	for( i = 0; i < sizeof( st_button_names) / sizeof( st_button_names[0] ); i++ ){
-		if( buttons & st_button_names[i].button ){
-			if( *str != '\0' ){
-				strutilSafeCat( str, " + ", max );
-			}
-			strutilSafeCat( str, st_button_names[i].label, max );
-		}
-	}
-	
-	return str;
-}
-
-unsigned int ctrlpadUtilStringToButtons( char *str )
-{
-	int i;
-	unsigned int buttons = 0;
-	char *btn_name, *next;
-	
-	btn_name = str;
-	
-	do{
-		next = strchr( btn_name, '+' );
-		if( next ) *next = '\0';
-		
-		strutilRemoveChar( btn_name, "\x20\t" );
-		strutilToUpper( btn_name );
-		
-		for( i = 0; i < sizeof( st_button_names ) / sizeof( st_button_names[0] ); i++ ){
-			if( strcmp( btn_name, st_button_names[i].label ) == 0 ){
-				buttons |= st_button_names[i].button;
-				break;
-			}
-		}
-	
-	} while( next && ( btn_name = ++next ) );
-	
-	return buttons;
-}
-
-unsigned int ctrlpadUtilGetAnalogDirection( int x, int y, int deadzone )
-{
-	unsigned int direction = 0;
-	
-	x -= 128;
-	y -= 128;
-	
-	if( deadzone ){
-		if( CTRLPAD_IN_DEADZONE( abs( x ), abs( y ), deadzone ) ) return 0;
-	} else{
-		if( x == 0 && y == 0 ) return 0;
-	}
-	
-	if( abs( y ) > (int)(sin( CTRLPAD_DEGREE_TO_RADIAN( CTRLPAD_INVALID_RIGHT_TRIANGLE_DEGREE ) ) * abs( x )) ){
-		if( y > 0 ){
-			direction |= CTRLPAD_CTRL_ANALOG_DOWN;
-		} else if( y < 0 ){
-			direction |= CTRLPAD_CTRL_ANALOG_UP;
-		}
-	}
-	
-	if( abs( x ) > (int)(sin( CTRLPAD_DEGREE_TO_RADIAN( CTRLPAD_INVALID_RIGHT_TRIANGLE_DEGREE ) ) * abs( y )) ){
-		if( x > 0 ){
-			direction |= CTRLPAD_CTRL_ANALOG_RIGHT;
-		} else if( x < 0 ){
-			direction |= CTRLPAD_CTRL_ANALOG_LEFT;
-		}
-	}
-	
-	return direction;
-}
-
-void ctrlpadUtilSetAnalogDirection( unsigned int analog_direction, unsigned char *x, unsigned char *y )
-{
-	if( analog_direction & CTRLPAD_CTRL_ANALOG_UP    ) *y = 0;
-	if( analog_direction & CTRLPAD_CTRL_ANALOG_RIGHT ) *x = 255;
-	if( analog_direction & CTRLPAD_CTRL_ANALOG_DOWN  ) *y = 255;
-	if( analog_direction & CTRLPAD_CTRL_ANALOG_LEFT  ) *x = 0;
-}
 
 void ctrlpadInit( CtrlpadParams *params )
 {
@@ -134,6 +23,10 @@ void ctrlpadInit( CtrlpadParams *params )
 	params->tickRepeatDelayHigh = 100000;
 	params->countLowToHigh      = 1;
 	params->maskRepeatButtons   = 0;
+	
+	params->alternativeButtons = NULL;
+	params->numberOfEntries    = 0;
+	params->useHeap            = false;
 	
 	sceCtrlSetSamplingMode( PSP_CTRL_MODE_ANALOG );
 	
@@ -158,6 +51,45 @@ void ctrlpadReset( CtrlpadParams *params )
 	params->lastButtons = 0;
 }
 
+void ctrlpadSetRemap( CtrlpadParams *params, CtrlpadAltBtn *altbtn, unsigned int num )
+{
+	if( ! params || ! altbtn ) return;
+	
+	ctrlpadClearRemap( params );
+	params->alternativeButtons = altbtn;
+	params->numberOfEntries    = num;
+}
+
+bool ctrlpadStoreRemap( CtrlpadParams *params, CtrlpadAltBtn *altbtn, unsigned int num )
+{
+	unsigned int size = sizeof( CtrlpadAltBtn ) * num;
+	
+	if( ! params || ! altbtn ) return true;
+	
+	ctrlpadClearRemap( params );
+	params->alternativeButtons = memsceMalloc( size );
+	if( ! params->alternativeButtons ) return false;
+	
+	params->numberOfEntries = num;
+	params->useHeap         = true;
+	
+	memcpy( params->alternativeButtons, altbtn, size );
+	
+	return true;
+}
+
+void ctrlpadClearRemap( CtrlpadParams *params )
+{
+	if( ! params ) return;
+	
+	if( params->alternativeButtons && params->useHeap ){
+		memsceFree( params->alternativeButtons );
+	}
+	params->alternativeButtons = NULL;
+	params->numberOfEntries    = 0;
+	params->useHeap            = false;
+}
+
 void ctrlpadSetRepeatButtons( CtrlpadParams *params, unsigned int mask )
 {
 	if( ! params ) return;
@@ -174,10 +106,10 @@ void ctrlpadUpdateData( CtrlpadParams *params )
 	sceCtrlPeekBufferPositive( &pad, 1 );
 	
 	params->countLow    = 0;
-	params->lastButtons = pad.Buttons;
+	params->lastButtons = params->alternativeButtons ? ctrlpad_remap_button( pad.Buttons, params->alternativeButtons, params->numberOfEntries ) : pad.Buttons;
 }
 
-unsigned int ctrlpadGetData( CtrlpadParams *params, SceCtrlData *pad_data, int analog_deadzone )
+unsigned int ctrlpadGetData( CtrlpadParams *params,SceCtrlData *pad_data, int analog_deadzone )
 {
 	uint64_t current_tick;
 	uint64_t *delay_tick;
@@ -186,10 +118,10 @@ unsigned int ctrlpadGetData( CtrlpadParams *params, SceCtrlData *pad_data, int a
 	sceRtcGetCurrentTick( &current_tick );
 	sceCtrlPeekBufferPositive( pad_data, 1 );
 	
-	buttons = pad_data->Buttons;
+	buttons = params->alternativeButtons ? ctrlpad_remap_button( pad_data->Buttons, params->alternativeButtons, params->numberOfEntries ) : pad_data->Buttons;
 	
 	if( analog_deadzone >= 0 ){
-		buttons |= ctrlpadUtilGetAnalogDirection( pad_data->Lx, pad_data->Ly, analog_deadzone );
+		buttons |= padutilGetAnalogDirection( pad_data->Lx, pad_data->Ly, analog_deadzone );
 	}
 	
 	if( params->countLow >= params->countLowToHigh ){
@@ -216,6 +148,24 @@ unsigned int ctrlpadGetData( CtrlpadParams *params, SceCtrlData *pad_data, int a
 			params->countLow    = 0;
 		}
 	}
+	return buttons;
+}
+
+static unsigned int ctrlpad_remap_button( unsigned int buttons, CtrlpadAltBtn *altbtn, unsigned int num )
+{
+	unsigned int i, newbuttons = 0, rmvbuttons = 0;
+	
+	for( i = 0; i < num; i++ ){
+		if( altbtn[i].realButtons && altbtn[i].altButtons ){
+			rmvbuttons |= altbtn[i].altButtons;
+			if( ( buttons & altbtn[i].realButtons ) == altbtn[i].realButtons ){
+				rmvbuttons |= altbtn[i].realButtons;
+				newbuttons |= altbtn[i].altButtons;
+			}
+		}
+	}
+	buttons &= ~rmvbuttons;
+	buttons |= newbuttons;
 	
 	return buttons;
 }

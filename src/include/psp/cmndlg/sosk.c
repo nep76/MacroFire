@@ -89,6 +89,8 @@ int cmndlgSoskStart( CmndlgSoskParams *params )
 	
 	ctrlpadInit( &st_cp_params );
 	ctrlpadSetRepeatButtons( &st_cp_params, PSP_CTRL_UP | PSP_CTRL_RIGHT | PSP_CTRL_DOWN | PSP_CTRL_LEFT | PSP_CTRL_LTRIGGER | PSP_CTRL_RTRIGGER | PSP_CTRL_TRIANGLE | PSP_CTRL_CIRCLE | PSP_CTRL_SQUARE );
+	ctrlpadSetRemap( &st_cp_params, cmndlgGetAlternativeButtonsList(), cmndlgGetAlternativeButtonsListCount() );
+	ctrlpadUpdateData( &st_cp_params );
 	
 	st_params->base.state = CMNDLG_VISIBLE;
 	

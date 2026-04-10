@@ -49,6 +49,8 @@ typedef MfMenuRc ( *RemapExtFunc )( RemapData** );
 /*-----------------------------------------------
 	ä÷êî
 -----------------------------------------------*/
+void remapLoadIni( IniUID ini, char *buf, size_t len );
+void remapCreateIni( IniUID ini, char *buf, size_t len );
 void remapTerm( void );
 void remapMain( MfCallMode mode, SceCtrlData *pad, void *argp );
 MfMenuRc remapMenu( SceCtrlData *pad, void *arg );

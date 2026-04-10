@@ -17,6 +17,7 @@ static MfMenuRc remap_menu_save( RemapData **remap );
 static MfMenuRc remap_menu_clear( RemapData **remap );
 static void remap_load( InimgrCallbackMode mode, InimgrCallbackParams *params, char *buf, size_t buflen );
 static void remap_save( InimgrCallbackMode mode, InimgrCallbackParams *params, char *buf, size_t buflen );
+static bool remap_ini_verck( IniUID ini );
 
 /*-----------------------------------------------
 	ÉçÅ[ÉJÉãïœêîÇ∆íËêî
@@ -35,6 +36,23 @@ static MfMenuItem st_menu_table[] = {
 
 /*=============================================*/
 
+void remapLoadIni( IniUID ini, char *buf, size_t len )
+{
+	IniUID remapini;
+	
+	if( inimgrGetString( ini, "Remap", "Default", buf, len ) <= 0 ) return;
+	if( ( remapini = inimgrNew() ) > 0 ){
+		inimgrSetCallback( remapini, REMAP_DATA_SECTION, remap_load );
+		inimgrLoad( remapini, buf );
+	}
+	inimgrDestroy( remapini );
+}
+
+void remapCreateIni( IniUID ini, char *buf, size_t len )
+{
+	inimgrSetString( ini, "Remap", "Default", "" );
+}
+
 void remapTerm( void )
 {
 	remap_clear( &st_remap );
@@ -47,7 +65,7 @@ void remapMain( MfCallMode mode, SceCtrlData *pad, void *argp )
 		SceCtrlData new_pad;
 		unsigned int analog_direction, remove_buttons;
 		
-		analog_direction = ctrlpadUtilGetAnalogDirection( pad->Lx, pad->Ly, 0 );
+		analog_direction = padutilGetAnalogDirection( pad->Lx, pad->Ly, 0 );
 		remove_buttons  = 0;
 		new_pad.Buttons = 0;
 		new_pad.Lx      = pad->Lx;
@@ -56,19 +74,19 @@ void remapMain( MfCallMode mode, SceCtrlData *pad, void *argp )
 		for( remap = st_remap; remap; remap = remap->next ){
 			if( ( ( pad->Buttons | analog_direction ) & remap->realButtons ) == remap->realButtons ){
 				if(
-					( remap->realButtons & CTRLPAD_CTRL_ANALOG_UP )    ||
-					( remap->realButtons & CTRLPAD_CTRL_ANALOG_RIGHT ) ||
-					( remap->realButtons & CTRLPAD_CTRL_ANALOG_DOWN )  ||
-					( remap->realButtons & CTRLPAD_CTRL_ANALOG_LEFT )
+					( remap->realButtons & PADUTIL_CTRL_ANALOG_UP )    ||
+					( remap->realButtons & PADUTIL_CTRL_ANALOG_RIGHT ) ||
+					( remap->realButtons & PADUTIL_CTRL_ANALOG_DOWN )  ||
+					( remap->realButtons & PADUTIL_CTRL_ANALOG_LEFT )
 				){
 					new_pad.Lx = 128;
 					new_pad.Ly = 128;
 				}
 				
-				if( remap->remapButtons & CTRLPAD_CTRL_ANALOG_UP    ) new_pad.Ly = 0;
-				if( remap->remapButtons & CTRLPAD_CTRL_ANALOG_RIGHT ) new_pad.Lx = 255;
-				if( remap->remapButtons & CTRLPAD_CTRL_ANALOG_DOWN  ) new_pad.Ly = 255;
-				if( remap->remapButtons & CTRLPAD_CTRL_ANALOG_LEFT  ) new_pad.Lx = 0;
+				if( remap->remapButtons & PADUTIL_CTRL_ANALOG_UP    ) new_pad.Ly = 0;
+				if( remap->remapButtons & PADUTIL_CTRL_ANALOG_RIGHT ) new_pad.Lx = 255;
+				if( remap->remapButtons & PADUTIL_CTRL_ANALOG_DOWN  ) new_pad.Ly = 255;
+				if( remap->remapButtons & PADUTIL_CTRL_ANALOG_LEFT  ) new_pad.Lx = 0;
 				remove_buttons  |= remap->realButtons;
 				new_pad.Buttons |= remap->remapButtons;
 			}
@@ -132,8 +150,8 @@ MfMenuRc remapMenu( SceCtrlData *pad, void *arg )
 			real_buttons[0]  = '\0';
 			remap_buttons[0] = '\0';
 			
-			mfMenuButtonsSymStr( remap_data->realButtons,  real_buttons,  sizeof( real_buttons ) );
-			mfMenuButtonsSymStr( remap_data->remapButtons, remap_buttons, sizeof( remap_buttons ) );
+			mfMenuCreateButtonSymbolList( remap_data->realButtons,  real_buttons,  sizeof( real_buttons ) );
+			mfMenuCreateButtonSymbolList( remap_data->remapButtons, remap_buttons, sizeof( remap_buttons ) );
 			if( selected == line ){
 				cur_remap = remap_data;
 				gbPrintf( gbOffsetChar( 3 ), gbOffsetLine( 7 + linepos ), MFM_TEXT_FCCOLOR, MFM_TEXT_BGCOLOR, "%s: %s", real_buttons, remap_buttons );
@@ -285,8 +303,7 @@ static MfMenuRc remap_menu_load( RemapData **remap )
 					unsigned int err;
 					inimgrSetCallback( ini, REMAP_DATA_SECTION, remap_load );
 					if( ( err = inimgrLoad( ini, inipath ) ) == 0 ){
-						int version;
-						if( ! inimgrGetInt( ini, "default", REMAP_DATA_SIGNATURE, (long *)&version ) || version <= REMAP_DATA_REFUSE_VERSION ){
+						if( ! remap_ini_verck( ini ) ){
 							gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FCCOLOR, "remap file is invalid or too lower version." );
 							mfMenuWait( MFM_DISPLAY_MICROSEC_ERROR );
 						} else{
@@ -352,9 +369,9 @@ static void remap_load( InimgrCallbackMode mode, InimgrCallbackParams *params, c
 	RemapData *remap = NULL;
 	char *remap_line[REMAP_INILINE_ALL_COLUMNS], *key, *value;
 	char *saveptr;
-	int version = 0, prev_seq = -1, cur_seq;
+	int prev_seq = -1, cur_seq;
 	
-	if( ! inimgrGetInt( params->uid, "default", REMAP_DATA_SIGNATURE, (long *)&version ) || version <= REMAP_DATA_REFUSE_VERSION ) return;
+	if( ! remap_ini_verck( params->uid ) ) return;
 	
 	if( st_remap ) remap_clear( &st_remap );
 	
@@ -394,10 +411,10 @@ static void remap_load( InimgrCallbackMode mode, InimgrCallbackParams *params, c
 			continue;
 		}
 		
-		if( strcmp( remap_line[REMAP_INILINE_TARGET], REMAP_REAL_BUTTONS ) == 0 ){
-			remap->realButtons = ctrlpadUtilStringToButtons( value );
-		} else if( strcmp( remap_line[REMAP_INILINE_TARGET], REMAP_REMAP_BUTTONS ) == 0 ){
-			remap->remapButtons = ctrlpadUtilStringToButtons( value );
+		if( strcasecmp( remap_line[REMAP_INILINE_TARGET], REMAP_REAL_BUTTONS ) == 0 ){
+			remap->realButtons = mfIniConvertButtonNamesToCode( value );
+		} else if( strcasecmp( remap_line[REMAP_INILINE_TARGET], REMAP_REMAP_BUTTONS ) == 0 ){
+			remap->remapButtons = mfIniConvertButtonNamesToCode( value );
 		} else{
 			return;
 		}
@@ -412,12 +429,12 @@ static void remap_save( InimgrCallbackMode mode, InimgrCallbackParams *params, c
 	
 	for( remap = st_remap; remap; remap = remap->next, seq++ ){
 		if( remap->realButtons ){
-			ctrlpadUtilButtonsToString( remap->realButtons, buttons, sizeof( buttons ) );
+			mfIniConvertButtonCodeToNames( remap->realButtons, buttons, sizeof( buttons ) );
 			len = snprintf( buf, buflen, "%d.%s = %s", seq, REMAP_REAL_BUTTONS, buttons );
 			inimgrCbWriteln( params, buf, len );
 			
 			if( remap->remapButtons ){
-				ctrlpadUtilButtonsToString( remap->remapButtons, buttons, sizeof( buttons ) );
+				mfIniConvertButtonCodeToNames( remap->remapButtons, buttons, sizeof( buttons ) );
 				len = snprintf( buf, buflen, "%d.%s = %s", seq, REMAP_REMAP_BUTTONS, buttons );
 				inimgrCbWriteln( params, buf, len );
 			}
@@ -469,5 +486,15 @@ static MfMenuRc remap_menu_proc( MfMenuCtrlSignal signal, SceCtrlData *pad, void
 		return MR_CONTINUE;
 	} else{
 		return mfMenuDefCallbackProc( signal, pad, var, value, arg );
+	}
+}
+
+static bool remap_ini_verck( IniUID ini )
+{
+	int version;
+	if( ! inimgrGetInt( ini, "default", REMAP_DATA_SIGNATURE, (long *)&version ) || version <= REMAP_DATA_REFUSE_VERSION ){
+		return false;
+	} else{
+		return true;
 	}
 }

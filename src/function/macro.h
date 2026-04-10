@@ -104,6 +104,8 @@ typedef struct {
 void macroInit( void );
 void macroTerm( void );
 void macroIntr( const bool mfengine );
+void macroLoadIni( IniUID ini, char *buf, size_t len );
+void macroCreateIni( IniUID ini, char *buf, size_t len );
 void macroMain( MfCallMode mode, SceCtrlData *pad_data, void *argp );
 MfMenuRc macroMenu( SceCtrlData *pad_data, void *arg );
 

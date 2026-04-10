@@ -46,6 +46,7 @@ static bool macro_is_busy_with_message( MacroEntry *entry );
 static bool macro_is_unavail_with_message( MacroEntry *entry );
 static bool macro_is_disable_engine_with_message( void );
 static bool macro_is_locked_with_message( void );
+static bool macro_ini_verck( IniUID ini );
 
 /*-----------------------------------------------
 	ローカル変数
@@ -77,6 +78,43 @@ static MfMenuItem st_menu_table[] = {
 };
 
 /*=============================================*/
+
+void macroLoadIni( IniUID ini, char *buf, size_t len )
+{
+	IniUID macroini;
+	unsigned int i, backup_slot;
+	char entryname[32];
+	
+	backup_slot = st_slot;
+	
+	for( i = 1; i <= MACRO_MAX_SLOT; i++ ){
+		/* マクロスロットを設定 */
+		st_slot = i - 1;
+		
+		snprintf( entryname, sizeof( entryname ), "Default%d", i );
+		if( inimgrGetString( ini, "Macro", entryname, buf, len ) <= 0 ) continue;
+		if( ( macroini = inimgrNew() ) > 0 ){
+			inimgrSetCallback( macroini, MACRO_DATA_SECTION, macro_load );
+			inimgrLoad( macroini, buf );
+		}
+		inimgrDestroy( macroini );
+	}
+	
+	st_slot = backup_slot;
+}
+
+void macroCreateIni( IniUID ini, char *buf, size_t len )
+{
+	unsigned int i;
+	
+	/* macroLoadIniと合わせる為に長さを制限 */
+	if( len > 32 ) len = 32;
+	
+	for( i = 1; i <= MACRO_MAX_SLOT; i++ ){
+		snprintf( buf, len, "Default%d", i );
+		inimgrSetString( ini, "Macro", buf, "" );
+	}
+}
 
 void macroInit( void )
 {
@@ -117,7 +155,7 @@ void macroMain( MfCallMode mode, SceCtrlData *pad, void *argp )
 		}
 		
 		if( st_macro[i].runButtons ){
-			bool trigger = ( ( ( pad->Buttons | ctrlpadUtilGetAnalogDirection( pad->Lx, pad->Ly, 0 ) ) & st_macro[i].runButtons ) == st_macro[i].runButtons ) ? true : false;
+			bool trigger = ( ( ( pad->Buttons | padutilGetAnalogDirection( pad->Lx, pad->Ly, 0 ) ) & st_macro[i].runButtons ) == st_macro[i].runButtons ) ? true : false;
 			
 			if( trigger && st_macro[i].current.hotkeyEnable ){
 				if( st_macro[i].current.runMode == MRM_NONE ){
@@ -367,8 +405,7 @@ static MfMenuRc macro_menu_load( SceCtrlData *pad_data, void *arg )
 					unsigned int err;
 					inimgrSetCallback( ini, MACRO_DATA_SECTION, macro_load );
 					if( ( err = inimgrLoad( ini, inipath ) ) == 0 ){
-						int version;
-						if( ! inimgrGetInt( ini, "default", MACRO_DATA_SIGNATURE, (long *)&version ) || version <= MACRO_DATA_REFUSE_VERSION ){
+						if( ! macro_ini_verck( ini ) ){
 							gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FCCOLOR, "Macro file is invalid or too lower version." );
 							mfMenuWait( MFM_DISPLAY_MICROSEC_ERROR );
 						} else{
@@ -690,10 +727,10 @@ static void macro_load( InimgrCallbackMode mode, InimgrCallbackParams *params, c
 {
 	char *macro[MACRO_INILINE_ALL_COLUMNS], *key = NULL, *value = NULL;
 	char *saveptr;
-	int version, prev_seq = -1, cur_seq;
+	int prev_seq = -1, cur_seq;
 	uint64_t data, *storage;
 	
-	if( ! inimgrGetInt( params->uid, "default", MACRO_DATA_SIGNATURE, (long *)&version ) || version <= MACRO_DATA_REFUSE_VERSION ) return;
+	if( ! macro_ini_verck( params->uid ) ) return;
 	
 	if( st_macro[st_slot].current.macro ) macro_purge( &(st_macro[st_slot]) );
 	
@@ -751,7 +788,7 @@ static void macro_load( InimgrCallbackMode mode, InimgrCallbackParams *params, c
 		if( strcasecmp( macro[MACRO_INILINE_TYPE], "Num" ) == 0 ){
 			data = strtoul( value, NULL, 10 );
 		} else if( strcasecmp( macro[MACRO_INILINE_TYPE], "Buttons" ) == 0 ){
-			data = ctrlpadUtilStringToButtons( value );
+			data = mfIniConvertButtonNamesToCode( value );
 		} else{
 			return;
 		}
@@ -790,17 +827,17 @@ static void macro_save( InimgrCallbackMode mode, InimgrCallbackParams *params, c
 				inimgrCbWriteln( params, buf, len );
 				break;
 			case MA_BUTTONS_PRESS:
-				ctrlpadUtilButtonsToString( st_macro[st_slot].current.command->data, buttons, sizeof( buttons ) );
+				mfIniConvertButtonCodeToNames( st_macro[st_slot].current.command->data, buttons, sizeof( buttons ) );
 				len = snprintf( buf, buflen, "%d.%s.Data.Full.Buttons = %s", seq, MACRO_ACTION_BUTTONS_PRESS, buttons );
 				inimgrCbWriteln( params, buf, len );
 				break;
 			case MA_BUTTONS_RELEASE:
-				ctrlpadUtilButtonsToString( st_macro[st_slot].current.command->data, buttons, sizeof( buttons ) );
+				mfIniConvertButtonCodeToNames( st_macro[st_slot].current.command->data, buttons, sizeof( buttons ) );
 				len = snprintf( buf, buflen, "%d.%s.Data.Full.Buttons = %s", seq, MACRO_ACTION_BUTTONS_RELEASE, buttons );
 				inimgrCbWriteln( params, buf, len );
 				break;
 			case MA_BUTTONS_CHANGE:
-				ctrlpadUtilButtonsToString( st_macro[st_slot].current.command->data, buttons, sizeof( buttons ) );
+				mfIniConvertButtonCodeToNames( st_macro[st_slot].current.command->data, buttons, sizeof( buttons ) );
 				len = snprintf( buf, buflen, "%d.%s.Data.Full.Buttons = %s", seq, MACRO_ACTION_BUTTONS_CHANGE, buttons );
 				inimgrCbWriteln( params, buf, len );
 				break;
@@ -811,7 +848,7 @@ static void macro_save( InimgrCallbackMode mode, InimgrCallbackParams *params, c
 				inimgrCbWriteln( params, buf, len );
 				break;
 			case MA_RAPIDFIRE_START:
-				ctrlpadUtilButtonsToString( st_macro[st_slot].current.command->data, buttons, sizeof( buttons ) );
+				mfIniConvertButtonCodeToNames( st_macro[st_slot].current.command->data, buttons, sizeof( buttons ) );
 				len = snprintf( buf, buflen, "%d.%s.Data.Full.Buttons = %s", seq, MACRO_ACTION_RAPIDFIRE_START, buttons );
 				inimgrCbWriteln( params, buf, len );
 				len = snprintf( buf, buflen, "%d.%s.Sub.Hi.Num = %d", seq, MACRO_ACTION_RAPIDFIRE_START, MACROMGR_GET_RAPIDPDELAY( st_macro[st_slot].current.command->sub ) );
@@ -820,7 +857,7 @@ static void macro_save( InimgrCallbackMode mode, InimgrCallbackParams *params, c
 				inimgrCbWriteln( params, buf, len );
 				break;
 			case MA_RAPIDFIRE_STOP:
-				ctrlpadUtilButtonsToString( st_macro[st_slot].current.command->data, buttons, sizeof( buttons ) );
+				mfIniConvertButtonCodeToNames( st_macro[st_slot].current.command->data, buttons, sizeof( buttons ) );
 				len = snprintf( buf, buflen, "%d.%s.Data.Full.Buttons = %s", seq, MACRO_ACTION_RAPIDFIRE_STOP, buttons );
 				inimgrCbWriteln( params, buf, len );
 				break;
@@ -901,3 +938,12 @@ static bool macro_is_locked_with_message( void )
 	return rc;
 }
 
+static bool macro_ini_verck( IniUID ini )
+{
+	int version;
+	if( ! inimgrGetInt( ini, "default", MACRO_DATA_SIGNATURE, (long *)&version ) || version <= MACRO_DATA_REFUSE_VERSION ){
+		return false;
+	} else{
+		return true;
+	}
+}
