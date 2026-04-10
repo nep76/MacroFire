@@ -33,7 +33,9 @@ static unsigned int st_world        = 0;
 static unsigned int st_prev_buttons = 0;
 static u32          st_prev_hprmkey = 0;
 
-static bool           st_hooked         = false;
+static bool           st_hooked          = false;
+static bool           st_hook_incomplete = false;
+
 static bool           st_is_enabled     = MF_INI_STARTUP;
 static PadutilButtons st_menu_buttons   = MF_INI_MENU_BUTTONS;
 static PadutilButtons st_toggle_buttons = MF_INI_TOGGLE_BUTTONS;
@@ -63,8 +65,6 @@ static void mf_init( void )
 	dbgprint( "Detecting world..." );
 	st_world = MF_WORLD_GAME;
 	for( i = 0; i < 5; i++ ){
-		sceKernelDelayThread( 2000000 );
-		
 		if( sceKernelFindModuleByName( "sceVshBridge_Driver" ) != NULL ){
 			st_world = MF_WORLD_VSH;
 			break;
@@ -77,13 +77,7 @@ static void mf_init( void )
 #endif
 		}
 		dbgprint( "Waiting for loading modules..." );
-	}
-	
-	/* ゲームIDを取得 */
-	umd = sceIoOpen( "disc0:/UMD_DATA.BIN", PSP_O_RDONLY, 0777 ); 
-	if( umd > 0 ){
-		sceIoRead( umd, st_game_id, 10);
-		sceIoClose( umd );
+		sceKernelDelayThread( 2000000 );
 	}
 	
 	/* フックアドレスを取得 */
@@ -93,7 +87,23 @@ static void mf_init( void )
 		dbgprintf( "\tNID:0x%08x Addr:%p Func:%p", hooktable[i].nid, hooktable[i].restore.addr, hooktable[i].hook );
 		if( hooktable[i].restore.addr ){
 			hooktable[i].restore.api = *(hooktable[i].restore.addr);
+		} else if( st_world == MF_WORLD_VSH ){
+			if( i == MF_VSHCTRL_READ_BUFFER_POSITIVE ) st_hook_incomplete = true;
+		} else if( 
+			i == MF_CTRL_PEEK_BUFFER_POSITIVE ||
+			i == MF_CTRL_PEEK_BUFFER_NEGATIVE ||
+			i == MF_CTRL_READ_BUFFER_POSITIVE ||
+			i == MF_CTRL_READ_BUFFER_NEGATIVE
+		){
+			st_hook_incomplete = true;
 		}
+	}
+	
+	/* ゲームIDを取得 */
+	umd = sceIoOpen( "disc0:/UMD_DATA.BIN", PSP_O_RDONLY, 0777 ); 
+	if( umd > 0 ){
+		sceIoRead( umd, st_game_id, 10 );
+		sceIoClose( umd );
 	}
 	
 	/* ファンクションの初期化 */
@@ -278,7 +288,18 @@ static int mf_get_ctrl_buffer( MfHookAction action, unsigned int api, SceCtrlDat
 
 	k1_register = pspSdkSetK1( 0 );
 	
-	ret = ( ( int (*)( SceCtrlData*, int ) )hooktable[api].restore.api )( pad, 1 );
+	if( hooktable[api].restore.api ){
+		ret = ( ( int (*)( SceCtrlData*, int ) )hooktable[api].restore.api )( pad, 1 );
+	} else{
+		switch( api ){
+			case MF_CTRL_PEEK_BUFFER_POSITIVE:    ret = sceCtrlPeekBufferPositive( pad, 1 ); break;
+			case MF_CTRL_PEEK_BUFFER_NEGATIVE:    ret = sceCtrlPeekBufferNegative( pad, 1 ); break;
+			case MF_CTRL_READ_BUFFER_POSITIVE:    ret = sceCtrlReadBufferPositive( pad, 1 ); break;
+			case MF_CTRL_READ_BUFFER_NEGATIVE:    ret = sceCtrlReadBufferNegative( pad, 1 ); break;
+			case MF_VSHCTRL_READ_BUFFER_POSITIVE: ret = sceCtrlReadBufferPositive( pad, 1 ); break;
+			default: return CG_ERROR_INVALID_ARGUMENT;
+		}
+	}
 	if( hooktable[MF_HPRM_PEEK_CURRENT_KEY].restore.api ){
 		( ( int (*)( u32* ) )hooktable[MF_HPRM_PEEK_CURRENT_KEY].restore.api )( hk );
 	} else{
@@ -715,6 +736,11 @@ bool mfOverlayMessagePrintf( const char *format, ... )
 	va_end( ap );
 	
 	return ret;
+}
+
+bool mfHookIncomplete( void )
+{
+	return st_hook_incomplete;
 }
 
 /*-----------------------------------------------

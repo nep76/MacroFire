@@ -1534,4 +1534,8 @@ static void mf_draw_frame( void )
 	} else{
 		gbPrintf( gbOffsetChar( 32 + 5 + strlen( reqid ) ), gbOffsetLine( 1 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, " / Loaded: %s]", trgid );
 	}
+	
+	if( mfHookIncomplete() ){
+		gbPrint( gbOffsetChar( 44 ), gbOffsetLine( 2 ) + ( gbOffsetLine( 1 ) >> 1 ), MF_COLOR_EX4, MF_COLOR_TEXT_BG, "MacroFire is not working perfectly." );
+	}
 }

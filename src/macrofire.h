@@ -16,7 +16,7 @@
 	íËêî
 ==========================================================*/
 #define MF_TITLE        "MacroFire %s In-game menu"
-#define MF_VERSION      "3.0.0"
+#define MF_VERSION      "3.0.1"
 #define MF_AUTHOR       "ClassG (http://classg.sytes.net)"
 
 #define MF_INI_FILENAME        "ms0:/seplugins/macrofire.ini"
@@ -39,6 +39,7 @@
 #define MF_COLOR_EX1         0xffff0000
 #define MF_COLOR_EX2         0xffffff00
 #define MF_COLOR_EX3         0xffff00ff
+#define MF_COLOR_EX4         0xff00ffff
 
 /*==========================================================
 	É}ÉNÉç
@@ -143,6 +144,7 @@ int mfOverlayMessageStart( void );
 void mfOverlayMessageExit( void );
 bool mfOverlayMessageIsRunning( void );
 bool mfOverlayMessagePrintf( const char *format, ... );
+bool mfHookIncomplete( void );
 
 #ifndef MFEXCLUDE_DIALOG
 #include "mfdialog.h"
