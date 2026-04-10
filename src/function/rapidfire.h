@@ -17,29 +17,19 @@
 #define RAPIDFIRE_DEFAULT_RELEASE_DELAY 18
 #define RAPIDFIRE_DEFAULT_PRESS_DELAY   18
 
-#define RAPIDFIRE_BUTTON_CIRCLE    0
-#define RAPIDFIRE_BUTTON_CROSS     1
-#define RAPIDFIRE_BUTTON_SQUARE    2
-#define RAPIDFIRE_BUTTON_TRIANGLE  3
-#define RAPIDFIRE_BUTTON_UP        4
-#define RAPIDFIRE_BUTTON_RIGHT     5
-#define RAPIDFIRE_BUTTON_DOWN      6
-#define RAPIDFIRE_BUTTON_LEFT      7
-#define RAPIDFIRE_BUTTON_LTRIGGER  8
-#define RAPIDFIRE_BUTTON_RTRIGGER  9
-#define RAPIDFIRE_BUTTON_START    10
-#define RAPIDFIRE_BUTTON_SELECT   11
-
 #define RAPIDFIRE_MODE_NORMAL     0
 #define RAPIDFIRE_MODE_SEMI_RAPID 1
 #define RAPIDFIRE_MODE_AUTO_RAPID 2
 #define RAPIDFIRE_MODE_HOLD       3
 #define RAPIDFIRE_MODE_AUTO_HOLD  4
-#define RAPIDFIRE_LOAD 19
-#define RAPIDFIRE_SAVE 20
+#define RAPIDFIRE_LOAD            19
+#define RAPIDFIRE_SAVE            20
 
+#define RAPIDFIRE_DATA_MODE_SECTION     "Mode"
+#define RAPIDFIRE_DATA_DELAY_SECTION    "Delay"
 #define RAPIDFIRE_DATA_SIGNATURE        "MACROFIRE-RAPIDFIRE"
 #define RAPIDFIRE_DATA_VERSION          3
+#define RAPIDFIRE_DATA_REFUSE_VERSION   1
 #define RAPIDFIRE_DID_CIRCLE            "Circle"
 #define RAPIDFIRE_DID_CROSS             "Cross"
 #define RAPIDFIRE_DID_SQUARE            "Square"
@@ -67,6 +57,7 @@
 typedef MfMenuRc ( *RapidfireConfIo )( void );
 
 typedef struct {
+	char *name;
 	unsigned int button;
 	int  mode;
 } RapidfireConf;

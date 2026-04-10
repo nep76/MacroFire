@@ -31,10 +31,15 @@ static void analogtune_normalize( void );
 
 void analogtuneLoadIni( IniUID ini )
 {
-	st_deadzone.x  = inimgrGetInt( ini, "Analogtune", "OriginX",     ANALOGTUNE_INIT_X );
-	st_deadzone.y  = inimgrGetInt( ini, "Analogtune", "OriginY",     ANALOGTUNE_INIT_Y );
-	st_deadzone.r  = inimgrGetInt( ini, "Analogtune", "Deadzone",    ANALOGTUNE_INIT_R );
-	st_sensitivity = inimgrGetInt( ini, "Analogtune", "Sensitivity", ANALOGTUNE_INIT_SENS );
+	st_deadzone.x  = ANALOGTUNE_INIT_X;
+	st_deadzone.y  = ANALOGTUNE_INIT_Y;
+	st_deadzone.r  = ANALOGTUNE_INIT_R;
+	st_sensitivity = ANALOGTUNE_INIT_SENS;
+	
+	inimgrGetInt( ini, "Analogtune", "OriginX",     (long *)&(st_deadzone.x) );
+	inimgrGetInt( ini, "Analogtune", "OriginY",     (long *)&(st_deadzone.y) );
+	inimgrGetInt( ini, "Analogtune", "Deadzone",    (long *)&(st_deadzone.r) );
+	inimgrGetInt( ini, "Analogtune", "Sensitivity", (long *)&(st_sensitivity) );
 }
 
 void analogtuneCreateIni( IniUID ini )

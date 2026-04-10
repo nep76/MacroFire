@@ -31,16 +31,25 @@
 #define MACRO_LOAD          15
 #define MACRO_SAVE          16
 
+#define MACRO_DATA_SECTION          "Macro"
 #define MACRO_DATA_SIGNATURE        "MACROFIRE-MACRO"
-#define MACRO_DATA_VERSION          3
+#define MACRO_DATA_VERSION          4
+#define MACRO_DATA_REFUSE_VERSION   3
 
-#define MACRO_ACTION_DELAY          "Delay"
-#define MACRO_ACTION_BTNPRESS       "ButtonsPress"
-#define MACRO_ACTION_BTNRELEASE     "ButtonsRelease"
-#define MACRO_ACTION_BTNCHANGE      "ButtonsChange"
-#define MACRO_ACTION_ALMOVE         "AnalogMove"
-#define MACRO_ACTION_BTNRAPIDSTART  "RapidfireStart"
-#define MACRO_ACTION_BTNRAPIDSTOP   "RapidfireStop"
+#define MACRO_ACTION_DELAY           "Delay"
+#define MACRO_ACTION_BUTTONS_PRESS   "ButtonsPress"
+#define MACRO_ACTION_BUTTONS_RELEASE "ButtonsRelease"
+#define MACRO_ACTION_BUTTONS_CHANGE  "ButtonsChange"
+#define MACRO_ACTION_ANALOG_MOVE     "AnalogMove"
+#define MACRO_ACTION_RAPIDFIRE_START "RapidfireStart"
+#define MACRO_ACTION_RAPIDFIRE_STOP  "RapidfireStop"
+
+#define MACRO_INILINE_ALL_COLUMNS 5
+#define MACRO_INILINE_SEQ         0
+#define MACRO_INILINE_ACTION      1
+#define MACRO_INILINE_TARGET      2
+#define MACRO_INILINE_ORDER       3
+#define MACRO_INILINE_TYPE        4
 
 /*-----------------------------------------------
 	É}ÉNÉç

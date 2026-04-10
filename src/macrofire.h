@@ -23,7 +23,7 @@
 /*-----------------------------------------------
 	íËêî
 -----------------------------------------------*/
-#define MF_VERSION      "2.3.4"
+#define MF_VERSION      "2.4.0"
 #define MF_INI_FILENAME "ms0:/seplugins/macrofire.ini"
 
 #define MF_UNUSED_BUTTONS ( PSP_CTRL_WLAN_UP | PSP_CTRL_REMOTE | PSP_CTRL_DISC | PSP_CTRL_MS )

@@ -1,4 +1,4 @@
-MacroFire 2.3.4
+MacroFire 2.4.0
 
 
 Tuning the analog stick sensitivity

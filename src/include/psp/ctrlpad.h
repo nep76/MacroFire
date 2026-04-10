@@ -1,5 +1,9 @@
 /*
 	Controll pad utility
+	
+	$NOTICE$
+	
+	‚Å‚«‚ªˆ«‚¢‚Ì‚Åì‚è’¼‚·B
 */
 
 #ifndef CTRLPAD_H
@@ -74,6 +78,7 @@ unsigned int ctrlpadGetData( CtrlpadParams *params, SceCtrlData *pad_data, int a
 char *ctrlpadUtilButtonsToString( unsigned int buttons, char *str, size_t max );
 unsigned int ctrlpadUtilStringToButtons( char *str );
 unsigned int ctrlpadUtilGetAnalogDirection( int x, int y, int deadzone );
+void ctrlpadUtilSetAnalogDirection( unsigned int analog_direction, unsigned char *x, unsigned char *y );
 
 #ifdef __cplusplus
 }

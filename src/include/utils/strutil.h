@@ -162,6 +162,22 @@ char *strutilToUpperFirst( char *str );
 */
 char *strutilToLowerFirst( char *str );
 
+/*
+	strutilCountChar
+	
+	文字列中に含まれる文字の数を数える。
+	
+	@param: char *str
+		検索対象文字列。
+	
+	@param: char c
+		検索文字。
+	
+	@return: unsigned int
+		発見した文字数。
+*/
+unsigned int strutilCountChar( char *str, char c );
+
 #ifdef __cplusplus
 }
 #endif

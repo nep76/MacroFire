@@ -87,6 +87,9 @@ int cmndlgMessageUpdate( void )
 	if( pad_data.Buttons & PSP_CTRL_CIRCLE ){
 		st_params->rc         = CMNDLG_ACCEPT;
 		st_params->base.state = CMNDLG_SHUTDOWN;
+	} else if( ( st_params->options & CMNDLG_MESSAGE_YESNO ) && ( pad_data.Buttons & PSP_CTRL_CROSS ) ){
+		st_params->rc         = CMNDLG_CANCEL;
+		st_params->base.state = CMNDLG_SHUTDOWN;
 	}
 	
 	return 0;

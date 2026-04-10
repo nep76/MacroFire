@@ -313,13 +313,13 @@ void mfMenu( void )
 			break;
 		}
 		
+		st_pad_data.Buttons &= 0x0000FFFF;
+		
 		if( rc == MR_BACK ){
 			mfMenuQuit();
 		} else if( rc == MR_CONTINUE ){
 			rc = mfMenuUniDraw( gbOffsetChar( 5 ), gbOffsetLine( 4 ), menu, menu_num, &menu_selected, 0 );
 		} else{
-			st_pad_data.Buttons &= 0x0000FFFF;
-			
 			if( ( (MfFuncMenu)mf_menu.func )( &st_pad_data, NULL ) == MR_BACK ){
 				if( (MfFuncTerm)MFM_GET_CB_ARG_BY_PTR( mf_menu.arg, 0 ) ) ( (MfFuncTerm)MFM_GET_CB_ARG_BY_PTR( mf_menu.arg, 0 ) )();
 				rc = MR_CONTINUE;
@@ -373,6 +373,9 @@ void mfMenu( void )
 		sceDisplayEnable();
 }
 
+/*-------------------------------------
+	ユーティリティ関数
+-------------------------------------*/
 void mfMenuDisableInterrupt( void )
 {
 	st_interrupt = false;
@@ -474,6 +477,40 @@ MfMenuRc mfMenuUniDraw( int x, int y, MfMenuItem menu[], size_t max, int *select
 	}
 }
 
+unsigned int mfMenuScroll( int selected, unsigned int viewlines, unsigned int maxlines )
+{
+	int scroll_lines, line_number;
+	
+	for( scroll_lines = selected - ( viewlines >> 1 ), line_number = 0; scroll_lines > 0; scroll_lines--, line_number++ ){
+		if( maxlines - line_number < viewlines ){
+			break;
+		}
+	}
+	
+	return line_number;
+}
+
+void mfMenuButtonsSymStr( unsigned int buttons, char *str, size_t len )
+{
+	if( buttons & PSP_CTRL_CIRCLE   ) strutilSafeCat( str, "\x85 "  , len );
+	if( buttons & PSP_CTRL_CROSS    ) strutilSafeCat( str, "\x86 "  , len );
+	if( buttons & PSP_CTRL_SQUARE   ) strutilSafeCat( str, "\x87 "  , len );
+	if( buttons & PSP_CTRL_TRIANGLE ) strutilSafeCat( str, "\x84 "  , len );
+	if( buttons & PSP_CTRL_UP       ) strutilSafeCat( str, "\x80 "  , len );
+	if( buttons & PSP_CTRL_RIGHT    ) strutilSafeCat( str, "\x81 "  , len );
+	if( buttons & PSP_CTRL_DOWN     ) strutilSafeCat( str, "\x82 "  , len );
+	if( buttons & PSP_CTRL_LEFT     ) strutilSafeCat( str, "\x83 "  , len );
+	if( buttons & PSP_CTRL_LTRIGGER ) strutilSafeCat( str, "L "     , len );
+	if( buttons & PSP_CTRL_RTRIGGER ) strutilSafeCat( str, "R "     , len );
+	if( buttons & PSP_CTRL_SELECT   ) strutilSafeCat( str, "SELECT ", len );
+	if( buttons & PSP_CTRL_START    ) strutilSafeCat( str, "START " , len );
+	
+	if( buttons & CTRLPAD_CTRL_ANALOG_UP    ) strutilSafeCat( str, "A\x80 " , len );
+	if( buttons & CTRLPAD_CTRL_ANALOG_RIGHT ) strutilSafeCat( str, "A\x81 " , len );
+	if( buttons & CTRLPAD_CTRL_ANALOG_DOWN  ) strutilSafeCat( str, "A\x82 " , len );
+	if( buttons & CTRLPAD_CTRL_ANALOG_LEFT  ) strutilSafeCat( str, "A\x83 " , len );
+}
+
 static void mf_emerg_menu( void )
 {
 	mf_ready_to_draw();
@@ -547,11 +584,6 @@ static void mf_menu_create_home_menu( MfMenuItem *menu, int menu_num, MfMenuCall
 		menu[mftable_index].value[0].pointer = mftable[mftable_index - MFM_MAIN_MENU_COUNT].menu.func;
 		menu[mftable_index].value[1].pointer = mftable[mftable_index - MFM_MAIN_MENU_COUNT].menu.quit;
 	}
-}
-
-static void mfRunDialog( void )
-{
-	st_dialog = true;
 }
 
 /*-------------------------------------
@@ -643,7 +675,7 @@ MfMenuRc mfMenuDefGetNumberProc( MfMenuCtrlSignal signal, SceCtrlData *pad, void
 					value[2].integer
 				) == MR_ENTER
 			){
-				mfRunDialog();
+				st_dialog = true;
 			}
 		}
 	}
@@ -665,7 +697,7 @@ MfMenuRc mfMenuDefGetButtonsProc( MfMenuCtrlSignal signal, SceCtrlData *pad, voi
 					(unsigned int)(value[1].integer)
 				) == MR_ENTER
 			){
-				mfRunDialog();
+				st_dialog = true;
 			}
 		}
 	}
@@ -909,6 +941,80 @@ bool mfMenuGetFilenameResult( char *path, size_t len, int *split )
 		snprintf( path, len, "%s%s", params->data->path, params->data->name );
 		if( split ) *split = strlen( params->data->path ) + 1;
 	}
+	
+	memsceFree( params );
+	
+	return rc;
+}
+
+bool mfMenuMessageIsReady( void )
+{
+	if( cmndlgMessageGetStatus() != CMNDLG_NONE ){
+		return true;
+	} else{
+		return false;
+	}
+}
+
+bool mfMenuMessageInit( const char *title, const char *message, bool yesno )
+{
+	CmndlgMessageParams *params = (CmndlgMessageParams *)memsceMalloc( sizeof( CmndlgMessageParams ) );
+	
+	mfMenuDisableInterrupt();
+	
+	strutilSafeCopy( params->title, title, CMNDLG_MESSAGE_TITLE_LENGTH );
+	strutilSafeCopy( params->message, message, CMNDLG_MESSAGE_LENGTH );
+	params->options        = CMNDLG_MESSAGE_DISPLAY_CENTER;
+	params->rc             = 0;
+	params->ui.x           = 0;
+	params->ui.y           = 0;
+	params->ui.fgTextColor = MFM_TEXT_FGCOLOR;
+	params->ui.fcTextColor = MFM_TEXT_FCCOLOR;
+	params->ui.bgTextColor = MFM_TRANSPARENT;
+	params->ui.bgColor     = MFM_BG_COLOR;
+	params->ui.borderColor = MFM_TRANSPARENT;
+	
+	if( yesno ) params->options |= CMNDLG_MESSAGE_YESNO;
+	
+	st_update_screen = true;
+	
+	if( cmndlgMessageStart( params ) ){
+		cmndlgMessageShutdownStart();
+		memsceFree( params );
+		mfMenuEnableInterrupt();
+		return false;
+	}
+	
+	return true;
+}
+
+bool mfMenuMessage( void )
+{
+	CmndlgState state;
+	if( cmndlgMessageUpdate() ){
+		//エラー
+	}
+	state = cmndlgMessageGetStatus();
+	if( state == CMNDLG_SHUTDOWN ) return false;
+	
+	return true;
+}
+
+bool mfMenuMessageResult( void )
+{
+	bool rc;
+	CmndlgMessageParams *params = cmndlgMessageGetParams();
+	
+	if( params->rc == CMNDLG_ACCEPT ){
+		rc = true;
+	} else{
+		rc = false;
+	}
+	
+	cmndlgMessageShutdownStart();
+	
+	mfMenuKeyRepeatReset();
+	mfMenuEnableInterrupt();
 	
 	memsceFree( params );
 	

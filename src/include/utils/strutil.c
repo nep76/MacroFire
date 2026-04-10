@@ -131,3 +131,13 @@ char *strutilToLowerFirst( char *str )
 	str[0] = tolower( str[0] );
 	return str;
 }
+
+unsigned int strutilCountChar( char *str, char c )
+{
+	unsigned int cnt = 0;
+	char *save = str;
+	
+	while( ( save = strchr( save, c ) ) ) cnt++;
+	
+	return cnt;
+}

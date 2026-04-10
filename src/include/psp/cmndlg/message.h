@@ -17,6 +17,9 @@
 #define CMNDLG_MESSAGE_MAX_WIDTH    80
 #define CMNDLG_MESSAGE_MAX_HEIGHT   34
 
+#define CMNDLG_MESSAGE_TITLE_LENGTH 64
+#define CMNDLG_MESSAGE_LENGTH       512
+
 #define CMNDLG_MESSAGE_PROMPT_YESNO "[\x85]YES  [\x86]NO"
 #define CMNDLG_MESSAGE_PROMPT_OK    "[\x85]OK"
 
@@ -33,8 +36,8 @@ typedef enum {
 } CmndlgMessageOptions;
 
 typedef struct {
-	char                 title[64];
-	char                 message[512];
+	char                 title[CMNDLG_MESSAGE_TITLE_LENGTH];
+	char                 message[CMNDLG_MESSAGE_LENGTH];
 	CmndlgMessageOptions options;
 	CmndlgRc             rc;
 	CmndlgUI             ui;

@@ -71,8 +71,10 @@ static void mf_loadstore_ini( const char *inipath )
 		char buttons[128];
 		if( inimgrLoad( ini, MF_INI_FILENAME ) != 0 ){
 			inimgrSetBool( ini, "Main", "Startup", MF_INIDEF_MAIN_STARTUP );
-			inimgrSetString( ini, "Main", "MenuButtons",   MF_INIDEF_MAIN_MENUBUTTONS );
-			inimgrSetString( ini, "Main", "ToggleButtons", MF_INIDEF_MAIN_TOGGLEBUTTONS );
+			ctrlpadUtilButtonsToString( MF_INIDEF_MAIN_MENUBUTTONS, buttons, sizeof( buttons ) );
+			inimgrSetString( ini, "Main", "MenuButtons", buttons );
+			ctrlpadUtilButtonsToString( MF_INIDEF_MAIN_TOGGLEBUTTONS, buttons, sizeof( buttons ) );
+			inimgrSetString( ini, "Main", "ToggleButtons", buttons );
 			
 			analogtuneCreateIni( ini );
 			
@@ -83,13 +85,19 @@ static void mf_loadstore_ini( const char *inipath )
 			inimgrSave( ini, MF_INI_FILENAME );
 		}
 		
-		gMfEngine = inimgrGetBool( ini, "Main", "Startup", false );
+		inimgrGetBool( ini, "Main", "Startup", &gMfEngine );
 		
-		inimgrGetString( ini, "Main", "MenuButtons", MF_INIDEF_MAIN_MENUBUTTONS, buttons, sizeof( buttons ) );
-		gMfMenu = ctrlpadUtilStringToButtons( buttons );
+		if( inimgrGetString( ini, "Main", "MenuButtons", buttons, sizeof( buttons ) ) < 0 ){
+			gMfMenu = MF_INIDEF_MAIN_MENUBUTTONS;
+		} else{
+			gMfMenu = ctrlpadUtilStringToButtons( buttons );
+		}
 		
-		inimgrGetString( ini, "Main", "ToggleButtons", MF_INIDEF_MAIN_TOGGLEBUTTONS, buttons, sizeof( buttons ) );
-		gMfToggle = ctrlpadUtilStringToButtons( buttons );
+		if( inimgrGetString( ini, "Main", "ToggleButtons", buttons, sizeof( buttons ) ) < 0 ){
+			gMfToggle = MF_INIDEF_MAIN_TOGGLEBUTTONS;
+		} else{
+			gMfToggle = ctrlpadUtilStringToButtons( buttons );
+		}
 		
 		analogtuneLoadIni( ini );
 		

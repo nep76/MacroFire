@@ -118,6 +118,14 @@ unsigned int ctrlpadUtilGetAnalogDirection( int x, int y, int deadzone )
 	return direction;
 }
 
+void ctrlpadUtilSetAnalogDirection( unsigned int analog_direction, unsigned char *x, unsigned char *y )
+{
+	if( analog_direction & CTRLPAD_CTRL_ANALOG_UP    ) *y = 0;
+	if( analog_direction & CTRLPAD_CTRL_ANALOG_RIGHT ) *x = 255;
+	if( analog_direction & CTRLPAD_CTRL_ANALOG_DOWN  ) *y = 255;
+	if( analog_direction & CTRLPAD_CTRL_ANALOG_LEFT  ) *x = 0;
+}
+
 void ctrlpadInit( CtrlpadParams *params )
 {
 	if( ! params ) return;
@@ -192,7 +200,9 @@ unsigned int ctrlpadGetData( CtrlpadParams *params, SceCtrlData *pad_data, int a
 	
 	if( buttons ){
 		if( buttons == params->lastButtons ){
-			if( current_tick - params->tickLast > *delay_tick ){
+			if( ! params->tickRepeatDelayLow && ! params->tickRepeatDelayHigh && ! params->countLowToHigh ){
+				buttons = 0;
+			} else if( current_tick - params->tickLast > *delay_tick ){
 				params->tickLast    = current_tick;
 				params->lastButtons = buttons;
 				if( params->countLow <= params->countLowToHigh ) params->countLow++;

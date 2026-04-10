@@ -17,17 +17,21 @@
 -----------------------------------------------*/
 #define MACROMGR_MAX_DELAY                999999999UL
 
-#define MACROMGR_SET_ANALOG_XY( x, y )    ( (u64)(( (u64)( x ) << 32 ) | ( y )) )
-#define MACROMGR_GET_ANALOG_X( x )        ( (u32)(( x ) >> 32) )
-#define MACROMGR_GET_ANALOG_Y( y )        ( (u32)( y ) )
+#define MACROMGR_SET_HILO_DWORD( x, y )   ( (u64)(( (u64)( x ) << 32 ) | ( y )) )
+#define MACROMGR_GET_HI_DWORD( x )        ( (u32)(( x ) >> 32) )
+#define MACROMGR_GET_LO_DWORD( y )        ( (u32)( y ) )
+
+#define MACROMGR_SET_ANALOG_XY( x, y )    MACROMGR_SET_HILO_DWORD( x, y )
+#define MACROMGR_GET_ANALOG_X( x )        MACROMGR_GET_HI_DWORD( x )
+#define MACROMGR_GET_ANALOG_Y( y )        MACROMGR_GET_LO_DWORD( y )
 #define MACROMGR_ANALOG_CENTER            128
 #define MACROMGR_ANALOG_NEUTRAL           MACROMGR_SET_ANALOG_XY( MACROMGR_ANALOG_CENTER, MACROMGR_ANALOG_CENTER )
 
 #define MACROMGR_DEFAULT_PRESS_DELAY     18
 #define MACROMGR_DEFAULT_RELEASE_DELAY   18
-#define MACROMGR_SET_RAPIDDELAY( pd, rd ) MACROMGR_SET_ANALOG_XY( pd, rd )
-#define MACROMGR_GET_RAPIDPDELAY( pd )    MACROMGR_GET_ANALOG_X( pd )
-#define MACROMGR_GET_RAPIDRDELAY( rd )    MACROMGR_GET_ANALOG_Y( rd )
+#define MACROMGR_SET_RAPIDDELAY( pd, rd ) MACROMGR_SET_HILO_DWORD( pd, rd )
+#define MACROMGR_GET_RAPIDPDELAY( pd )    MACROMGR_GET_HI_DWORD( pd )
+#define MACROMGR_GET_RAPIDRDELAY( rd )    MACROMGR_GET_LO_DWORD( rd )
 
 /*-----------------------------------------------
 	å^êÈåæ

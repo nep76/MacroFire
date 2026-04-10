@@ -37,6 +37,7 @@ OBJS = exports.o \
        menu.o \
        analogtune.o \
        rapidfire.o \
+       function/remap.o \
        function/rapidfire.o \
        function/macromgr.o \
        function/macro.o \

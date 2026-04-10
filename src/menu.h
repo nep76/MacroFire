@@ -236,8 +236,16 @@ bool mfMenuGetFilenameInit( const char *title, unsigned int flags, const char *i
 bool mfMenuGetFilename( void );
 bool mfMenuGetFilenameResult( char *path, size_t len, int *split );
 
+bool mfMenuMessageIsReady( void );
+bool mfMenuMessageInit( const char *title, const char *message, bool yesno );
+bool mfMenuMessage( void );
+bool mfMenuMessageResult( void );
+
 void mfMenuLabel( const char *format, ... );
 void mfMenuUsage( const char *format, ... );
+
+unsigned int mfMenuScroll( int selected, unsigned int viewlines, unsigned int maxlines );
+void mfMenuButtonsSymStr( unsigned int buttons, char *str, size_t len );
 
 /* デフォルトプロシージャ */
 MfMenuRc mfMenuDefAnchorProc( MfMenuCtrlSignal signal, SceCtrlData *pad, void *var, MfMenuItemValue value[], const void *arg );

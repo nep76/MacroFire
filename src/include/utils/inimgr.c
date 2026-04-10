@@ -7,8 +7,7 @@
 /*-----------------------------------------------
 	ローカル関数
 -----------------------------------------------*/
-static enum inimgr_line_type inimgr_parse_line( const char *line, char **start, char **end );
-static bool inimgr_split_keyval( char *line, char **key, char **value );
+static enum inimgr_line_type inimgr_parse_line( const char *line, char **start );
 static char *inimgr_get_value( struct inimgr_params *params, const char *section, const char *key );
 static int inimgr_set_value( struct inimgr_params *params, const char *section, const char *key, const char *value );
 static struct inimgr_section *inimgr_search_section( struct inimgr_params *params, const char *section );
@@ -49,15 +48,14 @@ IniUID inimgrNew( void )
 	return (IniUID)params;
 }
 
-int inimgrSetCallback( IniUID uid, const char *section, InimgrLoadCallback lcb, InimgrSaveCallback scb )
+int inimgrSetCallback( IniUID uid, const char *section, InimgrCallback cb )
 {
 	struct inimgr_params   *params = (struct inimgr_params *)uid;
 	struct inimgr_callback *new_cb = (struct inimgr_callback *)memsceMalloc( sizeof( struct inimgr_callback ) );
 	if( ! new_cb ) return CG_ERROR_NOT_ENOUGH_MEMORY;
 	
 	strutilSafeCopy( new_cb->section, section, INIMGR_SECTION_BUFFER );
-	new_cb->lcb = lcb;
-	new_cb->scb = scb;
+	new_cb->cb = cb;
 	
 	if( params->callbacks ){
 		struct inimgr_callback *last_cb;
@@ -76,11 +74,11 @@ int inimgrLoad( IniUID uid, const char *inipath )
 {
 	FilehUID fuid;
 	char     buf[INIMGR_ENTRY_BUFFER];
-	char     *line_start, *line_end;
+	bool     callback_section = false;
 	struct   inimgr_params    *params = (struct inimgr_params *)uid;
 	struct   inimgr_section   *current_section = NULL;
 	struct   inimgr_entry     *current_entry   = NULL;
-	struct   inimgr_callback  *callback;
+	struct   inimgr_callback  *callback        = NULL;
 	
 	fuid = filehOpen( inipath, PSP_O_RDONLY, 0777 );
 	
@@ -99,16 +97,21 @@ int inimgrLoad( IniUID uid, const char *inipath )
 	while( filehReadln( fuid, buf, sizeof( buf ) ) ){
 		struct inimgr_section  *new_section;
 		struct inimgr_entry    *new_entry;
-		char *key, *value;
-		bool skip_section = false;
+		char *line_start = NULL, *key = NULL, *value = NULL;
 		
-		switch( inimgr_parse_line( buf, &line_start, &line_end ) ){
+		switch( inimgr_parse_line( buf, &line_start ) ){
 			case INIMGR_LINE_NULL:
 				break;
 			case INIMGR_LINE_SECTION:
-				*(line_end + 1) = '\0';
+				if( callback_section ){
+					callback->length = ( filehTell( fuid ) - strlen( buf ) ) - callback->offset;
+					callback_section = false;
+				}
 				
-				if( skip_section ) skip_section = false;
+				if( ( callback = inimgr_search_callback( params, line_start ) ) ){
+					callback->offset = filehTell( fuid );
+					callback_section = true;
+				}
 				
 				new_section = inimgr_create_section( line_start );
 				if( ! new_section ) goto EXCEPTION_NOT_ENOUGH_MEMORY;
@@ -119,23 +122,14 @@ int inimgrLoad( IniUID uid, const char *inipath )
 				current_section->next = new_section;
 				current_section = new_section;
 				
-				callback = inimgr_search_callback( params, line_start );
-				if( callback && callback->lcb ){
-					callback->offset = filehTell( fuid );
-					skip_section = true;
-				}
 				break;
 			case INIMGR_LINE_ENTRY:
-				if( skip_section ) continue;
-				
-				*(line_end + 1) = '\0';
-				
-				if( ! current_section || ! inimgr_split_keyval( line_start, &key, &value ) ) break;
+				if( callback_section || ! current_section || ! inimgrParseEntry( line_start, &key, &value ) ) break;
 				
 				new_entry = inimgr_create_entry( key, value );
 				if( ! new_entry ) goto EXCEPTION_NOT_ENOUGH_MEMORY;
 				
-				new_entry->prev   = current_entry;
+				new_entry->prev = current_entry;
 				
 				if( current_entry ){
 					current_entry->next = new_entry;
@@ -146,12 +140,22 @@ int inimgrLoad( IniUID uid, const char *inipath )
 				break;
 		}
 	}
+	if( callback_section ) callback->length = filehTell( fuid ) - callback->offset;
 	
 	/* スペシャルセクションの処理 */
 	for( callback = params->callbacks; callback; callback = callback->next ){
+		InimgrCallbackParams cb_params;
+		
+		if( ! callback->cb ) continue;
+		
 		filehSeek( fuid, callback->offset, FW_SEEK_SET );
 		buf[0] = '\0';
-		( callback->lcb )( (IniUID)params, fuid, buf, sizeof( buf ) );
+		
+		cb_params.uid    = uid;
+		cb_params.ini    = fuid;
+		cb_params.cbinfo = callback;
+		
+		( (InimgrCallback)callback->cb )( INIMGR_CB_LOAD, &cb_params, buf, sizeof( buf ) );
 	}
 	
 	filehClose( fuid );
@@ -184,32 +188,33 @@ int inimgrSave( IniUID uid, const char *inipath )
 		return ferror;
 	}
 	
-	/* 先頭には必ずデフォルトセクションが存在するので、まずそれを書き込む */
-	callback = inimgr_search_callback( params, params->index->name );
-	if( callback ){
-		buf[0] = '\0';
-		( callback->scb )( fuid, buf, sizeof( buf ) );
-	} else{
-		for( entry = params->index->entry; entry; entry = entry->next ){
-			filehWritef( fuid, buf, INIMGR_ENTRY_BUFFER, "%s = %s\x0D\x0A", entry->key, entry->value );
+	/* セクションを書き込み */
+	for( section = params->index; section; section = section->next ){
+		
+		/* デフォルトセクションはセクション名を書き込まない */
+		if( strcasecmp( section->name, INIMGR_DEFAULT_SECTION_NAME ) != 0 ){
+			if( filehTell( fuid ) != 0 ) filehWrite( fuid, "\x0D\x0A", 2 );
+			filehWritef( fuid, buf, INIMGR_SECTION_BUFFER + 5, "[%s]\x0D\x0A", section->name );
 		}
-	}
-	if( params->index->entry ) filehWrite( fuid, "\x0D\x0A", 2 );
-	
-	/* 後続するセクションがあれば書き込み */
-	for( section = params->index->next; section; section = section->next ){
-		filehWritef( fuid, buf, INIMGR_SECTION_BUFFER + 5, "[%s]\x0D\x0A", section->name );
 		
 		callback = inimgr_search_callback( params, section->name );
-		if( callback && callback->scb ){
+		if( callback && callback->cb ){
+			InimgrCallbackParams cb_params;
+			
+			if( ! callback->cb ) continue;
+			
 			buf[0] = '\0';
-			( callback->scb )( fuid, buf, sizeof( buf ) );
+			
+			cb_params.uid    = uid;
+			cb_params.ini    = fuid;
+			cb_params.cbinfo = callback;
+			
+			( (InimgrCallback)callback->cb )( INIMGR_CB_SAVE, &cb_params, buf, sizeof( buf ) );
 		} else{
 			for( entry = section->entry; entry; entry = entry->next ){
 				filehWritef( fuid, buf, INIMGR_ENTRY_BUFFER, "%s = %s\x0D\x0A", entry->key, entry->value );
 			}
 		}
-		filehWrite( fuid, "\x0D\x0A", 2 );
 	}
 	
 	filehClose( fuid );
@@ -259,49 +264,51 @@ int inimgrAddSection( IniUID uid, const char *section )
 void inimgrDeleteSection( IniUID uid, const char *section )
 {
 	/* デフォルトセクションは削除させない */
-	if( strcmp( section, INIMGR_DEFAULT_SECTION_NAME ) == 0 ) return;
+	if( strcasecmp( section, INIMGR_DEFAULT_SECTION_NAME ) == 0 ) return;
 	
 	inimgr_delete_section( (struct inimgr_params *)uid, inimgr_search_section( (struct inimgr_params *)uid, section ) );
 }
 
-long inimgrGetInt( IniUID uid, const char *section, const char *key, const long def )
+bool inimgrGetInt( IniUID uid, const char *section, const char *key, long *var )
 {
 	char *value = inimgr_get_value( (struct inimgr_params *)uid, section, key );
 	
+	
 	if( value ){
-		return strtol( value, NULL, 10 );
+		*var = strtol( value, NULL, 10 );
+		return true;
 	} else{
-		return def;
+		return false;
 	}
 }
 
-unsigned int inimgrGetString( IniUID uid, const char *section, const char *key, const char *def, char *buf, size_t bufsize )
+int inimgrGetString( IniUID uid, const char *section, const char *key, char *buf, size_t bufsize )
 {
 	char *value = inimgr_get_value( (struct inimgr_params *)uid, section, key );
 	
 	if( value ){
 		strutilSafeCopy( buf, value, bufsize );
-	} else if( buf != def ){
-		strutilSafeCopy( buf, def, bufsize );
+		return strlen( buf );
+	} else {
+		return -1;
 	}
-	
-	return strlen( buf );
 }
 
-bool inimgrGetBool( IniUID uid, const char *section, const char *key, const bool def )
+bool inimgrGetBool( IniUID uid, const char *section, const char *key, bool *var )
 {
 	char *value = inimgr_get_value( (struct inimgr_params *)uid, section, key );
 	
 	if( value ){
 		strutilToUpper( value );
-		if( strcmp( value, "ON" ) == 0 ){
-			return true;
-		} else if( strcmp( value, "OFF" ) == 0 ){
-			return false;
+		if( strcasecmp( value, "ON" ) == 0 ){
+			*var = true;
+		} else if( strcasecmp( value, "OFF" ) == 0 ){
+			*var = false;
 		}
+		return true;
 	}
 	
-	return def;
+	return false;
 }
 
 int inimgrSetInt( IniUID uid, const char *section, const char *key, const long num )
@@ -335,59 +342,87 @@ int inimgrSetBool( IniUID uid, const char *section, const char *key, const bool 
 /*-------------------------------------
 	コールバック関数用API
 --------------------------------------*/
-int inimgrCBReadln( FilehUID fuid, char *buf, size_t max )
+int inimgrCbReadln( InimgrCallbackParams *params, char *buf, size_t buflen )
 {
-	int readsize;
-	SceOff rollback_point = filehTell( fuid );
-	
-	readsize = filehReadln( fuid, buf, max );
-	
-	if( readsize > 0 ){
-		char *line_start, *line_end;
-		if( inimgr_parse_line( buf, &line_start, &line_end ) == INIMGR_LINE_SECTION ){
-			filehSeek( fuid, rollback_point, FW_SEEK_SET );
-			return 0;
-		}
-	}
-	return readsize;
+	if( filehTell( params->ini ) >= params->cbinfo->offset + params->cbinfo->length ) return 0;
+	return filehReadln( params->ini, buf, buflen );
 }
 
-int inimgrCBWriteln( FilehUID fuid, char *buf )
+int inimgrCbSeekSet( InimgrCallbackParams *params, SceOff offset )
 {
-	int ret = filehWrite( fuid, buf, strlen( buf ) );
-	filehWrite( fuid, "\x0D\x0A", 2 );
+	if( offset > 0 ){
+		if( offset <= params->cbinfo->length ){
+			return filehSeek( params->ini, params->cbinfo->offset + offset, FW_SEEK_SET );
+		} else{
+			return filehSeek( params->ini, params->cbinfo->offset + params->cbinfo->length, FW_SEEK_SET );
+		}
+	} else{
+		return filehSeek( params->ini, params->cbinfo->offset, FW_SEEK_SET );
+	}
+}
+
+int inimgrCbSeekCur( InimgrCallbackParams *params, SceOff offset )
+{
+	SceOff pos = filehTell( params->ini ) - params->cbinfo->offset;
+	
+	if( pos < 0 ){
+		pos = 0;
+	} else if( pos > params->cbinfo->length ){
+		pos = params->cbinfo->length;
+	}
+	
+	pos += offset;
+	
+	if( pos < 0 ){
+		pos = 0;
+	} else if( pos > params->cbinfo->length ){
+		pos = params->cbinfo->length;
+	}
+	
+	return filehSeek( params->ini, params->cbinfo->offset + pos, FW_SEEK_SET );
+}
+
+int inimgrCbSeekEnd( InimgrCallbackParams *params, SceOff offset )
+{
+	SceOff endpos = params->cbinfo->offset + params->cbinfo->length;
+	
+	if( offset < 0 ){
+		if( abs( offset ) <= params->cbinfo->length ){
+			return filehSeek( params->ini, endpos + offset, FW_SEEK_SET );
+		} else{
+			return filehSeek( params->ini, params->cbinfo->offset, FW_SEEK_SET );
+		}
+	} else{
+		return filehSeek( params->ini, endpos, FW_SEEK_SET );
+	}
+}
+
+int inimgrCbTell( InimgrCallbackParams *params )
+{
+	return params->cbinfo->offset - filehTell( params->ini );
+}
+
+int inimgrCbWriteln( InimgrCallbackParams *params, char *buf, size_t buflen )
+{
+	int ret;
+	
+	if( buflen < 0 ){
+		ret = filehWrite( params->ini, buf, strlen( buf ) );
+	} else{
+		ret = filehWrite( params->ini, buf, buflen );
+	}
+	if( ret >= 0 ) filehWrite( params->ini, "\x0D\x0A", 2 );
 	
 	return ret;
 }
 
-/*-------------------------------------
-	スタティック関数
--------------------------------------*/
-static enum inimgr_line_type inimgr_parse_line( const char *line, char **start, char **end )
+bool inimgrParseEntry( char *entry, char **key, char **value )
 {
-	*start = strutilCounterPbrk( line, "\t\x20" );
-	if( ! *start || **start == ';' ) return INIMGR_LINE_NULL;
-	
-	*end = strutilCounterReversePbrk( *start, "\t\x20" );
-	
-	if( **start == '[' && **end == ']' ){
-		(*start)++;
-		(*end)--;
-		return INIMGR_LINE_SECTION;
-	}
-	
-	return INIMGR_LINE_ENTRY;
-
-}
-
-static bool inimgr_split_keyval( char *line, char **key, char **value )
-{
-	char *delim = strchr( line, '=' );
+	char *delim = strchr( entry, '=' );
 	if( ! delim ) return false;
 	
 	*delim = '\0';
-	
-	*key   = line;
+	*key   = entry;
 	*value = delim + 1;
 	
 	delim = strutilCounterReversePbrk( *key, "\t\x20" );
@@ -403,6 +438,36 @@ static bool inimgr_split_keyval( char *line, char **key, char **value )
 	}
 	
 	return true;
+}
+
+bool inimgrMakeEntry( char *entry, char *key, char *value )
+{
+	snprintf( entry, INIMGR_ENTRY_BUFFER, "%s = %s", key, value );
+	return true;
+}
+
+/*-------------------------------------
+	スタティック関数
+-------------------------------------*/
+static enum inimgr_line_type inimgr_parse_line( const char *line, char **start )
+{
+	char *end;
+	
+	*start = strutilCounterPbrk( line, "\t\x20" );
+	if( ! *start || **start == ';' ) return INIMGR_LINE_NULL;
+	
+	end = strutilCounterReversePbrk( *start, "\t\x20" );
+	
+	if( **start == '[' && *end == ']' ){
+		(*start)++;
+		*end = '\0';
+		return INIMGR_LINE_SECTION;
+	}
+	
+	*(end + 1) = '\0';
+	
+	return INIMGR_LINE_ENTRY;
+
 }
 
 static char *inimgr_get_value( struct inimgr_params *params, const char *section, const char *key )
@@ -462,10 +527,10 @@ static struct inimgr_section *inimgr_search_section( struct inimgr_params *param
 {
 	struct inimgr_section *current_section;
 	
-	if( params->last && strcmp( params->last->name, section ) == 0 ) return params->last;
+	if( params->last && strcasecmp( params->last->name, section ) == 0 ) return params->last;
 	
 	for( current_section = params->index; current_section; current_section = current_section->next ){
-		if( strcmp( current_section->name, section ) == 0 ){
+		if( strcasecmp( current_section->name, section ) == 0 ){
 			params->last = current_section;
 			break;
 		}
@@ -480,7 +545,7 @@ static struct inimgr_entry *inimgr_search_entry( struct inimgr_section *section,
 	if( ! section ) return NULL;
 	
 	for( current_entry = section->entry; current_entry; current_entry = current_entry->next ){
-		if( strcmp( current_entry->key, key ) == 0 ) break;
+		if( strcasecmp( current_entry->key, key ) == 0 ) break;
 	}
 	return current_entry;
 }
@@ -490,7 +555,7 @@ static struct inimgr_callback *inimgr_search_callback( struct inimgr_params *par
 	struct inimgr_callback *current_callback;
 	
 	for( current_callback = params->callbacks; current_callback; current_callback = current_callback->next ){
-		if( strcmp( current_callback->section, section ) == 0 ) break;
+		if( strcasecmp( current_callback->section, section ) == 0 ) break;
 	}
 	
 	return current_callback;

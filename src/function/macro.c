@@ -33,8 +33,8 @@ static bool macro_stop( MacroEntry *entry );
 static void macro_init_tempdata( struct macro_tempdata *temp );
 static void macro_record( MfCallMode mode, SceCtrlData *pad_data, void *argp );
 static void macro_trace( MfCallMode mode, SceCtrlData *pad_data, void *argp );
-static void macro_read( IniUID ini, FilehUID fuid, char *buf, size_t max );
-static void macro_store( FilehUID fuid, char *buf, size_t max );
+static void macro_load( InimgrCallbackMode mode, InimgrCallbackParams *params, char *buf, size_t buflen );
+static void macro_save( InimgrCallbackMode mode, InimgrCallbackParams *params, char *buf, size_t buflen );
 
 /* エラーチェック */
 static bool macro_in_webbrowser( void );
@@ -175,6 +175,9 @@ MfMenuRc macroMenu( SceCtrlData *pad_data, void *arg )
 	return MR_CONTINUE;
 }
 
+/*-------------------------------------
+	スタティック関数
+--------------------------------------*/
 static bool macro_in_webbrowser( void )
 {
 	if( sceKernelFindModuleByName( "sceHVNetfront_Module" ) != NULL ){
@@ -362,10 +365,10 @@ static MfMenuRc macro_menu_load( SceCtrlData *pad_data, void *arg )
 				IniUID ini = inimgrNew();
 				if( ini > 0 ){
 					unsigned int err;
-					inimgrSetCallback( ini, "CommandSequence", macro_read, NULL );
+					inimgrSetCallback( ini, MACRO_DATA_SECTION, macro_load );
 					if( ( err = inimgrLoad( ini, inipath ) ) == 0 ){
-						int version = inimgrGetInt( ini, "default", MACRO_DATA_SIGNATURE, 0 );
-						if( version <= 1 ){
+						int version;
+						if( ! inimgrGetInt( ini, "default", MACRO_DATA_SIGNATURE, (long *)&version ) || version <= MACRO_DATA_REFUSE_VERSION ){
 							gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FCCOLOR, "Macro file is invalid or too lower version." );
 							mfMenuWait( MFM_DISPLAY_MICROSEC_ERROR );
 						} else{
@@ -405,8 +408,8 @@ static MfMenuRc macro_menu_save( SceCtrlData *pad_data, void *arg )
 				if( ini > 0 ){
 					unsigned int err;
 					inimgrSetInt( ini, "default", MACRO_DATA_SIGNATURE, MACRO_DATA_VERSION );
-					inimgrAddSection(  ini, "CommandSequence" );
-					inimgrSetCallback( ini, "CommandSequence", NULL, macro_store );
+					inimgrAddSection(  ini, MACRO_DATA_SECTION );
+					inimgrSetCallback( ini, MACRO_DATA_SECTION, macro_save );
 					if( ( err = inimgrSave( ini, inipath ) ) == 0 ){
 						gbPrintf( gbOffsetChar( 3 ), gbOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FGCOLOR, "Saved to %s.", inipath );
 						mfMenuWait( MFM_DISPLAY_MICROSEC_INFO );
@@ -425,6 +428,8 @@ static MfMenuRc macro_menu_save( SceCtrlData *pad_data, void *arg )
 
 static MfMenuRc macro_menu_edit( SceCtrlData *pad_data, void *arg )
 {
+	MfMenuRc rc;
+	
 	if( macro_is_busy_with_message( &(st_macro[st_slot]) ) ) return MR_BACK;
 	
 	if( ! st_macro[st_slot].current.macro ){
@@ -439,7 +444,12 @@ static MfMenuRc macro_menu_edit( SceCtrlData *pad_data, void *arg )
 		return MR_CONTINUE;
 	}
 	
-	return macroeditorMain( pad_data, st_macro[st_slot].current.macro );
+	mfMenuDisableInterrupt();
+	
+	rc = macroeditorMain( pad_data, st_macro[st_slot].current.macro );
+	
+	if( rc == MR_BACK ) mfMenuEnableInterrupt();
+	return rc;
 }
 
 static MfMenuRc macro_menu_clear( SceCtrlData *pad_data, void *arg )
@@ -673,123 +683,156 @@ static void macro_trace( MfCallMode mode, SceCtrlData *pad, void *argp )
 	}
 }
 
-static void macro_read( IniUID ini, FilehUID fuid, char *buf, size_t max )
+/*-------------------------------------
+	セーブ/ロード
+--------------------------------------*/
+static void macro_load( InimgrCallbackMode mode, InimgrCallbackParams *params, char *buf, size_t buflen )
 {
-	char *action, *data;
+	char *macro[MACRO_INILINE_ALL_COLUMNS], *key = NULL, *value = NULL;
+	char *saveptr;
+	int version, prev_seq = -1, cur_seq;
+	uint64_t data, *storage;
 	
-	if( inimgrGetInt( ini, "default", MACRO_DATA_SIGNATURE, 0 ) <= 1 ) return;
+	if( ! inimgrGetInt( params->uid, "default", MACRO_DATA_SIGNATURE, (long *)&version ) || version <= MACRO_DATA_REFUSE_VERSION ) return;
 	
 	if( st_macro[st_slot].current.macro ) macro_purge( &(st_macro[st_slot]) );
-	macro_create( &(st_macro[st_slot]) );
-	st_macro[st_slot].current.command = st_macro[st_slot].current.macro;
 	
-	while( inimgrCBReadln( fuid, buf, max ) ){
-		strutilRemoveChar( buf, "\t\x20" );
+	while( inimgrCbReadln( params, buf, buflen ) ){
+		inimgrParseEntry( buf, &key, &value );
 		
-		data = strchr( buf, ':' );
-		if( ! data ) continue;
-		*data = '\0';
-		data++;
-		action = buf;
+		macro[MACRO_INILINE_SEQ]    = strtok_r( buf,  ".", &saveptr );
+		macro[MACRO_INILINE_ACTION] = strtok_r( NULL, ".", &saveptr );
+		macro[MACRO_INILINE_TARGET] = strtok_r( NULL, ".", &saveptr );
+		macro[MACRO_INILINE_ORDER]  = strtok_r( NULL, ".", &saveptr );
+		macro[MACRO_INILINE_TYPE]   = strtok_r( NULL, ".", &saveptr );
 		
-		if( strcmp( action, MACRO_ACTION_DELAY ) == 0 ){
-			st_macro[st_slot].current.command->action = MA_DELAY;
-			st_macro[st_slot].current.command->data   = strtoul( data, NULL, 10 );
-			st_macro[st_slot].current.command->sub    = 0;
-		} else if( strcmp( action, MACRO_ACTION_BTNPRESS ) == 0 ){
-			st_macro[st_slot].current.command->action = MA_BUTTONS_PRESS;
-			st_macro[st_slot].current.command->data   = ctrlpadUtilStringToButtons( data );
-			st_macro[st_slot].current.command->sub    = 0;
-		} else if( strcmp( action, MACRO_ACTION_BTNRELEASE ) == 0 ){
-			st_macro[st_slot].current.command->action = MA_BUTTONS_RELEASE;
-			st_macro[st_slot].current.command->data   = ctrlpadUtilStringToButtons( data );
-			st_macro[st_slot].current.command->sub    = 0;
-		} else if( strcmp( action, MACRO_ACTION_BTNCHANGE ) == 0 ){
-			st_macro[st_slot].current.command->action = MA_BUTTONS_CHANGE;
-			st_macro[st_slot].current.command->data   = ctrlpadUtilStringToButtons( data );
-			st_macro[st_slot].current.command->sub    = 0;
-		} else if( strcmp( action, MACRO_ACTION_ALMOVE ) == 0 ){
-			int x, y;
-			char *data2 = strchr( data, ',' );
-			if( ! data2 ) continue;
+		if( ! macro[MACRO_INILINE_TYPE] ) return;
+		
+		cur_seq = strtol( macro[MACRO_INILINE_SEQ], NULL, 10 );
+		
+		/* マクロシーケンスが増加した場合のみアクションを判定し、MacroDataを初期化 */
+		if( cur_seq > prev_seq ){
+			if( ! st_macro[st_slot].current.macro ){
+				macro_create( &(st_macro[st_slot]) );
+				st_macro[st_slot].current.command = st_macro[st_slot].current.macro;
+			} else{
+				st_macro[st_slot].current.command = macromgrInsertAfter( st_macro[st_slot].current.command );
+				if( ! st_macro[st_slot].current.command ) return;
+			}
 			
-			*data2 = '\0';
-			data2++;
+			prev_seq = cur_seq;
 			
-			x = strtol( data, NULL, 10 );
-			y = strtol( data2, NULL, 10 );
+			st_macro[st_slot].current.command->data = 0;
+			st_macro[st_slot].current.command->sub  = 0;
 			
-			st_macro[st_slot].current.command->action = MA_ANALOG_MOVE;
-			st_macro[st_slot].current.command->data   = MACROMGR_SET_ANALOG_XY( x, y );
-			st_macro[st_slot].current.command->sub    = 0;
-		} else if( strcmp( action, MACRO_ACTION_BTNRAPIDSTART ) == 0 ){
-			char *pdelay, *rdelay, *buttons;
-			pdelay = data;
-			rdelay = strchr( pdelay, ',' );
-			if( ! rdelay ) continue;
-			
-			*rdelay = '\0';
-			rdelay++;
-			
-			buttons = strchr( rdelay, ',' );
-			if( ! buttons ) continue;
-			
-			*buttons = '\0';
-			buttons++;
-			
-			st_macro[st_slot].current.command->action = MA_RAPIDFIRE_START;
-			st_macro[st_slot].current.command->data   = ctrlpadUtilStringToButtons( buttons );
-			st_macro[st_slot].current.command->sub    = MACROMGR_SET_RAPIDDELAY( strtoul( pdelay, NULL, 10 ), strtoul( rdelay, NULL, 10 ) );
-		} else if( strcmp( action, MACRO_ACTION_BTNRAPIDSTOP ) == 0 ){
-			st_macro[st_slot].current.command->action = MA_RAPIDFIRE_STOP;
-			st_macro[st_slot].current.command->data   = ctrlpadUtilStringToButtons( data );
-			st_macro[st_slot].current.command->sub    = 0;
+			/* 初期化 */
+			if( strcasecmp( macro[MACRO_INILINE_ACTION], MACRO_ACTION_DELAY ) == 0 ){
+				st_macro[st_slot].current.command->action = MA_DELAY;
+			} else if( strcasecmp( macro[MACRO_INILINE_ACTION], MACRO_ACTION_BUTTONS_PRESS ) == 0 ){
+				st_macro[st_slot].current.command->action = MA_BUTTONS_PRESS;
+			} else if( strcasecmp( macro[MACRO_INILINE_ACTION], MACRO_ACTION_BUTTONS_RELEASE ) == 0 ){
+				st_macro[st_slot].current.command->action = MA_BUTTONS_RELEASE;
+			} else if( strcasecmp( macro[MACRO_INILINE_ACTION], MACRO_ACTION_BUTTONS_CHANGE ) == 0 ){
+				st_macro[st_slot].current.command->action = MA_BUTTONS_CHANGE;
+			} else if( strcasecmp( macro[MACRO_INILINE_ACTION], MACRO_ACTION_ANALOG_MOVE ) == 0 ){
+				st_macro[st_slot].current.command->action = MA_ANALOG_MOVE;
+				st_macro[st_slot].current.command->data   = MACROMGR_ANALOG_NEUTRAL;
+			} else if( strcasecmp( macro[MACRO_INILINE_ACTION], MACRO_ACTION_RAPIDFIRE_START ) == 0 ){
+				st_macro[st_slot].current.command->action = MA_RAPIDFIRE_START;
+				st_macro[st_slot].current.command->sub    = MACROMGR_SET_RAPIDDELAY( MACROMGR_DEFAULT_PRESS_DELAY, MACROMGR_DEFAULT_RELEASE_DELAY );
+			} else if( strcasecmp( macro[MACRO_INILINE_ACTION], MACRO_ACTION_RAPIDFIRE_STOP ) == 0 ){
+				st_macro[st_slot].current.command->action = MA_RAPIDFIRE_STOP;
+			}
+		} else if( cur_seq < prev_seq ){
+			return;
 		}
-		st_macro[st_slot].current.command = macromgrInsertAfter( st_macro[st_slot].current.command );
-		if( ! st_macro[st_slot].current.command ) return;
+		
+		/* データを作成 */
+		if( strcasecmp( macro[MACRO_INILINE_TYPE], "Num" ) == 0 ){
+			data = strtoul( value, NULL, 10 );
+		} else if( strcasecmp( macro[MACRO_INILINE_TYPE], "Buttons" ) == 0 ){
+			data = ctrlpadUtilStringToButtons( value );
+		} else{
+			return;
+		}
+		
+		/* データの格納位置を確定 */
+		if( strcasecmp( macro[MACRO_INILINE_TARGET], "Data" ) == 0 ){
+			storage = &(st_macro[st_slot].current.command->data);
+		} else if( strcasecmp( macro[MACRO_INILINE_TARGET], "Sub" ) == 0 ){
+			storage = &(st_macro[st_slot].current.command->sub);
+		} else{
+			return;
+		}
+		
+		/* データを格納 */
+		if( strcasecmp( macro[MACRO_INILINE_ORDER], "Full" ) == 0 ){
+			*storage = data;
+		} else if( strcasecmp( macro[MACRO_INILINE_ORDER], "Hi" ) == 0 ){
+			*storage = MACROMGR_SET_HILO_DWORD( data, MACROMGR_GET_LO_DWORD( *storage ) );
+		} else if( strcasecmp( macro[MACRO_INILINE_ORDER], "Lo" ) == 0 ){
+			*storage = MACROMGR_SET_HILO_DWORD( MACROMGR_GET_HI_DWORD( *storage ), data );
+		} else{
+			return;
+		}
 	}
-	macromgrRemove( st_macro[st_slot].current.command );
 }
 
-static void macro_store( FilehUID fuid, char *buf, size_t max )
+static void macro_save( InimgrCallbackMode mode, InimgrCallbackParams *params, char *buf, size_t buflen )
 {
 	char buttons[128];
+	unsigned int seq = 0, len = 0;
 	
 	for( st_macro[st_slot].current.command = st_macro[st_slot].current.macro; st_macro[st_slot].current.command; st_macro[st_slot].current.command = st_macro[st_slot].current.command->next ){
 		switch( st_macro[st_slot].current.command->action ){
 			case MA_DELAY:
-				snprintf( buf, max, "%s: %llu", MACRO_ACTION_DELAY, (uint64_t)st_macro[st_slot].current.command->data );
+				len = snprintf( buf, buflen, "%d.%s.Data.Full.Num = %llu", seq, MACRO_ACTION_DELAY, (uint64_t)st_macro[st_slot].current.command->data );
+				inimgrCbWriteln( params, buf, len );
 				break;
 			case MA_BUTTONS_PRESS:
 				ctrlpadUtilButtonsToString( st_macro[st_slot].current.command->data, buttons, sizeof( buttons ) );
-				snprintf( buf, max, "%s: %s", MACRO_ACTION_BTNPRESS, buttons );
+				len = snprintf( buf, buflen, "%d.%s.Data.Full.Buttons = %s", seq, MACRO_ACTION_BUTTONS_PRESS, buttons );
+				inimgrCbWriteln( params, buf, len );
 				break;
 			case MA_BUTTONS_RELEASE:
 				ctrlpadUtilButtonsToString( st_macro[st_slot].current.command->data, buttons, sizeof( buttons ) );
-				snprintf( buf, max, "%s: %s", MACRO_ACTION_BTNRELEASE, buttons );
+				len = snprintf( buf, buflen, "%d.%s.Data.Full.Buttons = %s", seq, MACRO_ACTION_BUTTONS_RELEASE, buttons );
+				inimgrCbWriteln( params, buf, len );
 				break;
 			case MA_BUTTONS_CHANGE:
 				ctrlpadUtilButtonsToString( st_macro[st_slot].current.command->data, buttons, sizeof( buttons ) );
-				snprintf( buf, max, "%s: %s", MACRO_ACTION_BTNCHANGE, buttons );
+				len = snprintf( buf, buflen, "%d.%s.Data.Full.Buttons = %s", seq, MACRO_ACTION_BUTTONS_CHANGE, buttons );
+				inimgrCbWriteln( params, buf, len );
 				break;
 			case MA_ANALOG_MOVE:
-				snprintf( buf, max, "%s: %d,%d", MACRO_ACTION_ALMOVE, (int)MACROMGR_GET_ANALOG_X( st_macro[st_slot].current.command->data ), (int)MACROMGR_GET_ANALOG_Y( st_macro[st_slot].current.command->data ) );
+				len = snprintf( buf, buflen, "%d.%s.Data.Hi.Num = %d", seq, MACRO_ACTION_ANALOG_MOVE, (int)MACROMGR_GET_ANALOG_X( st_macro[st_slot].current.command->data ) );
+				inimgrCbWriteln( params, buf, len );
+				len = snprintf( buf, buflen, "%d.%s.Data.Lo.Num = %d", seq, MACRO_ACTION_ANALOG_MOVE, (int)MACROMGR_GET_ANALOG_Y( st_macro[st_slot].current.command->data ) );
+				inimgrCbWriteln( params, buf, len );
 				break;
 			case MA_RAPIDFIRE_START:
 				ctrlpadUtilButtonsToString( st_macro[st_slot].current.command->data, buttons, sizeof( buttons ) );
-				snprintf( buf, max, "%s: %lu,%lu,%s", MACRO_ACTION_BTNRAPIDSTART, MACROMGR_GET_RAPIDPDELAY( st_macro[st_slot].current.command->sub ), MACROMGR_GET_RAPIDRDELAY( st_macro[st_slot].current.command->sub ), buttons );
+				len = snprintf( buf, buflen, "%d.%s.Data.Full.Buttons = %s", seq, MACRO_ACTION_RAPIDFIRE_START, buttons );
+				inimgrCbWriteln( params, buf, len );
+				len = snprintf( buf, buflen, "%d.%s.Sub.Hi.Num = %d", seq, MACRO_ACTION_RAPIDFIRE_START, MACROMGR_GET_RAPIDPDELAY( st_macro[st_slot].current.command->sub ) );
+				inimgrCbWriteln( params, buf, len );
+				len = snprintf( buf, buflen, "%d.%s.Sub.Lo.Num = %d", seq, MACRO_ACTION_RAPIDFIRE_START, MACROMGR_GET_RAPIDRDELAY( st_macro[st_slot].current.command->sub ) );
+				inimgrCbWriteln( params, buf, len );
 				break;
 			case MA_RAPIDFIRE_STOP:
 				ctrlpadUtilButtonsToString( st_macro[st_slot].current.command->data, buttons, sizeof( buttons ) );
-				snprintf( buf, max, "%s: %s", MACRO_ACTION_BTNRAPIDSTOP, buttons );
+				len = snprintf( buf, buflen, "%d.%s.Data.Full.Buttons = %s", seq, MACRO_ACTION_RAPIDFIRE_STOP, buttons );
+				inimgrCbWriteln( params, buf, len );
 				break;
 		}
-		inimgrCBWriteln( fuid, buf );
+		seq++;
 	}
 }
 
 
-
+/*-------------------------------------
+	エラーチェック
+--------------------------------------*/
 static bool macro_is_busy( MacroEntry *entry )
 {
 	return entry->current.runMode != MRM_NONE ? true : false;

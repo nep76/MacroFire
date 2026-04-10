@@ -19,6 +19,7 @@
 /*-----------------------------------------------
 	機能を実装したソースのヘッダ
 -----------------------------------------------*/
+#include "function/remap.h"
 #include "function/rapidfire.h"
 #include "function/macro.h"
 
@@ -59,6 +60,14 @@ typedef struct {
 EXPORT MfEntry mftable[]
 #ifdef MFTABLE_DEFINE
 = {
+	{
+		"Remap settings",
+		NULL, NULL,
+ 		NULL, NULL,
+		{ remapMain, NULL },
+		{ remapMenu, NULL }
+	},
+	
 	{
 		"Rapidfire settings",
 		NULL, NULL,
