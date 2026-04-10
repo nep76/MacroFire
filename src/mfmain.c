@@ -77,7 +77,7 @@ static void mf_init( void )
 #endif
 		}
 		dbgprint( "Waiting for loading modules..." );
-		//sceKernelDelayThread( 2000000 );
+		sceKernelDelayThread( 2000000 );
 	}
 	
 	/* フックアドレスを取得 */
