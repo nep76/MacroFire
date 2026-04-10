@@ -81,41 +81,7 @@ bool mfMenuInit( void )
 	sceCtrlSetSamplingMode( PSP_CTRL_MODE_ANALOG );
 	return true;
 }
-/*
-void mfDebug( struct mf_buffers *buf )
-{
-	static int fps = 0;
-	static int st_fps = 0;
-	static uint64_t st_fps_tick_now = 0;
-	static uint64_t st_fps_tick_last = 0;
-	
-	st_fps++;
-	sceRtcGetCurrentTick( &st_fps_tick_now );
-	if( (st_fps_tick_now - st_fps_tick_last) >= 1000000 ){
-		st_fps_tick_last = st_fps_tick_now;
-		fps = st_fps;
-		st_fps = 0;
-	}
 
-	
-	gbPrintf( gbOffsetChar( 1 ), gbOffsetLine( 0 ), MFM_TITLE_TEXT_COLOR, MFM_TRANSPARENT,
-		"%d %x",
-		mfRunEnv(),
-		st_pad_data.Buttons
-	);
-		
-	gbPrintf( gbOffsetChar( 1 ), gbOffsetLine( 2 ), MFM_TITLE_TEXT_COLOR, MFM_TRANSPARENT,
-		"%d 1:%d 2:%d 3:%d 4:%d 5:%d 6:%d",
-		fps,
-		sceKernelPartitionTotalFreeMemSize( 1 ),
-		sceKernelPartitionTotalFreeMemSize( 2 ),
-		sceKernelPartitionTotalFreeMemSize( 3 ),
-		sceKernelPartitionTotalFreeMemSize( 4 ),
-		sceKernelPartitionTotalFreeMemSize( 5 ),
-		sceKernelPartitionTotalFreeMemSize( 6 )
-	);
-}
-*/
 static void mf_backup_fbstat( struct mf_fbstat *fbstat )
 {
 	fbstat->mode        = gbGetMode();
@@ -201,6 +167,40 @@ static void mf_draw_base( void )
 	gbPrintf( gbOffsetChar( 3 ), gbOffsetLine( 1 ), MFM_TITLE_TEXT_COLOR, MFM_TRANSPARENT, MFM_TOP_MESSAGE, MF_VERSION );
 }
 
+#ifdef DEBUG
+void mfDebug( struct mf_buffers *buf )
+{
+	static int fps = 0;
+	static int st_fps = 0;
+	static uint64_t st_fps_tick_now = 0;
+	static uint64_t st_fps_tick_last = 0;
+	
+	st_fps++;
+	sceRtcGetCurrentTick( &st_fps_tick_now );
+	if( (st_fps_tick_now - st_fps_tick_last) >= 1000000 ){
+		st_fps_tick_last = st_fps_tick_now;
+		fps = st_fps;
+		st_fps = 0;
+	}
+
+	
+	gbPrintf( gbOffsetChar( 45 ), gbOffsetLine( 5 ), MFM_TITLE_TEXT_COLOR, MFM_TRANSPARENT,
+		""
+	);
+		
+	gbPrintf( gbOffsetChar( 1 ), gbOffsetLine( 2 ), MFM_TITLE_TEXT_COLOR, MFM_TRANSPARENT,
+		"%d 1:%d 2:%d 3:%d 4:%d 5:%d 6:%d",
+		fps,
+		sceKernelPartitionTotalFreeMemSize( 1 ),
+		sceKernelPartitionTotalFreeMemSize( 2 ),
+		sceKernelPartitionTotalFreeMemSize( 3 ),
+		sceKernelPartitionTotalFreeMemSize( 4 ),
+		sceKernelPartitionTotalFreeMemSize( 5 ),
+		sceKernelPartitionTotalFreeMemSize( 6 )
+	);
+}
+#endif
+
 void mfMenu( void )
 {
 	SceUID thlist[MFM_MAX_NUMBER_OF_THREADS];
@@ -211,7 +211,7 @@ void mfMenu( void )
 	MfMenuCallback mf_menu;
 	int            menu_num, menu_selected;
 	
-	bool mf_api_hooked = mfIsApiHooked();
+	bool mf_api_hooked = false;//mfIsApiHooked();
 	struct mf_fbstat  fbstat;
 	struct mf_buffers buf;
 	
@@ -282,10 +282,12 @@ void mfMenu( void )
 		/* îwåiÇï`âÊ */
 		if( buf.frame.clearImage ){
 			sceDmacMemcpy( gbGetCurrentDrawBuf(), buf.frame.clearImage, buf.frame.size );
+			mf_indicator();
 		} else if( buf.frame.draw ){
 			memset( gbGetCurrentDrawBuf(), 0, buf.frame.size );
 			gbRmvOpt( GB_ALPHABLEND );
 			mf_draw_base();
+			mf_indicator();
 			gbAddOpt( GB_ALPHABLEND );
 		} else{
 			if( st_pad_data.Buttons || st_update_screen ){
@@ -293,17 +295,17 @@ void mfMenu( void )
 				st_update_screen = false;
 				memset( gbGetCurrentDrawBuf(), 0, buf.frame.size );
 				mf_draw_base();
+				mf_indicator();
 			} else{
 				gbSleep();
 			}
 		}
 		
-		st_pad_data.Buttons = ctrlpadGetData( &st_cp_params, &st_pad_data, CTRLPAD_IGNORE_ANALOG_DIRECTION ) & 0x0000FFFF;
+		st_pad_data.Buttons = ctrlpadGetData( &st_cp_params, &st_pad_data, CTRLPAD_IGNORE_ANALOG_DIRECTION );
 		
-		//mfDebug( &buf );
-		
-		/* ÉCÉìÉWÉPÅ[É^Çï`âÊ */
-		mf_indicator();
+		#ifdef DEBUG
+		mfDebug( &buf );
+		#endif
 		
 		if( ( st_interrupt && st_pad_data.Buttons & ( PSP_CTRL_START | PSP_CTRL_HOME ) ) || st_menu_quit ){
 			if( rc == MR_ENTER && (MfFuncTerm)MFM_GET_CB_ARG_BY_PTR( mf_menu.arg, 0 ) ) ( (MfFuncTerm)MFM_GET_CB_ARG_BY_PTR( mf_menu.arg, 0 ) )();
@@ -316,8 +318,9 @@ void mfMenu( void )
 		} else if( rc == MR_CONTINUE ){
 			rc = mfMenuUniDraw( gbOffsetChar( 5 ), gbOffsetLine( 4 ), menu, menu_num, &menu_selected, 0 );
 		} else{
-			MfMenuRc func_rc = ( (MfFuncMenu)mf_menu.func )( &st_pad_data, NULL );
-			if( func_rc == MR_BACK ){
+			st_pad_data.Buttons &= 0x0000FFFF;
+			
+			if( ( (MfFuncMenu)mf_menu.func )( &st_pad_data, NULL ) == MR_BACK ){
 				if( (MfFuncTerm)MFM_GET_CB_ARG_BY_PTR( mf_menu.arg, 0 ) ) ( (MfFuncTerm)MFM_GET_CB_ARG_BY_PTR( mf_menu.arg, 0 ) )();
 				rc = MR_CONTINUE;
 			}

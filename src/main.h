@@ -11,8 +11,6 @@
 #include <unistd.h>
 #include <string.h>
 
-#include <systemctrl.h>
-
 #define GLOBAL_VARIABLES_DEFINE
 #include "macrofire.h"
 #undef GLOBAL_VARIABLE_DEFINE
@@ -20,6 +18,8 @@
 #define MFTABLE_DEFINE
 #include "mftable.h"
 #undef MFTABLE_DEFINE
+
+#include "psp/hook.h"
 
 /*-----------------------------------------------
 	íËêî
@@ -36,6 +36,11 @@
 -----------------------------------------------*/
 typedef int ( *MfSceCtrlDataFunc  )( SceCtrlData*, int );
 typedef int ( *MfSceCtrlLatchFunc )( SceCtrlLatch* );
+
+enum mf_interrupt_handler_mode {
+	MF_IHM_USER = 0,
+	MF_IHM_KERNEL
+};
 
 /*-----------------------------------------------
 	ä÷êî

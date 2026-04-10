@@ -43,14 +43,14 @@ int cmndlgGetFilenameStart( CmndlgGetFilenameParams *params )
 {
 	int i;
 	
-	if( st_params || ! params ) return -1;
+	if( st_params || ! params ) return CG_ERROR_INVALID_ARGUMENT;
 	
 	st_params = params;
 	
 	st_params->base.state = CMNDLG_INIT;
 	
 	st_params->base.tempBuffer = memsceMalloc( sizeof( struct cmndlg_get_filename_tempdata ) * st_params->numberOfData );
-	if( ! st_params->base.tempBuffer ) return -2;
+	if( ! st_params->base.tempBuffer ) return CG_ERROR_NOT_ENOUGH_MEMORY;
 	
 	for( i = 0; i < st_params->numberOfData; i++ ){
 		pathexpandFromCwd( st_params->data[i].initPath, st_params->data[i].path, st_params->data[i].pathMax );
@@ -84,7 +84,7 @@ int cmndlgGetFilenameUpdate( void )
 		}
 		if( ret < 0 ){
 			st_params->base.state = CMNDLG_SHUTDOWN;
-			return -1;
+			return ret;
 		}
 		st_chdir = false;
 		st_all_entries = dirhGetAllEntryCount( st_dirh );
@@ -152,7 +152,7 @@ int cmndlgGetFilenameUpdate( void )
 			} else if( attr == FIO_SO_IFDIR ){
 				if( strlen( selected_data->path ) + strlen( name ) + 2 > selected_data->pathMax ){
 					//ƒGƒ‰[
-					return -1;
+					return CG_ERROR_OUT_OF_BUFFER;
 				}
 				strcat( selected_data->path, "/" );
 				strcat( selected_data->path, name );
@@ -161,10 +161,9 @@ int cmndlgGetFilenameUpdate( void )
 				strutilSafeCopy( selected_data->name, name, selected_data->nameMax );
 			}
 		} else{
+			int ret;
 			CmndlgSoskParams *sosk_params = (CmndlgSoskParams *)memsceMalloc( sizeof( CmndlgSoskParams ) );
-			if( ! sosk_params ){
-				return -1;
-			}
+			if( ! sosk_params ) return CG_ERROR_NOT_ENOUGH_MEMORY;
 			
 			sosk_params->title          = "Input filename";
 			sosk_params->text           = selected_data->name;
@@ -181,12 +180,12 @@ int cmndlgGetFilenameUpdate( void )
 			
 			if( ! sosk_params->text ){
 				memsceFree( sosk_params );
-				return -1;
+				return CG_ERROR_OUT_OF_BUFFER;
 			}
 			
-			if( cmndlgSoskStart( sosk_params ) ){
+			if( ( ret = cmndlgSoskStart( sosk_params ) ) ){
 				memsceFree( sosk_params );
-				return -1;
+				return ret;
 			}
 			st_input = true;
 		}

@@ -12,7 +12,7 @@
 #include <pspctrl.h>
 #include <pspdisplay.h>
 #include <stdbool.h>
-#include "psp/cmndlg/errors.h"
+#include "cgerrs.h"
 
 #define CMNDLG_DEFAULT_FGCOLOR 0xffffffff
 #define CMNDLG_DEFAULT_BGCOLOR 0x66000000

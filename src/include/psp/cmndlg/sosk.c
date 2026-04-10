@@ -52,23 +52,19 @@ int cmndlgSoskStart( CmndlgSoskParams *params )
 {
 	struct cmndlg_sosk_tempdata *tempdata;
 	
-	if( st_params || ! params ) return -1;
+	if( st_params || ! params ) return CG_ERROR_INVALID_ARGUMENT;
 	
 	st_params = params;
 	
 	st_params->base.state = CMNDLG_INIT;
 	
-	st_params->base.tempBuffer = memsceMalloc( sizeof( struct cmndlg_sosk_tempdata ) );
-	if( ! st_params->base.tempBuffer ) return -2;
+	st_params->base.tempBuffer = memsceMalloc( sizeof( struct cmndlg_sosk_tempdata ) + st_params->textMax );
+	if( ! st_params->base.tempBuffer ) return CG_ERROR_NOT_ENOUGH_MEMORY;
 	
 	tempdata = st_params->base.tempBuffer;
+	tempdata->workText = (char *)( (unsigned int)st_params->base.tempBuffer + sizeof( struct cmndlg_sosk_tempdata ) );
 	
-	tempdata->workText = (char *)memsceMalloc( st_params->textMax );
-	if( ! tempdata->workText ){
-		return - 3;
-	}
 	strcpy( tempdata->workText, st_params->text );
-	
 	tempdata->currentLength = strlen( st_params->text );
 	
 	if( tempdata->currentLength ){
@@ -195,7 +191,6 @@ int cmndlgSoskShutdownStart( void )
 		st_params->base.state = CMNDLG_SHUTDOWN;
 	}
 	
-	memsceFree( ((struct cmndlg_sosk_tempdata *)(st_params->base.tempBuffer))->workText );
 	memsceFree( st_params->base.tempBuffer );
 	
 	st_params = NULL;

@@ -14,21 +14,24 @@
 #define MF_VSHCTRL_READ_BUFFER_POSITIVE 6
 
 typedef struct {
-	void *origfunc;
-	char *modname;
+	struct{
+		void **addr;
+		void *entrypoint;
+	} restore;
+	char *module;
 	char *library;
 	unsigned int nid;
-	void *hookfunc;
+	void *entrypoint;
 } MfHookParams;
 
-MfHookParams Hooktable[] = {
-	{ NULL, "sceController_Service", "sceCtrl",      0x3A622550, mfCtrlPeekBufferPositive },
-	{ NULL, "sceController_Service", "sceCtrl",      0xC152080A, mfCtrlPeekBufferNegative },
-	{ NULL, "sceController_Service", "sceCtrl",      0x1F803938, mfCtrlReadBufferPositive },
-	{ NULL, "sceController_Service", "sceCtrl",      0x60B81F86, mfCtrlReadBufferNegative },
-	{ NULL, "sceController_Service", "sceCtrl",      0xB1D0E5CD, mfCtrlPeekLatch },
-	{ NULL, "sceController_Service", "sceCtrl",      0x0B588501, mfCtrlReadLatch },
-	{ NULL, "sceVshBridge_Driver",   "sceVshBridge", 0xC6395C03, mfVshCtrlReadBufferPositive },
+MfHookParams hook[] = {
+	{ { NULL }, "sceController_Service", "sceCtrl",      0x3A622550, mfCtrlPeekBufferPositive },
+	{ { NULL }, "sceController_Service", "sceCtrl",      0xC152080A, mfCtrlPeekBufferNegative },
+	{ { NULL }, "sceController_Service", "sceCtrl",      0x1F803938, mfCtrlReadBufferPositive },
+	{ { NULL }, "sceController_Service", "sceCtrl",      0x60B81F86, mfCtrlReadBufferNegative },
+	{ { NULL }, "sceController_Service", "sceCtrl",      0xB1D0E5CD, mfCtrlPeekLatch },
+	{ { NULL }, "sceController_Service", "sceCtrl",      0x0B588501, mfCtrlReadLatch },
+	{ { NULL }, "sceVshBridge_Driver",   "sceVshBridge", 0xC6395C03, mfVshCtrlReadBufferPositive },
 };
 
 #endif

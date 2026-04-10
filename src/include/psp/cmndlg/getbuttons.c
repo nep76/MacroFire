@@ -66,13 +66,13 @@ int cmndlgGetButtonsStart( CmndlgGetButtonsParams *params )
 	int i, j;
 	struct cmndlg_get_buttons_tempdata *tempdata;
 	
-	if( st_params || ! params ) return -1;
+	if( st_params || ! params ) return CG_ERROR_INVALID_ARGUMENT;
 	
 	st_params = params;
 	st_params->base.state = CMNDLG_INIT;
 	
 	st_params->base.tempBuffer = memsceMalloc( sizeof( struct cmndlg_get_buttons_tempdata ) * st_params->numberOfData );
-	if( ! st_params->base.tempBuffer ) return -2;
+	if( ! st_params->base.tempBuffer ) return CG_ERROR_NOT_ENOUGH_MEMORY;
 	
 	tempdata = st_params->base.tempBuffer;
 	for( i = 0; i < st_params->numberOfData; i++ ){

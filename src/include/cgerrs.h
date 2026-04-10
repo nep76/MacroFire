@@ -5,7 +5,6 @@
 #ifndef CGERRS_H
 #define CGERRS_H
 
-/* システムエラー */
 #define CG_ERROR_OK                    0
 #define CG_ERROR_UNKNOWN               0xE0000000
 #define CG_ERROR_SYSTEM_ERROR          0xE0000001
@@ -18,7 +17,6 @@
 #define CG_ERROR_INVALID_ARGUMENT      0xE0000008
 #define CG_ERROR_OUT_OF_BUFFER         0xE0000009
 
-/* ファイルI/O */
 #define CG_ERROR_FAILED_TO_CREATE_SEMA 0xE0000010
 #define CG_ERROR_FAILED_TO_GETSTAT     0xE0000011
 #define CG_ERROR_PATH_IS_NOT_REGFILE   0xE0000012
@@ -30,7 +28,9 @@
 #define CG_ERROR_FAILED_TO_DOPEN       0xE0000018
 #define CG_ERROR_FAILED_TO_DREAD       0xE0000019
 
-/* ハードエラー */
 #define CG_ERROR_DISPLAY_NOT_INITIALIZED 0xE0000030
+
+#define CG_ERROR_ALREADY_RUNNING       0xE00000050
+#define CG_ERROR_NOT_RUNNING_YET       0xE00000051
 
 #endif

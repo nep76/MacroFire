@@ -40,7 +40,7 @@ int cmndlgMessageStart( CmndlgMessageParams *params )
 {
 	int len;
 	
-	if( st_params || ! params ) return -1;
+	if( st_params || ! params ) return CG_ERROR_INVALID_ARGUMENT;
 	
 	st_params = params;
 	

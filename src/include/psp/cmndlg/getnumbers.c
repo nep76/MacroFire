@@ -36,20 +36,20 @@ int cmndlgGetNumbersStart( CmndlgGetNumbersParams *params )
 {
 	int i;
 	
-	if( st_params || ! params ) return -1;
+	if( st_params || ! params ) return CG_ERROR_INVALID_ARGUMENT;
 	
 	st_params = params;
 	
 	params->base.state = CMNDLG_INIT;
 	
 	st_params->base.tempBuffer = memsceMalloc( ( CMNDLG_GET_NUMBERS_MAX_DIGITS + 1 ) * st_params->numberOfData );
-	if( ! st_params->base.tempBuffer ) return -2;
+	if( ! st_params->base.tempBuffer ) return CG_ERROR_NOT_ENOUGH_MEMORY;
 	
 	for( i = 0; i < params->numberOfData; i++ ){
 		if( st_params->data[i].numDigits > CMNDLG_GET_NUMBERS_MAX_DIGITS ){
 			st_params->data[i].numDigits = CMNDLG_GET_NUMBERS_MAX_DIGITS;
 		} else if( st_params->data[i].numDigits <= 0 ){
-			return -2;
+			return CG_ERROR_INVALID_ARGUMENT;
 		}
 		
 		if( st_params->data[i].selectedPlace > st_params->data[i].numDigits - 1 ){
