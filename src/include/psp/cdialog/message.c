@@ -44,6 +44,9 @@ int cdialogMessageInit( CdialogMessageParams *params )
 	st_params->data.title[0]   = '\0';
 	st_params->data.options    = 0;
 	st_params->data.message[0] = '\0';
+	st_params->data.width      = 0;
+	st_params->data.height     = 0;
+	st_params->data.callback   = NULL;
 	
 	return CG_ERROR_OK;
 }
@@ -86,6 +89,10 @@ int cdialogMessageStartNoLock( unsigned short x, unsigned short y )
 	/* ƒ_ƒCƒAƒƒO‚Ì•‚Æ‚‚³‚ðŒŸo */
 	cdialog_message_count_width_and_height( st_params->data.message, &w, &h );
 	
+	/* ŒÅ’èc•/‰¡•‚ªŽw’è‚³‚ê‚Ä‚¢‚é‚©’²‚×‚é */
+	if( st_params->data.width  ) w = st_params->data.width;
+	if( st_params->data.height ) h = st_params->data.height;
+	
 	/* ŒÅ’è•‚ÆŒÅ’ès‚ð‰ÁŽZ */
 	st_params->base.width  = w + pbOffsetChar( 2 );
 	st_params->base.height = h + pbOffsetLine( 6 );
@@ -113,9 +120,9 @@ int cdialogMessageUpdate( void )
 	cdialog_message_draw( &(st_params->base), &(st_params->data) );
 	cdialogDevReadCtrlBuffer( &(st_params->base), &pad, NULL );
 	
-	if( pad.Buttons & PSP_CTRL_CIRCLE ){
+	if( pad.Buttons & cdialogDevAcceptButton() ){
 		st_params->base.result = CDIALOG_ACCEPT;
-	} else if( ( pad.Buttons & PSP_CTRL_CROSS ) && ( st_params->data.options & CDIALOG_MESSAGE_YESNO ) ){
+	} else if( ( pad.Buttons & cdialogDevCancelButton() ) && ( st_params->data.options & CDIALOG_MESSAGE_YESNO ) ){
 		st_params->base.result = CDIALOG_CANCEL;
 	}
 	
@@ -173,7 +180,13 @@ static void cdialog_message_count_width_and_height( const char *str, unsigned in
 
 static void cdialog_message_draw( struct cdialog_dev_base_params *base, CdialogMessageData *data )
 {
-	const char *ans = data->options & CDIALOG_MESSAGE_YESNO ? CDIALOG_MESSAGE_ANS_YESNO : CDIALOG_MESSAGE_ANS_OK;
+	char ans[32];
+	
+	if( data->options & CDIALOG_MESSAGE_YESNO ){
+		snprintf( ans, sizeof( ans ), "[%s]%s [%s]%s", cdialogDevAcceptSymbol(), CDIALOG_STR_MESSAGE_YES, cdialogDevCancelSymbol(), CDIALOG_STR_MESSAGE_NO );
+	} else{
+		snprintf( ans, sizeof( ans ), "[%s]%s", cdialogDevAcceptSymbol(), CDIALOG_STR_MESSAGE_OK );
+	}
 	
 	/* ˜g‚ð•`‰æ */
 	pbFillRectRel( base->x, base->y, base->width, base->height, base->color->bg );
@@ -195,6 +208,7 @@ static void cdialog_message_draw( struct cdialog_dev_base_params *base, CdialogM
 		PB_TRANSPARENT,
 		data->message
 	);
+	if( data->callback ) ( data->callback )( base->x + pbOffsetChar( 1 ), base->y + pbOffsetLine( 3 ), base->color );
 	
 	pbPrint(
 		base->x + ( base->width >> 1 ) - ( pbMeasureString( ans ) >> 1 ),

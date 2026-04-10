@@ -178,11 +178,14 @@ void mfAnalogStickMenu( MfMenuMessage message )
 			pbPoint( pbOffsetChar( 60 ) + ( ( pad_dupe.Lx - PADUTIL_CENTER_X  ) >> 1 ), pbOffsetLine( 18 ) + ( ( pad_dupe.Ly - PADUTIL_CENTER_Y ) >> 1 ), MF_COLOR_TEXT_FG );
 			
 			pad_dupe.Buttons |= padutilGetAnalogStickDirection( pad_dupe.Lx, pad_dupe.Ly, 0 );
-			pbPrint( pbOffsetChar( 3 ), pbOffsetLine( 24 ),  MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, MF_STR_ASA_TEST_DIR );
-			pbPrint( pbOffsetChar( 32 + 5 ), pbOffsetLine( 23 ), pad_dupe.Buttons & PADUTIL_CTRL_ANALOG_UP    ? MF_COLOR_TEXT_FC : MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, PB_SYM_PSP_UP );
-			pbPrint( pbOffsetChar( 32 + 7 ), pbOffsetLine( 24 ), pad_dupe.Buttons & PADUTIL_CTRL_ANALOG_RIGHT ? MF_COLOR_TEXT_FC : MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, PB_SYM_PSP_RIGHT );
-			pbPrint( pbOffsetChar( 32 + 5 ), pbOffsetLine( 25 ), pad_dupe.Buttons & PADUTIL_CTRL_ANALOG_DOWN  ? MF_COLOR_TEXT_FC : MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, PB_SYM_PSP_DOWN );
-			pbPrint( pbOffsetChar( 32 + 3 ), pbOffsetLine( 24 ), pad_dupe.Buttons & PADUTIL_CTRL_ANALOG_LEFT  ? MF_COLOR_TEXT_FC : MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, PB_SYM_PSP_LEFT );
+			{
+				unsigned short test_cross_offset = pbMeasureString( MF_STR_ASA_TEST_DIR ) + pbOffsetChar( 1 );
+				pbPrint( pbOffsetChar( 3 ), pbOffsetLine( 24 ),  MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, MF_STR_ASA_TEST_DIR );
+				pbPrint( test_cross_offset + pbOffsetChar( 5 ), pbOffsetLine( 23 ), pad_dupe.Buttons & PADUTIL_CTRL_ANALOG_UP    ? MF_COLOR_TEXT_FC : MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, PB_SYM_PSP_UP );
+				pbPrint( test_cross_offset + pbOffsetChar( 7 ), pbOffsetLine( 24 ), pad_dupe.Buttons & PADUTIL_CTRL_ANALOG_RIGHT ? MF_COLOR_TEXT_FC : MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, PB_SYM_PSP_RIGHT );
+				pbPrint( test_cross_offset + pbOffsetChar( 5 ), pbOffsetLine( 25 ), pad_dupe.Buttons & PADUTIL_CTRL_ANALOG_DOWN  ? MF_COLOR_TEXT_FC : MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, PB_SYM_PSP_DOWN );
+				pbPrint( test_cross_offset + pbOffsetChar( 3 ), pbOffsetLine( 24 ), pad_dupe.Buttons & PADUTIL_CTRL_ANALOG_LEFT  ? MF_COLOR_TEXT_FC : MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, PB_SYM_PSP_LEFT );
+			}
 			pbPrint( pbOffsetChar( 3 ), pbOffsetLine( 27 ),  MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, MF_STR_ASA_TEST_MOVE );
 			pbPrintf( pbOffsetChar( 5 ), pbOffsetLine( 28 ), MF_COLOR_TEXT_FC, MF_COLOR_TEXT_BG, "%s (X,Y) = ( %03d , %03d )", MF_STR_ASA_TEST_MOVE_RAW, pad->Lx, pad->Ly );
 			pbPrintf( pbOffsetChar( 5 ), pbOffsetLine( 29 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, "%s (X,Y) = ( %03d , %03d )", MF_STR_ASA_TEST_MOVE_ADJ, pad_dupe.Lx, pad_dupe.Ly );

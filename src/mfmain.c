@@ -60,7 +60,7 @@ static void mf_init( void )
 	
 	/*
 		実行環境を取得
-		合計で10秒程度待つ。
+		合計で12秒程度待つ。
 	*/
 	dbgprint( "Detecting world..." );
 	st_world = MF_WORLD_GAME;
@@ -77,7 +77,7 @@ static void mf_init( void )
 #endif
 		}
 		dbgprint( "Waiting for loading modules..." );
-		sceKernelDelayThread( 2000000 );
+		//sceKernelDelayThread( 2000000 );
 	}
 	
 	/* フックアドレスを取得 */

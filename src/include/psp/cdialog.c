@@ -18,6 +18,12 @@ static SceUID                    st_semaid;
 static struct cdialog_dev_color  st_color;
 static PadutilRemap              *st_remap;
 
+static unsigned int st_envvar;
+
+/* ヘルプメッセージ用 */
+static struct cdialog_dev_help *st_help;
+static size_t st_help_count;
+
 /*=========================================================
 	関数
 =========================================================*/
@@ -35,7 +41,19 @@ bool cdialogInit( void )
 	st_color.help   = 0xffaa0000;
 	st_color.extra  = 0xffff0000;
 	
+	st_envvar = 0;
+	
 	return true;
+}
+
+void cdialogEnable( unsigned int env )
+{
+	st_envvar |= env;
+}
+
+void cdialogDisable( unsigned int env )
+{
+	st_envvar &= ~env;
 }
 
 void cdialogFinish( void )
@@ -66,6 +84,31 @@ bool cdialogDevUnlock( void )
 	return ret < 0 ? false : true;
 }
 
+unsigned int cdialogDevGetEnvvar( void )
+{
+	return st_envvar;
+}
+
+unsigned int cdialogDevAcceptButton( void )
+{
+	return st_envvar & CDIALOG_ACCEPT_CROSS ? PSP_CTRL_CROSS : PSP_CTRL_CIRCLE;
+}
+
+unsigned int cdialogDevCancelButton( void )
+{
+	return st_envvar & CDIALOG_ACCEPT_CROSS ? PSP_CTRL_CIRCLE : PSP_CTRL_CROSS;
+}
+
+char *cdialogDevAcceptSymbol( void )
+{
+	return st_envvar & CDIALOG_ACCEPT_CROSS ? PB_SYM_PSP_CROSS : PB_SYM_PSP_CIRCLE;
+}
+
+char *cdialogDevCancelSymbol( void )
+{
+	return st_envvar & CDIALOG_ACCEPT_CROSS ? PB_SYM_PSP_CIRCLE: PB_SYM_PSP_CROSS;
+}
+
 void cdialogDevInitBaseParams( struct cdialog_dev_base_params *params )
 {
 	params->status = CDIALOG_INIT;
@@ -81,6 +124,7 @@ void cdialogDevInitBaseParams( struct cdialog_dev_base_params *params )
 	params->analogStick.deadzone    = 40;
 	params->analogStick.sensitivity = 1.0f;
 	params->remap = NULL;
+	params->help = NULL;
 }
 
 int cdialogDevPrepareToStart( struct cdialog_dev_base_params *params, unsigned int options )
@@ -137,3 +181,26 @@ PadutilButtons cdialogDevReadCtrlBuffer( struct cdialog_dev_base_params *params,
 	
 	return (PadutilButtons)( padutilSetPad( real_pad.Buttons ) | padutilSetHprm( real_hprmkey ) );
 }
+
+void cdialogDevHelp( struct cdialog_dev_help *help, unsigned short x, unsigned short y, const char *str )
+{
+	help->x   = x;
+	help->y   = y;
+	help->str = str;
+}
+
+void cdialogDevSetHelp( struct cdialog_dev_help *help, size_t count )
+{
+	st_help = help;
+	st_help_count = count;
+}
+
+int cdialogDevDrawHelp( unsigned short x, unsigned short y, struct cdialog_dev_color *colors )
+{
+	size_t count = st_help_count;
+	while( count-- ){
+		pbPrint( x + st_help[count].x, y + st_help[count].y, colors->fg, PB_TRANSPARENT, st_help[count].str );
+	}
+	return CG_ERROR_OK;
+}
+

@@ -175,10 +175,10 @@ void remapMenu( MfMenuMessage message )
 					if( ! st_params.remapList ){
 						mfMenuSetInfoText( MF_MENU_INFOTEXT_COMMON_CTRL | MF_MENU_INFOTEXT_MOVABLEPAGE_CTRL | MF_MENU_INFOTEXT_SET_LOWER_LINE, "(L/R)%s, (%s)%s", MF_STR_REMAP_CTRL_SWITCH_COLUMN, PB_SYM_PSP_TRIANGLE, MF_STR_REMAP_CTRL_ADD );
 					} else{
-						mfMenuSetInfoText( MF_MENU_INFOTEXT_COMMON_CTRL | MF_MENU_INFOTEXT_MOVABLEPAGE_CTRL | MF_MENU_INFOTEXT_SET_LOWER_LINE, "(L/R)%s, (%s)%s, (%s)%s, (%s)%s", MF_STR_REMAP_CTRL_SWITCH_COLUMN, PB_SYM_PSP_TRIANGLE, MF_STR_REMAP_CTRL_ADD, PB_SYM_PSP_SQUARE, MF_STR_REMAP_CTRL_DELETE, PB_SYM_PSP_CIRCLE, MF_STR_REMAP_CTRL_EDIT_REMAP );
+						mfMenuSetInfoText( MF_MENU_INFOTEXT_COMMON_CTRL | MF_MENU_INFOTEXT_MOVABLEPAGE_CTRL | MF_MENU_INFOTEXT_SET_LOWER_LINE, "(L/R)%s, (%s)%s, (%s)%s, (%s)%s", MF_STR_REMAP_CTRL_SWITCH_COLUMN, PB_SYM_PSP_TRIANGLE, MF_STR_REMAP_CTRL_ADD, PB_SYM_PSP_SQUARE, MF_STR_REMAP_CTRL_DELETE, mfMenuAcceptSymbol(), MF_STR_REMAP_CTRL_EDIT_REMAP );
 					}
 					if( buttons ){
-						if( buttons & PSP_CTRL_CROSS ){
+						if( buttons & mfMenuCancelButton() ){
 							mfMenuProc( NULL );
 						} else if( buttons & PSP_CTRL_TRIANGLE ){
 							if( remap_add( &st_params ) ){
@@ -187,7 +187,7 @@ void remapMenu( MfMenuMessage message )
 						} else if( buttons & ( PSP_CTRL_LTRIGGER | PSP_CTRL_RTRIGGER ) ){
 							column = REMAP_COLUMN_MENU;
 						} else if( st_params.selected ){
-							if( buttons & PSP_CTRL_CIRCLE ){
+							if( buttons & mfMenuAcceptButton() ){
 								mfDialogDetectbuttonsInit( MF_STR_REMAP_DIAGBUTTON_REMAP, MF_TARGET_BUTTONS, &(st_params.selected->remapButtons) );
 							} else if( buttons & PSP_CTRL_SQUARE ){
 								remap_delete( &st_params );

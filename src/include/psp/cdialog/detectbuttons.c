@@ -141,12 +141,12 @@ int cdialogDetectbuttonsUpdate( void )
 			padutilGetButtonNamesByCode( st_params->work.buttonNames, st_params->work.buttons, " ", 0, st_params->work.buf, CDIALOG_DETECTBUTTONS_BUF_LENGTH );
 		}
 	} else{
-		if( pad.Buttons & PSP_CTRL_CIRCLE ){
+		if( pad.Buttons & cdialogDevAcceptButton() ){
 			st_params->work.buttons        = 0;
 			st_params->work.detecting      = true;
 			st_params->work.waitForRelease = true;
 			st_params->work.buf[0]         = '\0';
-		} else if( pad.Buttons & PSP_CTRL_CROSS ){
+		} else if( pad.Buttons & cdialogDevCancelButton() ){
 			st_params->base.result = CDIALOG_CANCEL;
 		} else if( pad.Buttons & PSP_CTRL_SQUARE ){
 			st_params->work.buttons = 0;
@@ -257,10 +257,13 @@ void cdialog_detectbuttons_draw( struct cdialog_dev_base_params *base, CdialogDe
 			base->y + pbOffsetLine( 5 ),
 			base->color->fg,
 			PB_TRANSPARENT,
-			"%s\n%s\n%s\n%s",
-			CDIALOG_STR_DETECTBUTTONS_START,
-			CDIALOG_STR_DETECTBUTTONS_CLEAR,
-			CDIALOG_STR_DETECTBUTTONS_CANCEL,
+			"  %s  : %s\n"
+			"  %s  : %s\n"
+			"  %s  : %s\n"
+			"START: %s",
+			cdialogDevAcceptSymbol(), CDIALOG_STR_DETECTBUTTONS_START,
+			PB_SYM_PSP_SQUARE,        CDIALOG_STR_DETECTBUTTONS_CLEAR,
+			cdialogDevCancelSymbol(), CDIALOG_STR_DETECTBUTTONS_CANCEL,
 			CDIALOG_STR_DETECTBUTTONS_ACCEPT
 		);
 	}

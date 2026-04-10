@@ -2,10 +2,10 @@
 # 例外ハンドラを設定する:
 #     make WITH_EXCEPTION_HANDLER=1
 #
-# PSPLINK用にデバッグメッセージをprintf出力する (スタックサイズに注意する):
+# PSPLINK用にデバッグメッセージをprintf出力する:
 #     make WITH_PSPLINK_DEBUG=1
 #
-# メモリの割り付け/解放をPSPLINKへ出力 (スタックサイズに注意する):
+# メモリの割り付け/解放をPSPLINKへ出力 (使用するスタックメモリが増えることに注意)
 #     make WITH_MEMORY_DEBUG=1
 #
 # 日本語フォントと日本語表示サポート:
@@ -35,14 +35,14 @@ USE_KERNEL_LIBC = 1
 # 優先的にカーネルモードのライブラリ(psp***_driver)をリンクしようとするみたい。
 USE_KERNEL_LIBS = 1
 
-DIR_CLASSG = include
+DIR_CLASSG = ./include
 
 INCDIR   = $(DIR_CLASSG)
 CFLAGS   = -Os -G 0 -Wall -fno-strict-aliasing
 ASFLAGS  = $(CFLAGS)
 LIBDIR   = 
 LDFLAGS  = 
-LIBS     = -lpsppower_driver -lpsphprm_driver -lpspge -lpsprtc -lm
+LIBS     = -lpsppower_driver -lpsphprm_driver -lpspge -lpsprtc -lpsputility -lm
 
 OBJS = exports.o \
        sceDmac.o \

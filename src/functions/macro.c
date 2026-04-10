@@ -581,7 +581,7 @@ static void macro_menu_save( MfMenuMessage message )
 		if( (st_slot[st_current_slot].name)[0] != '\0' ){
 			snprintf( name, MACRO_NAME_LENGTH + 4, "%s.ini", st_slot[st_current_slot].name );
 		} else{
-			strutilCopy( name, "macro.ini", MACRO_NAME_LENGTH + 4 );
+			snprintf( name, MACRO_NAME_LENGTH + 4, "macro%d.ini", st_current_slot + 1 );
 		}
 		
 		if( ! mfDialogGetfilenameInit( MF_STR_MACRO_DIAGGETFN_SAVE, "ms0:", name, path, 255, CDIALOG_GETFILENAME_SAVE | CDIALOG_GETFILENAME_OVERWRITEPROMPT  ) ){

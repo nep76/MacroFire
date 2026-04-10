@@ -81,6 +81,11 @@
 #define PB_SYM_PSP_SQUARE   "\x87"
 #define PB_SYM_PSP_NOTE     "\x88"
 #endif
+#define PB_SYM_PSP_START    "START"
+#define PB_SYM_PSP_SELECT   "SELECT"
+#define PB_SYM_PSP_LTRIGGER "L"
+#define PB_SYM_PSP_RTRIGGER "R"
+#define PB_SYM_PSP_HOME     "HOME"
 
 #ifdef __cplusplus
 extern "C" {

@@ -1,4 +1,4 @@
-MacroFire 3.0.9
+MacroFire 3.0.10
 
 
 Macro settings
@@ -10,7 +10,7 @@ Macro settings
     スロットごとにマクロは保存され、最大10まで保存できます。
     ただし、空きメモリの関係で10全てを満足に使えるとは限りません。
 
-    この項目にカーソルを合わせて三角ボタンをおすと、
+    この項目にカーソルを合わせて△ボタンをおすと、
     このマクロに名前を付けることができます。
 
 
@@ -83,11 +83,11 @@ Edit macro
                    となっていると、最終的に○と×の二つが押される状態になる。
 
     Buttons release: ボタンを放す。
-                      Buttons press同様に、直前の状態から指定されたボタンが放される形になる。
-                        Buttons press  : ○ △
-                        Buttons press  : ×
-                        Buttons release: △
-                      となっていると、最終的に○と×の二つが押される状態になる。
+                       Buttons press同様に、直前の状態から指定されたボタンが放される形になる。
+                       Buttons press  : ○ △
+                       Buttons press  : ×
+                       Buttons release: △
+                     となっていると、最終的に○と×の二つが押される状態になる。
 
     Buttons change: ボタンの状態を変更する。
                     Buttons pressとButtons releaseが同時に起きたときに発生するコマンドで、

@@ -21,6 +21,10 @@ extern "C" {
 	å^êÈåæ
 =========================================================*/
 typedef enum {
+	CDIALOG_ACCEPT_CROSS = 0x00000001,
+} CdialogEnvFlags;
+
+typedef enum {
 	CDIALOG_NONE = 0,
 	CDIALOG_INIT,
 	CDIALOG_VISIBLE,
@@ -44,6 +48,8 @@ bool cdialogInit( void );
 void cdialogFinish( void );
 void cdialogSetRemap( PadutilRemap *remap );
 void cdialogClearRemap( void );
+void cdialogEnable( unsigned int opt );
+void cdialogDisable( unsigned int opt );
 unsigned int cdialogGetLastError( void );
 unsigned int cdialogGetLastSysError( void );
 

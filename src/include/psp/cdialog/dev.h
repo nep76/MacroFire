@@ -52,6 +52,11 @@ struct cdialog_dev_color {
 	unsigned int extra;
 };
 
+typedef struct cdialog_dev_help {
+	unsigned short x, y;
+	const char *str;
+} CdialogDevHelp;
+
 struct cdialog_dev_base_params {
 	CdialogStatus status;
 	CdialogResult result;
@@ -61,6 +66,7 @@ struct cdialog_dev_base_params {
 	PadctrlUID paduid;
 	PadutilAnalogStick analogStick;
 	PadutilRemap *remap;
+	CdialogDevHelp *help;
 };
 
 /*=========================================================
@@ -68,12 +74,20 @@ struct cdialog_dev_base_params {
 =========================================================*/
 bool cdialogDevLock( void );
 bool cdialogDevUnlock( void );
+unsigned int cdialogDevGetEnvvar( void );
+unsigned int cdialogDevAcceptButton( void );
+unsigned int cdialogDevCancelButton( void );
+char *cdialogDevAcceptSymbol( void );
+char *cdialogDevCancelSymbol( void );
 void cdialogDevInitBaseParams( struct cdialog_dev_base_params *params );
 int cdialogDevPrepareToStart( struct cdialog_dev_base_params *params, unsigned int options );
 void cdialogDevPrepareToFinish( struct cdialog_dev_base_params *params );
 void cdialogDevSetAnalogStickAdjust( struct cdialog_dev_base_params *params, PadutilCoord x, PadutilCoord y, PadutilCoord deadzone, PadutilSensitivity sens );
 void cdialogDevSetRepeatButtons( struct cdialog_dev_base_params *params, unsigned int buttons );
 PadutilButtons cdialogDevReadCtrlBuffer( struct cdialog_dev_base_params *params, SceCtrlData *pad, u32 *hprmkey );
+void cdialogDevHelp( struct cdialog_dev_help *help, unsigned short x, unsigned short y, const char *str );
+void cdialogDevSetHelp( struct cdialog_dev_help *help, size_t count );
+int cdialogDevDrawHelp( unsigned short x, unsigned short y, struct cdialog_dev_color *colors );
 
 #ifdef __cplusplus
 }

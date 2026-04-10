@@ -143,17 +143,18 @@ int cdialogNumeditUpdate( void )
 			cdialogMessageDestroy();
 			st_params->showMessage = false;
 			padctrlResetRepeat( st_params->base.paduid );
+			memoryFree( st_params->base.help );
 		}
 		return 0;
 	}
 	
 	cdialogDevReadCtrlBuffer( &(st_params->base), &pad, NULL );
 	
-	if( pad.Buttons & PSP_CTRL_CIRCLE ){
+	if( pad.Buttons & ( cdialogDevAcceptButton() | PSP_CTRL_START ) ){
 		uint32_t value = strtoul( st_params->work.numbers, NULL, 10 );
 		cdialog_numedit_set_number( st_params->data.num, st_params->data.max, &value );
 		st_params->base.result = CDIALOG_ACCEPT;
-	} else if( pad.Buttons & PSP_CTRL_CROSS ){
+	} else if( pad.Buttons & cdialogDevCancelButton() ){
 		st_params->base.result = CDIALOG_CANCEL;
 	} else if( pad.Buttons & PSP_CTRL_RIGHT ){
 		if( st_params->work.pos == st_params->work.maxdigits - 1 ){
@@ -172,11 +173,25 @@ int cdialogNumeditUpdate( void )
 	} else if( pad.Buttons & PSP_CTRL_DOWN ){
 		cdialog_numedit_rotate( CDIALOG_NUMEDIT_ROTATE_DOWN, &(st_params->work), st_params->data.max );
 	} else if( pad.Buttons & PSP_CTRL_HOME ){
-		if( cdialogMessageInit( NULL ) == 0 ){
+		st_params->base.help = memoryAlloc( sizeof( CdialogDevHelp ) * 8 );
+		if( st_params->base.help && cdialogMessageInit( NULL ) == 0 ){
 			CdialogMessageData *data = cdialogMessageGetData();
-			strutilCopy( data->title,   CDIALOG_STR_HELP_LABEL,   CDIALOG_MESSAGE_TITLE_LENGTH );
-			strutilCopy( data->message, CDIALOG_STR_NUMEDIT_HELP, CDIALOG_MESSAGE_LENGTH );
 			data->options = CDIALOG_DISPLAY_CENTER;
+			strutilCopy( data->title, CDIALOG_STR_HELP_LABEL, CDIALOG_MESSAGE_TITLE_LENGTH );
+			data->width  = pbOffsetChar( CDIALOG_NUMEDIT_HELP_WIDTH );
+			data->height = pbOffsetLine(  5 );
+			data->callback = cdialogDevDrawHelp;
+			cdialogDevSetHelp( st_params->base.help, 8 );
+			
+			cdialogDevHelp( &st_params->base.help[0], 0,                 0,                 PB_SYM_PSP_LEFT PB_SYM_PSP_RIGHT );
+			cdialogDevHelp( &st_params->base.help[1], pbOffsetChar( 4 ), 0,                 CDIALOG_STR_NUMEDIT_HELP_MOVE );
+			cdialogDevHelp( &st_params->base.help[2], 0,                 pbOffsetLine( 1 ), PB_SYM_PSP_UP PB_SYM_PSP_DOWN );
+			cdialogDevHelp( &st_params->base.help[3], pbOffsetChar( 4 ), pbOffsetLine( 1 ), CDIALOG_STR_NUMEDIT_HELP_CHANGEVALUE );
+			cdialogDevHelp( &st_params->base.help[4], 0,                 pbOffsetLine( 3 ), PB_SYM_PSP_START );
+			cdialogDevHelp( &st_params->base.help[5], pbOffsetChar( 6 ), pbOffsetLine( 3 ), CDIALOG_STR_HELP_ACCEPT );
+			cdialogDevHelp( &st_params->base.help[6], 0,                 pbOffsetLine( 4 ), cdialogDevCancelSymbol() );
+			cdialogDevHelp( &st_params->base.help[7], pbOffsetChar( 6 ), pbOffsetLine( 4 ), CDIALOG_STR_HELP_CANCEL );
+			
 			if( cdialogMessageStartNoLock( 0, 0 ) < 0 ){
 				cdialogMessageShutdownStartNoLock();
 			} else{

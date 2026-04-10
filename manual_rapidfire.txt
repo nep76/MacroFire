@@ -1,4 +1,4 @@
-MacroFire 3.0.9
+MacroFire 3.0.10
 
 
 Rapidfire settings

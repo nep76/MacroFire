@@ -16,9 +16,6 @@
 #define CDIALOG_MESSAGE_TITLE_LENGTH 32
 #define CDIALOG_MESSAGE_LENGTH       512
 
-#define CDIALOG_MESSAGE_ANS_YESNO "[" PB_SYM_PSP_CIRCLE "]" CDIALOG_STR_MESSAGE_YES " [" PB_SYM_PSP_CROSS "]" CDIALOG_STR_MESSAGE_NO
-#define CDIALOG_MESSAGE_ANS_OK    "[" PB_SYM_PSP_CIRCLE "]" CDIALOG_STR_MESSAGE_OK
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -30,10 +27,15 @@ typedef enum {
 	CDIALOG_MESSAGE_YESNO = 0x00000001,
 } CdialogMessageOptions;
 
+typedef int ( *CdialogMessageCallback )( unsigned short x, unsigned short y, struct cdialog_dev_color *colors );
+
 typedef struct {
 	char title[CDIALOG_MESSAGE_TITLE_LENGTH];
 	unsigned int options;
 	char message[CDIALOG_MESSAGE_LENGTH];
+	
+	unsigned int width, height;
+	CdialogMessageCallback callback;
 } CdialogMessageData;
 
 typedef struct {

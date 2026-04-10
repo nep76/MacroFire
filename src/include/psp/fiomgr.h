@@ -21,7 +21,7 @@
 	É}ÉNÉç
 =========================================================*/
 #define FH_PATH_MAX     255
-                        
+
 #define FH_O_RDONLY     PSP_O_RDONLY
 #define FH_O_WRONLY     PSP_O_WRONLY
 #define FH_O_RDWR       PSP_O_RDWR
@@ -33,7 +33,7 @@
 #define FH_O_NOWAIT     PSP_O_NOWAIT
 #define FH_O_LARGEFILE  0x80000000
 #define FH_O_ALLOC_HIGH 0x40000000
-                        
+
 #define FH_SEEK_SET     PSP_SEEK_SET
 #define FH_SEEK_END     PSP_SEEK_END
 #define FH_SEEK_CUR     PSP_SEEK_CUR

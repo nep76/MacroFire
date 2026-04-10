@@ -10,6 +10,7 @@
 #include <pspimpose_driver.h>
 #include <pspsdk.h>
 #include <pspsuspend.h>
+#include <psputility.h>
 #include <stdarg.h>
 #include "psp/memory.h"
 #include "psp/heap.h"
@@ -83,6 +84,12 @@ struct mf_menu_input {
 	SceCtrlData *pad;
 	MfHprmKey   *hprmKey;
 	PadctrlUID  uid;
+	
+	unsigned int acceptButton;
+	unsigned int cancelButton;
+	
+	char *acceptSymbol;
+	char *cancelSymbol;
 };
 
 struct mf_menu_pref {
@@ -437,7 +444,7 @@ bool mfMenuDrawTables( MfMenuTable menu[], unsigned short menucnt, unsigned int 
 	}
 	
 	/* BACKの検出 */
-	if( mfMenuIsPressed( PSP_CTRL_CROSS ) ) return false;
+	if( mfMenuIsPressed( mfMenuCancelButton() ) ) return false;
 	
 	/* オプション処理 */
 	if( ( opt & MF_MENU_DISPLAY_ONLY ) || message == MF_CM_EXTRA ) return true;
@@ -556,6 +563,27 @@ bool mfMenuDrawTables( MfMenuTable menu[], unsigned short menucnt, unsigned int 
 	if( refind ) st_params->menu = dupe_pos;
 	
 	return true;
+}
+
+
+unsigned int mfMenuAcceptButton( void )
+{
+	return st_params->ctrl.acceptButton;
+}
+
+unsigned int mfMenuCancelButton( void )
+{
+	return st_params->ctrl.cancelButton;
+}
+
+char *mfMenuAcceptSymbol( void )
+{
+	return st_params->ctrl.acceptSymbol;
+}
+
+char *mfMenuCancelSymbol( void )
+{
+	return st_params->ctrl.cancelSymbol;
 }
 
 inline SceCtrlData *mfMenuGetCurrentPadData( void )
@@ -1125,10 +1153,36 @@ void mfMenuMain( SceCtrlData *pad, MfHprmKey *hk )
 		st_params->ctrl.uid = 0;
 		goto DESTROY;
 	}
-	padctrlSetRepeatButtons( st_params->ctrl.uid,
-		PSP_CTRL_UP | PSP_CTRL_RIGHT | PSP_CTRL_DOWN | PSP_CTRL_LEFT |
-		PSP_CTRL_CIRCLE | PSP_CTRL_SQUARE | PSP_CTRL_RTRIGGER | PSP_CTRL_LTRIGGER
-	);
+	
+	{
+		/* ○×ボタン入れ替えチェック */
+		int ox_swap;
+		
+		if( sceUtilityGetSystemParamInt( PSP_SYSTEMPARAM_ID_INT_UNKNOWN,  &ox_swap ) == PSP_SYSTEMPARAM_RETVAL_FAIL ){
+			ox_swap = PSP_UTILITY_ACCEPT_CIRCLE;
+		}
+		if( ox_swap == PSP_UTILITY_ACCEPT_CROSS ){
+			st_params->ctrl.acceptButton = PSP_CTRL_CROSS;
+			st_params->ctrl.cancelButton = PSP_CTRL_CIRCLE;
+			st_params->ctrl.acceptSymbol = PB_SYM_PSP_CROSS;
+			st_params->ctrl.cancelSymbol = PB_SYM_PSP_CIRCLE;
+			
+			/* ×ボタンが決定の場合、ダイアログの環境フラグをセット */
+			cdialogEnable( CDIALOG_ACCEPT_CROSS );
+		} else{
+			st_params->ctrl.acceptButton = PSP_CTRL_CIRCLE;
+			st_params->ctrl.cancelButton = PSP_CTRL_CROSS;
+			st_params->ctrl.acceptSymbol = PB_SYM_PSP_CIRCLE;
+			st_params->ctrl.cancelSymbol = PB_SYM_PSP_CROSS;
+			
+			
+		}
+		/* リピートボタンを設定 */
+		padctrlSetRepeatButtons( st_params->ctrl.uid,
+			PSP_CTRL_UP | PSP_CTRL_RIGHT | PSP_CTRL_DOWN | PSP_CTRL_LEFT |
+			st_params->ctrl.acceptButton | PSP_CTRL_SQUARE | PSP_CTRL_RTRIGGER | PSP_CTRL_LTRIGGER
+		);
+	}
 	
 	mfMenuEnable( MF_MENU_SCREEN_UPDATE );
 	
@@ -1281,12 +1335,12 @@ void mfMenuSetInfoText( unsigned int options, char *format, ... )
 		if( options & MF_MENU_INFOTEXT_MULTICOLUMN_CTRL ){
 			strtop += snprintf( strtop, MF_MENU_INFOTEXT_LENGTH, "(%s%s%s%s)%s, ", PB_SYM_PSP_UP, PB_SYM_PSP_RIGHT, PB_SYM_PSP_DOWN, PB_SYM_PSP_LEFT, MF_STR_CTRL_MOVE );
 		} else if( options & MF_MENU_INFOTEXT_MOVABLEPAGE_CTRL ){
-			strtop += snprintf( strtop, MF_MENU_INFOTEXT_LENGTH, "(%s%s)%s, (%s%s)%s, ", PB_SYM_PSP_UP, PB_SYM_PSP_DOWN, PB_SYM_PSP_LEFT, PB_SYM_PSP_RIGHT, MF_STR_CTRL_MOVE, MF_STR_CTRL_PAGEMOVE );
+			strtop += snprintf( strtop, MF_MENU_INFOTEXT_LENGTH, "(%s%s)%s, (%s%s)%s, ", PB_SYM_PSP_UP, PB_SYM_PSP_DOWN, MF_STR_CTRL_MOVE, PB_SYM_PSP_LEFT, PB_SYM_PSP_RIGHT, MF_STR_CTRL_PAGEMOVE );
 		} else{
 			strtop += snprintf( strtop, MF_MENU_INFOTEXT_LENGTH, "(%s%s)%s, ", PB_SYM_PSP_UP, PB_SYM_PSP_DOWN, MF_STR_CTRL_MOVE );
 		}
 		
-		strtop += snprintf( strtop, MF_MENU_INFOTEXT_LENGTH, "(%s)%s, (START/HOME)%s", PB_SYM_PSP_CROSS, MF_STR_CTRL_BACK, MF_STR_CTRL_EXIT );
+		strtop += snprintf( strtop, MF_MENU_INFOTEXT_LENGTH, "(%s)%s, (START/HOME)%s", mfMenuCancelSymbol(), MF_STR_CTRL_BACK, MF_STR_CTRL_EXIT );
 	}
 	
 	if( options & MF_MENU_INFOTEXT_SET_LOWER_LINE ){

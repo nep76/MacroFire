@@ -26,10 +26,10 @@ bool mfCtrlDefBool( MfMessage message, const char *label, void *var, void *unuse
 			mfCtrlSetLabel( ex, "%s: %s", label, *((bool *)var) ? MF_STR_CTRL_ON : MF_STR_CTRL_OFF );
 			break;
 		case MF_CM_INFO:
-			mfMenuSetInfoText( *((unsigned int *)ex) | MF_MENU_INFOTEXT_COMMON_CTRL | MF_MENU_INFOTEXT_SET_LOWER_LINE, "(%s/%s)%s", PB_SYM_PSP_SQUARE, PB_SYM_PSP_CIRCLE, MF_STR_CTRL_TOGGLE_SWITCH );
+			mfMenuSetInfoText( *((unsigned int *)ex) | MF_MENU_INFOTEXT_COMMON_CTRL | MF_MENU_INFOTEXT_SET_LOWER_LINE, "(%s/%s)%s", PB_SYM_PSP_SQUARE, mfMenuAcceptSymbol(), MF_STR_CTRL_TOGGLE_SWITCH );
 			break;
 		case MF_CM_PROC:
-			if( mfMenuIsAnyPressed( PSP_CTRL_CIRCLE | PSP_CTRL_SQUARE ) ) *((bool *)var) = *((bool *)var) ? false : true;
+			if( mfMenuIsAnyPressed( mfMenuAcceptButton() | PSP_CTRL_SQUARE ) ) *((bool *)var) = *((bool *)var) ? false : true;
 			break;
 	}
 	return true;
@@ -49,10 +49,10 @@ bool mfCtrlDefOptions( MfMessage message, const char *label, void *var, void *it
 			}
 			break;
 		case MF_CM_INFO:
-			mfMenuSetInfoText( *((unsigned int *)ex) | MF_MENU_INFOTEXT_COMMON_CTRL | MF_MENU_INFOTEXT_SET_LOWER_LINE, "(%s/%s)%s", PB_SYM_PSP_SQUARE, PB_SYM_PSP_CIRCLE, MF_STR_CTRL_CHANGE_OPTION );
+			mfMenuSetInfoText( *((unsigned int *)ex) | MF_MENU_INFOTEXT_COMMON_CTRL | MF_MENU_INFOTEXT_SET_LOWER_LINE, "(%s/%s)%s", PB_SYM_PSP_SQUARE, mfMenuAcceptSymbol(), MF_STR_CTRL_CHANGE_OPTION );
 			break;
 		case MF_CM_PROC:
-			if( mfMenuIsPressed( PSP_CTRL_CIRCLE ) ){
+			if( mfMenuIsPressed( mfMenuAcceptButton() ) ){
 				(*((unsigned int *)var))++;
 				if( ! ((char **)items)[*((unsigned int *)var)] ) *((unsigned int *)var) = 0;
 			} else if( mfMenuIsPressed( PSP_CTRL_SQUARE ) ){
@@ -75,10 +75,10 @@ bool mfCtrlDefCallback( MfMessage message, const char *label, void *func, void *
 		case MF_CM_LABEL:
 			break;
 		case MF_CM_INFO:
-			mfMenuSetInfoText( *((unsigned int *)ex) | MF_MENU_INFOTEXT_COMMON_CTRL | MF_MENU_INFOTEXT_SET_LOWER_LINE, "(%s)%s", PB_SYM_PSP_CIRCLE, MF_STR_CTRL_ENTER );
+			mfMenuSetInfoText( *((unsigned int *)ex) | MF_MENU_INFOTEXT_COMMON_CTRL | MF_MENU_INFOTEXT_SET_LOWER_LINE, "(%s)%s", mfMenuAcceptSymbol(), MF_STR_CTRL_ENTER );
 			break;
 		case MF_CM_PROC:
-			if( mfMenuIsPressed( PSP_CTRL_CIRCLE ) ){
+			if( mfMenuIsPressed( mfMenuAcceptButton() ) ){
 				mfMenuProc( (MfMenuProc)func );
 			}
 			break;
@@ -94,10 +94,10 @@ bool mfCtrlDefExtra( MfMessage message, const char *label, void *func, void *arg
 		case MF_CM_LABEL:
 			break;
 		case MF_CM_INFO:
-			mfMenuSetInfoText( *((unsigned int *)ex) | MF_MENU_INFOTEXT_COMMON_CTRL | MF_MENU_INFOTEXT_SET_LOWER_LINE, "(%s)%s", PB_SYM_PSP_CIRCLE, MF_STR_CTRL_EXECUTE );
+			mfMenuSetInfoText( *((unsigned int *)ex) | MF_MENU_INFOTEXT_COMMON_CTRL | MF_MENU_INFOTEXT_SET_LOWER_LINE, "(%s)%s", mfMenuAcceptSymbol(), MF_STR_CTRL_EXECUTE );
 			break;
 		case MF_CM_PROC:
-			if( mfMenuIsPressed( PSP_CTRL_CIRCLE ) ){
+			if( mfMenuIsPressed( mfMenuAcceptButton() ) ){
 				mfMenuSetExtra( (MfMenuProc)func );
 			}
 			break;
@@ -113,10 +113,10 @@ bool mfCtrlDefGetButtons( MfMessage message, const char *label, void *var, void 
 		case MF_CM_LABEL:
 			break;
 		case MF_CM_INFO:
-			mfMenuSetInfoText( *((unsigned int *)ex) | MF_MENU_INFOTEXT_COMMON_CTRL | MF_MENU_INFOTEXT_SET_LOWER_LINE, "(%s)%s", PB_SYM_PSP_CIRCLE, MF_STR_CTRL_ASSIGN );
+			mfMenuSetInfoText( *((unsigned int *)ex) | MF_MENU_INFOTEXT_COMMON_CTRL | MF_MENU_INFOTEXT_SET_LOWER_LINE, "(%s)%s", mfMenuAcceptSymbol(), MF_STR_CTRL_ASSIGN );
 			break;
 		case MF_CM_PROC:
-			if( mfMenuIsPressed( PSP_CTRL_CIRCLE ) ){
+			if( mfMenuIsPressed( mfMenuAcceptButton() ) ){
 				mfDialogDetectbuttonsInit( label, ((MfCtrlDefGetButtonsPref *)pref)->availButtons, (PadutilButtons *)var );
 			}
 			break;
@@ -140,7 +140,7 @@ bool mfCtrlDefGetNumber( MfMessage message, const char *label, void *var, void *
 			}
 			break;
 		case MF_CM_INFO:
-			mfMenuSetInfoText( *((unsigned int *)ex) | MF_MENU_INFOTEXT_COMMON_CTRL | MF_MENU_INFOTEXT_SET_LOWER_LINE, "(%s)%s, (%s)%s, (%s)%s", PB_SYM_PSP_SQUARE, MF_STR_CTRL_DECREASE, PB_SYM_PSP_CIRCLE, MF_STR_CTRL_INCREASE, PB_SYM_PSP_TRIANGLE, MF_STR_CTRL_EDIT );
+			mfMenuSetInfoText( *((unsigned int *)ex) | MF_MENU_INFOTEXT_COMMON_CTRL | MF_MENU_INFOTEXT_SET_LOWER_LINE, "(%s)%s, (%s)%s, (%s)%s", PB_SYM_PSP_SQUARE, MF_STR_CTRL_DECREASE, mfMenuAcceptSymbol(), MF_STR_CTRL_INCREASE, PB_SYM_PSP_TRIANGLE, MF_STR_CTRL_EDIT );
 			break;
 		case MF_CM_PROC:
 			if( mfMenuIsPressed( PSP_CTRL_SQUARE ) ){
@@ -149,7 +149,7 @@ bool mfCtrlDefGetNumber( MfMessage message, const char *label, void *var, void *
 				} else if( value > ((MfCtrlDefGetNumberPref *)pref)->min ){
 					value--;
 				}
-			} else if( mfMenuIsPressed( PSP_CTRL_CIRCLE ) ){
+			} else if( mfMenuIsPressed( mfMenuAcceptButton() ) ){
 				if( pref && ((MfCtrlDefGetNumberPref *)pref)->width ){
 					if( ((MfCtrlDefGetNumberPref *)pref)->max - value >= ((MfCtrlDefGetNumberPref *)pref)->width ) value += ((MfCtrlDefGetNumberPref *)pref)->width;
 				} else if( value < ((MfCtrlDefGetNumberPref *)pref)->max ){
@@ -199,7 +199,7 @@ bool mfCtrlDefGetFilename( MfMessage message, const char *label, void *var, void
 			mfCtrlSetInfo( ex, MF_CTRL_INFO_LOWER_LINE, "\x85 = Select file" );
 			break;
 		case MF_CM_PROC:
-			if( mfMenuIsPressed( PSP_CTRL_CIRCLE ) ){
+			if( mfMenuIsPressed( mfMenuAcceptButton() ) ){
 				mfDialogGetfilenameInit(
 					label,
 					((MfCtrlDefGetFilenamePref *)pref)->initDir,

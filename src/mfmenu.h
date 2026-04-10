@@ -73,6 +73,10 @@ void mfMenuSetTableEntry( MfMenuTable *menu, unsigned short tableid, unsigned sh
 void mfMenuActiveTableEntry( MfMenuTable *menu, unsigned short tableid, unsigned short row, unsigned short col );
 void mfMenuInactiveTableEntry( MfMenuTable *menu, unsigned short tableid, unsigned short row, unsigned short col );
 void mfMenuSetInfoText( unsigned int options, char *format, ... );
+unsigned int mfMenuAcceptButton( void );
+unsigned int mfMenuCancelButton( void );
+char *mfMenuAcceptSymbol( void );
+char *mfMenuCancelSymbol( void );
 inline SceCtrlData *mfMenuGetCurrentPadData( void );
 inline unsigned int mfMenuGetCurrentButtons( void );
 inline unsigned char mfMenuGetCurrentAnalogStickX( void );

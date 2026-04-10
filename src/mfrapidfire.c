@@ -230,7 +230,9 @@ void mfRapidfireExec( MfRapidfireUID uid, MfHookAction action, SceCtrlData *pad 
 				params->pref[i].bitFlags ^= MF_RAPIDFIRE_FLAGS_RAPID_PRESS;
 			}
 			
-			if( params->pref[i].autorun || ( pad->Buttons & params->pref[i].button ) ){
+			if( params->pref[i].autorun && ( pad->Buttons & params->pref[i].button ) ){
+				pad->Buttons ^= params->pref[i].button;
+			} else if( params->pref[i].autorun || ( pad->Buttons & params->pref[i].button ) ){
 				pad->Buttons |= params->pref[i].button;
 				if( ! ( params->pref[i].bitFlags & MF_RAPIDFIRE_FLAGS_RAPID_PRESS ) ){
 					pad->Buttons ^= params->pref[i].button;

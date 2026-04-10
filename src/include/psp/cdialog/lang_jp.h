@@ -2,27 +2,33 @@
 	
 	lang_jp.h
 	
-	MacroFire内で使用する文字列定数。
+	ダイアログ内で使用する文字列定数。
 	
 =========================================================*/
 #ifndef CDIALOG_STRINGS
 #define CDIALOG_STRINGS
 
+/* 共通 */
 #define CDIALOG_STR_HELP_LABEL "ヘルプ"
+#define CDIALOG_STR_HELP_ACCEPT "決定"
+#define CDIALOG_STR_HELP_CANCEL "キャンセル"
+#define CDIALOG_STR_HELP_MOVE   "移動"
 
 #define CDIALOG_STR_MESSAGE_YES "はい"
 #define CDIALOG_STR_MESSAGE_NO  "いいえ"
 #define CDIALOG_STR_MESSAGE_OK  "OK"
 
+/* ボタン検出 */
 #define CDIALOG_STR_DETECTBUTTONS_DESC            "1つ選んでください"
-#define CDIALOG_STR_DETECTBUTTONS_START           "  " PB_SYM_PSP_CIRCLE "  : ボタン検出開始"
-#define CDIALOG_STR_DETECTBUTTONS_CLEAR           "  " PB_SYM_PSP_SQUARE "  : 現在のボタンをクリア"
-#define CDIALOG_STR_DETECTBUTTONS_CANCEL          "  " PB_SYM_PSP_CROSS  "  : キャンセル"
-#define CDIALOG_STR_DETECTBUTTONS_ACCEPT          "START: 決定"
+#define CDIALOG_STR_DETECTBUTTONS_START           "ボタン検出開始"
+#define CDIALOG_STR_DETECTBUTTONS_CLEAR           "現在のボタンをクリア"
+#define CDIALOG_STR_DETECTBUTTONS_CANCEL          "キャンセル"
+#define CDIALOG_STR_DETECTBUTTONS_ACCEPT          "決定"
 #define CDIALOG_STR_DETECTBUTTONS_CURRENT_BUTTONS "現在のボタン:"
 #define CDIALOG_STR_DETECTBUTTONS_DETECT_DESC     "組み合わせたいボタンを押してください。\n\n既に検出されているボタンをもう一度押すと終了します。"
 #define CDIALOG_STR_DETECTBUTTONS_NOW_DETECTING   "検出中..."
 
+/* ファイル名取得 */
 #define CDIALOG_STR_GETFILENAME_SAVE_IN                 "セーブ"
 #define CDIALOG_STR_GETFILENAME_LOOK_IN                 "ロード"
 #define CDIALOG_STR_GETFILENAME_FILENAME                "ファイル名:"
@@ -38,35 +44,30 @@
 #define CDIALOG_STR_GETFILENAME_INPUT                   "ファイル名"
 #define CDIALOG_STR_GETFILENAME_EXTRA_MENU_LABEL        "エクストラメニュー"
 #define CDIALOG_STR_GETFILENAME_EXTRA_MENU              "未実装です。"
-#define CDIALOG_STR_GETFILENAME_HELP \
-	"L/R   = フォーカスの移動\n" \
-	"START = 決定\n" \
-	PB_SYM_PSP_CROSS "     = キャンセル\n\n" \
-	"*ファイルリスト\n\n" \
-	"  " PB_SYM_PSP_UP   PB_SYM_PSP_DOWN  "     = 移動\n" \
-	"  " PB_SYM_PSP_LEFT PB_SYM_PSP_RIGHT "     = ページ移動\n" \
-	"  " PB_SYM_PSP_CIRCLE               "      = 開く\n" \
-	"  " PB_SYM_PSP_TRIANGLE             "      = 1つ上のディレクトリ\n" \
-	"  SELECT = " CDIALOG_STR_GETFILENAME_EXTRA_MENU_LABEL " (未実装)\n\n" \
-	"*ファイル名\n\n" \
-	"  " PB_SYM_PSP_CIRCLE " = 入力"
+#define CDIALOG_GETFILENAME_HELP_WIDTH                  28
+#define CDIALOG_STR_GETFILENAME_HELP_COMMON_MOVEFOCUS   "フォーカスの移動"
+#define CDIALOG_STR_GETFILENAME_HELP_FILELIST_LABEL     "ファイルリスト"
+#define CDIALOG_STR_GETFILENAME_HELP_FILELIST_MOVE      CDIALOG_STR_HELP_MOVE
+#define CDIALOG_STR_GETFILENAME_HELP_FILELIST_MOVEPAGE  "ページ移動"
+#define CDIALOG_STR_GETFILENAME_HELP_FILELIST_ENTER     "開く"
+#define CDIALOG_STR_GETFILENAME_HELP_FILELIST_PARENTDIR "1つ上のディレクトリ"
+#define CDIALOG_STR_GETFILENAME_HELP_FILELIST_EXTRAMENU CDIALOG_STR_GETFILENAME_EXTRA_MENU_LABEL " (未実装)"
+#define CDIALOG_STR_GETFILENAME_HELP_FILENAME_LABEL     "ファイル名"
+#define CDIALOG_STR_GETFILENAME_HELP_FILENAME_INPUT     "入力"
 
-#define CDIALOG_STR_NUMEDIT_HELP \
-	PB_SYM_PSP_LEFT PB_SYM_PSP_RIGHT " = 移動\n" \
-	PB_SYM_PSP_UP   PB_SYM_PSP_DOWN  " = 値の変更\n\n" \
-	PB_SYM_PSP_CIRCLE " = 決定\n" \
-	PB_SYM_PSP_CROSS  " = キャンセル"
+/* 数値編集 */
+#define CDIALOG_NUMEDIT_HELP_WIDTH           16
+#define CDIALOG_STR_NUMEDIT_HELP_MOVE        CDIALOG_STR_HELP_MOVE
+#define CDIALOG_STR_NUMEDIT_HELP_CHANGEVALUE "値の変更"
 
-#define CDIALOG_STR_SOSK_CANCEL_LABEL "キャンセル"
-#define CDIALOG_STR_SOSK_CANCEL       "入力を中断しますか?"
-#define CDIALOG_STR_SOSK_HELP \
-	PB_SYM_PSP_UP PB_SYM_PSP_RIGHT PB_SYM_PSP_DOWN PB_SYM_PSP_LEFT " = 移動\n" \
-	"L/R  = カーソ\ルの移動\n\n" \
-	PB_SYM_PSP_CIRCLE   " = 入力\n" \
-	PB_SYM_PSP_TRIANGLE " = スペース\n" \
-	PB_SYM_PSP_SQUARE   " = 削除\n\n" \
-	"SELECT = 文字レイアウト変更\n\n" \
-	"START = 決定\n" \
-	PB_SYM_PSP_CROSS "     = キャンセル"
+/* 簡易OSK */
+#define CDIALOG_STR_SOSK_CANCEL            "入力を中断しますか?"
+#define CDIALOG_SOSK_HELP_WIDTH            20
+#define CDIALOG_STR_SOSK_HELP_MOVE         CDIALOG_STR_HELP_MOVE
+#define CDIALOG_STR_SOSK_HELP_MOVECURSOR   "カーソ\ルの移動"
+#define CDIALOG_STR_SOSK_HELP_INPUT        "入力"
+#define CDIALOG_STR_SOSK_HELP_WHITESPACE   "スペース"
+#define CDIALOG_STR_SOSK_HELP_BACKSPACE    "削除"
+#define CDIALOG_STR_SOSK_HELP_CHANGELAYOUT "文字レイアウト変更"
 
 #endif

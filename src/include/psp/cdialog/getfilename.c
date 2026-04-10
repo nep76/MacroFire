@@ -22,6 +22,7 @@ static void cdialog_getfilename_draw( struct cdialog_dev_base_params *base, Cdia
 static void cdialog_getfilename_set_filename( const char *path, size_t length, struct cdialog_getfilename_work *work, const char *filename );
 static void cdialog_getfilename_path_forward( char *path, size_t length, struct cdialog_getfilename_work *work, const char *dir );
 static void cdialog_getfilename_path_back( char *path, struct cdialog_getfilename_work *work );
+static bool cdialog_getfilename_init_help( CdialogDevHelp **help );
 static bool cdialog_getfilename_init_message( const char *title, const char *message, bool yesno );
 static bool cdialog_getfilename_init_keyboard( const char *title, char *text, size_t length, unsigned int kb );
 static CdialogResult cdialog_getfilename_draw_dialog( enum cdialog_getfilename_show_dialog dialog );
@@ -169,7 +170,9 @@ int cdialogGetfilenameUpdate( void )
 	if( st_params->showDialog ){
 		CdialogResult result = cdialog_getfilename_draw_dialog( st_params->showDialog );
 		if( result != CDIALOG_UNKNOWN ){
-			if( st_params->showDialog == CDIALOG_GETFILENAME_DIALOG_CONFIRM ){
+			if( st_params->showDialog == CDIALOG_GETFILENAME_DIALOG_HELP ){
+				memoryFree( st_params->base.help );
+			} else if( st_params->showDialog == CDIALOG_GETFILENAME_DIALOG_CONFIRM ){
 				st_params->shutdown = result == CDIALOG_ACCEPT ? true : false;
 			}
 			st_params->showDialog = CDIALOG_GETFILENAME_DIALOG_NONE;
@@ -223,12 +226,12 @@ int cdialogGetfilenameUpdate( void )
 			}
 		}
 		st_params->shutdown = true;
-	} else if( pad.Buttons & PSP_CTRL_CROSS ){
+	} else if( pad.Buttons & cdialogDevCancelButton() ){
 		st_params->data.path[0] = '\0';
 		st_params->base.result = CDIALOG_CANCEL;
 	} else if( pad.Buttons & PSP_CTRL_HOME ){
-		if( cdialog_getfilename_init_message( CDIALOG_STR_HELP_LABEL, CDIALOG_STR_GETFILENAME_HELP, false ) ){
-			st_params->showDialog = CDIALOG_GETFILENAME_DIALOG_MESSAGE;
+		if( cdialog_getfilename_init_help( &st_params->base.help ) ){
+			st_params->showDialog = CDIALOG_GETFILENAME_DIALOG_HELP;
 		}
 	} else if( pad.Buttons & ( PSP_CTRL_LTRIGGER | PSP_CTRL_RTRIGGER ) ){
 		st_params->work.area = st_params->work.area == CDIALOG_GETFILENAME_AREA_LIST ? CDIALOG_GETFILENAME_AREA_INPUT : CDIALOG_GETFILENAME_AREA_LIST;
@@ -245,7 +248,7 @@ int cdialogGetfilenameUpdate( void )
 		} else if( pad.Buttons & PSP_CTRL_RIGHT ){
 			st_params->work.selectPos += CDIALOG_GETFILENAME_LIST_LINES;
 			if( st_params->work.selectPos >= st_params->work.allEntries ) st_params->work.selectPos = st_params->work.allEntries - 1;
-		} else if( pad.Buttons & PSP_CTRL_CIRCLE ){
+		} else if( pad.Buttons & cdialogDevAcceptButton() ){
 			DirhFileInfo *info;
 			dirhSeek( st_params->work.dirh, DIRH_SEEK_SET, st_params->work.selectPos );
 			info = dirhRead( st_params->work.dirh );
@@ -270,7 +273,7 @@ int cdialogGetfilenameUpdate( void )
 			}
 		}
 	} else if( st_params->work.area == CDIALOG_GETFILENAME_AREA_INPUT ){
-		if( pad.Buttons & PSP_CTRL_CIRCLE ){
+		if( pad.Buttons & cdialogDevAcceptButton() ){
 			if( cdialog_getfilename_init_keyboard( CDIALOG_STR_GETFILENAME_INPUT, st_params->work.filename, st_params->data.path + st_params->data.pathMax - st_params->work.filename, CDIALOG_SOSK_INPUTTYPE_FILENAME ) ){
 				st_params->showDialog = CDIALOG_GETFILENAME_DIALOG_KEYBOARD;
 			}
@@ -490,6 +493,56 @@ static bool cdialog_getfilename_init_message( const char *title, const char *mes
 	return false;
 }
 
+static bool cdialog_getfilename_init_help( CdialogDevHelp **help )
+{
+	if( ! help ) return false;
+	
+	*help = memoryAlloc( sizeof( CdialogDevHelp ) * 20 );
+	if( *help && cdialogMessageInit( NULL ) == 0 ){
+		CdialogMessageData *data = cdialogMessageGetData();
+		data->options = CDIALOG_DISPLAY_CENTER;
+		strutilCopy( data->title, CDIALOG_STR_HELP_LABEL, CDIALOG_MESSAGE_TITLE_LENGTH );
+		
+		data->width  = pbOffsetChar( CDIALOG_GETFILENAME_HELP_WIDTH );
+		data->height = pbOffsetLine( 15 );
+		data->callback = cdialogDevDrawHelp;
+		cdialogDevSetHelp( *help, 20 );
+		
+		/* 共通操作 */
+		cdialogDevHelp( &(*help)[0], 0,                 0,                 PB_SYM_PSP_LTRIGGER "/" PB_SYM_PSP_RTRIGGER );
+		cdialogDevHelp( &(*help)[1], pbOffsetChar( 6 ), 0,                 CDIALOG_STR_GETFILENAME_HELP_COMMON_MOVEFOCUS );
+		cdialogDevHelp( &(*help)[2], 0,                 pbOffsetLine( 1 ), PB_SYM_PSP_START );
+		cdialogDevHelp( &(*help)[3], pbOffsetChar( 6 ), pbOffsetLine( 1 ), CDIALOG_STR_HELP_ACCEPT );
+		cdialogDevHelp( &(*help)[4], 0,                 pbOffsetLine( 2 ), cdialogDevCancelSymbol() );
+		cdialogDevHelp( &(*help)[5], pbOffsetChar( 6 ), pbOffsetLine( 2 ), CDIALOG_STR_HELP_CANCEL );
+		
+		/* ファイルリスト */
+		cdialogDevHelp( &(*help)[6],  0,                 pbOffsetLine(  4 ), CDIALOG_STR_GETFILENAME_HELP_FILELIST_LABEL );
+		cdialogDevHelp( &(*help)[7],  pbOffsetChar( 2 ), pbOffsetLine(  6 ), PB_SYM_PSP_UP PB_SYM_PSP_DOWN );
+		cdialogDevHelp( &(*help)[8],  pbOffsetChar( 9 ), pbOffsetLine(  6 ), CDIALOG_STR_GETFILENAME_HELP_FILELIST_MOVE );
+		cdialogDevHelp( &(*help)[9],  pbOffsetChar( 2 ), pbOffsetLine(  7 ), PB_SYM_PSP_LEFT PB_SYM_PSP_RIGHT );
+		cdialogDevHelp( &(*help)[10], pbOffsetChar( 9 ), pbOffsetLine(  7 ), CDIALOG_STR_GETFILENAME_HELP_FILELIST_MOVEPAGE );
+		cdialogDevHelp( &(*help)[11], pbOffsetChar( 2 ), pbOffsetLine(  8 ), cdialogDevAcceptSymbol() );
+		cdialogDevHelp( &(*help)[12], pbOffsetChar( 9 ), pbOffsetLine(  8 ), CDIALOG_STR_GETFILENAME_HELP_FILELIST_ENTER );
+		cdialogDevHelp( &(*help)[13], pbOffsetChar( 2 ), pbOffsetLine(  9 ), PB_SYM_PSP_TRIANGLE );
+		cdialogDevHelp( &(*help)[14], pbOffsetChar( 9 ), pbOffsetLine(  9 ), CDIALOG_STR_GETFILENAME_HELP_FILELIST_PARENTDIR );
+		cdialogDevHelp( &(*help)[15], pbOffsetChar( 2 ), pbOffsetLine( 10 ), PB_SYM_PSP_SELECT );
+		cdialogDevHelp( &(*help)[16], pbOffsetChar( 9 ), pbOffsetLine( 10 ), CDIALOG_STR_GETFILENAME_HELP_FILELIST_EXTRAMENU );
+		
+		/* ファイル名 */
+		cdialogDevHelp( &(*help)[17], 0,                 pbOffsetLine( 12 ), CDIALOG_STR_GETFILENAME_HELP_FILENAME_LABEL );
+		cdialogDevHelp( &(*help)[18], pbOffsetChar( 2 ), pbOffsetLine( 14 ), cdialogDevAcceptSymbol() );
+		cdialogDevHelp( &(*help)[19], pbOffsetChar( 4 ), pbOffsetLine( 14 ), CDIALOG_STR_GETFILENAME_HELP_FILENAME_INPUT );
+		
+		if( cdialogMessageStartNoLock( 0, 0 ) < 0 ){
+			cdialogMessageShutdownStartNoLock();
+		} else{
+			return true;
+		}
+	}
+	return false;
+}
+
 static bool cdialog_getfilename_init_keyboard( const char *title, char *text, size_t length, unsigned int kb )
 {
 	if( cdialogSoskInit( NULL ) == 0 ){
@@ -521,6 +574,7 @@ static CdialogResult cdialog_getfilename_draw_dialog( enum cdialog_getfilename_s
 	void ( *destroy )( void )         = NULL;
 	
 	switch( dialog ){
+		case CDIALOG_GETFILENAME_DIALOG_HELP:
 		case CDIALOG_GETFILENAME_DIALOG_MESSAGE:
 		case CDIALOG_GETFILENAME_DIALOG_CONFIRM:
 			result   = cdialogMessageGetResult;

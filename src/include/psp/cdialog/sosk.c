@@ -148,7 +148,7 @@ int cdialogSoskStartNoLock( unsigned short x, unsigned short y )
 	cdialogDevSetRepeatButtons(
 		&(st_params->base),
 		PSP_CTRL_UP | PSP_CTRL_RIGHT | PSP_CTRL_DOWN | PSP_CTRL_LEFT |
-		PSP_CTRL_CIRCLE | PSP_CTRL_SQUARE | PSP_CTRL_TRIANGLE |
+		cdialogDevAcceptButton() | PSP_CTRL_SQUARE | PSP_CTRL_TRIANGLE |
 		PSP_CTRL_LTRIGGER | PSP_CTRL_RTRIGGER
 	);
 	
@@ -180,8 +180,8 @@ int cdialogSoskUpdate( void )
 			}
 			cdialogMessageDestroy();
 			st_params->showMessage = false;
-			
 			padctrlResetRepeat( st_params->base.paduid );
+			memoryFree( st_params->base.help );
 		} else{
 			return 0;
 		}
@@ -194,11 +194,11 @@ int cdialogSoskUpdate( void )
 	
 	cdialogDevReadCtrlBuffer( &(st_params->base), &pad, NULL );
 	
-	if( pad.Buttons & PSP_CTRL_CROSS ){
+	if( pad.Buttons & cdialogDevCancelButton() ){
 		st_params->cancel = true;
 		if( st_params->edited && cdialogMessageInit( NULL ) == 0 ){
 			CdialogMessageData *data = cdialogMessageGetData();
-			strutilCopy( data->title,   CDIALOG_STR_SOSK_CANCEL_LABEL, CDIALOG_MESSAGE_TITLE_LENGTH );
+			strutilCopy( data->title,   st_params->data.title, CDIALOG_MESSAGE_TITLE_LENGTH );
 			strutilCopy( data->message, CDIALOG_STR_SOSK_CANCEL, CDIALOG_MESSAGE_LENGTH );
 			data->options = CDIALOG_DISPLAY_CENTER | CDIALOG_MESSAGE_YESNO;
 			if( cdialogMessageStartNoLock( 0, 0 ) < 0 ){
@@ -210,7 +210,7 @@ int cdialogSoskUpdate( void )
 	} else if( pad.Buttons & PSP_CTRL_START ){
 		strcpy( st_params->data.text, st_params->work.text.buf );
 		st_params->base.result = CDIALOG_ACCEPT;
-	} else if( pad.Buttons & PSP_CTRL_CIRCLE ){
+	} else if( pad.Buttons & cdialogDevAcceptButton() ){
 		cdialog_sosk_input_char( &(st_params->work.text), st_params->work.chtab.data->codes[st_params->work.chtab.pos], st_params->data.textMax );
 		st_params->edited = true;
 	} else if( pad.Buttons & PSP_CTRL_SQUARE ){
@@ -234,11 +234,33 @@ int cdialogSoskUpdate( void )
 	} else if( pad.Buttons & PSP_CTRL_SELECT ){
 		cdialog_sosk_select_next_table( st_params->data.types, &(st_params->work.chtab) );
 	} else if( pad.Buttons & PSP_CTRL_HOME ){
-		if( cdialogMessageInit( NULL ) == 0 ){
+		st_params->base.help = memoryAlloc( sizeof( CdialogDevHelp ) * 16 );
+		if( st_params->base.help && cdialogMessageInit( NULL ) == 0 ){
 			CdialogMessageData *data = cdialogMessageGetData();
-			strutilCopy( data->title,   CDIALOG_STR_HELP_LABEL,   CDIALOG_MESSAGE_TITLE_LENGTH );
-			strutilCopy( data->message, CDIALOG_STR_SOSK_HELP, CDIALOG_MESSAGE_LENGTH );
 			data->options = CDIALOG_DISPLAY_CENTER;
+			strutilCopy( data->title, CDIALOG_STR_HELP_LABEL, CDIALOG_MESSAGE_TITLE_LENGTH );
+			data->width  = pbOffsetChar( CDIALOG_SOSK_HELP_WIDTH );
+			data->height = pbOffsetLine( 11 );
+			data->callback = cdialogDevDrawHelp;
+			cdialogDevSetHelp( st_params->base.help, 16 );
+			
+			cdialogDevHelp( &st_params->base.help[0],  0,                 0,                 PB_SYM_PSP_UP PB_SYM_PSP_RIGHT PB_SYM_PSP_DOWN PB_SYM_PSP_LEFT );
+			cdialogDevHelp( &st_params->base.help[1],  pbOffsetChar( 6 ), 0,                 CDIALOG_STR_SOSK_HELP_MOVE );
+			cdialogDevHelp( &st_params->base.help[2],  0,                 pbOffsetLine(  1 ), PB_SYM_PSP_LTRIGGER "/" PB_SYM_PSP_RTRIGGER );
+			cdialogDevHelp( &st_params->base.help[3],  pbOffsetChar( 6 ), pbOffsetLine(  1 ), CDIALOG_STR_SOSK_HELP_MOVECURSOR );
+			cdialogDevHelp( &st_params->base.help[4],  0,                 pbOffsetLine(  3 ), cdialogDevAcceptSymbol() );
+			cdialogDevHelp( &st_params->base.help[5],  pbOffsetChar( 3 ), pbOffsetLine(  3 ), CDIALOG_STR_SOSK_HELP_INPUT );
+			cdialogDevHelp( &st_params->base.help[6],  0,                 pbOffsetLine(  4 ), PB_SYM_PSP_TRIANGLE );
+			cdialogDevHelp( &st_params->base.help[7],  pbOffsetChar( 3 ), pbOffsetLine(  4 ), CDIALOG_STR_SOSK_HELP_WHITESPACE );
+			cdialogDevHelp( &st_params->base.help[8],  0,                 pbOffsetLine(  5 ), PB_SYM_PSP_SQUARE );
+			cdialogDevHelp( &st_params->base.help[9],  pbOffsetChar( 3 ), pbOffsetLine(  5 ), CDIALOG_STR_SOSK_HELP_BACKSPACE );
+			cdialogDevHelp( &st_params->base.help[10], 0,                 pbOffsetLine(  7 ), PB_SYM_PSP_SELECT );
+			cdialogDevHelp( &st_params->base.help[11], pbOffsetChar( 7 ), pbOffsetLine(  7 ), CDIALOG_STR_SOSK_HELP_CHANGELAYOUT );
+			cdialogDevHelp( &st_params->base.help[12], 0,                 pbOffsetLine(  9 ), PB_SYM_PSP_START );
+			cdialogDevHelp( &st_params->base.help[13], pbOffsetChar( 6 ), pbOffsetLine(  9 ), CDIALOG_STR_HELP_ACCEPT );
+			cdialogDevHelp( &st_params->base.help[14], 0,                 pbOffsetLine( 10 ), cdialogDevCancelSymbol() );
+			cdialogDevHelp( &st_params->base.help[15], pbOffsetChar( 6 ), pbOffsetLine( 10 ), CDIALOG_STR_HELP_CANCEL );
+			
 			if( cdialogMessageStartNoLock( 0, 0 ) < 0 ){
 				cdialogMessageShutdownStartNoLock();
 			} else{
