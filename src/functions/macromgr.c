@@ -325,13 +325,13 @@ static int macromgr_ini_parser( struct macromgr_params *params, InimgrContext ct
 			char *token, *saveptr = NULL;
 			token = strtok_r( value, ",", &saveptr );
 			pd = token ? strtoul( token, NULL, 10 ) : MF_RAPIDFIRE_DEFAULT_PRESS_DELAY;
-			token = strtok_r( value, ",", &saveptr );
+			token = strtok_r( NULL, ",", &saveptr );
 			rd = token ? strtoul( token, NULL, 10 ) : MF_RAPIDFIRE_DEFAULT_RELEASE_DELAY;
-			token = strtok_r( value, ",", &saveptr );
+			token = strtok_r( NULL, ",", &saveptr );
 			buttons = mfConvertButtonN2C( token );
 			macro->action = MACROMGR_RAPIDFIRE_START;
 			macro->data   = buttons;
-			macro->sub    = 0;
+			macro->sub    = MACROMGR_SET_RAPIDDELAY( pd, rd );
 		} else if( strcasecmp( key, MACROMGR_INI_KEY_RAPIDFIRE_STOP ) == 0 ){
 			macro->action = MACROMGR_RAPIDFIRE_STOP;
 			macro->data   = mfConvertButtonN2C( value );
