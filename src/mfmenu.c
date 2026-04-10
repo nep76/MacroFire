@@ -6,6 +6,7 @@
 
 =========================================================*/
 #include "mfmenu.h"
+#include <pspimpose_driver.h>
 
 /*=========================================================
 	ローカル定数
@@ -79,6 +80,7 @@ struct mf_menu_input {
 
 struct mf_menu_pref {
 	bool useVolatileMem;
+	bool useGraphicsMem;
 	PadutilRemap *remap;
 };
 
@@ -100,6 +102,12 @@ struct mf_menu_params {
 	struct mf_menu_info     info;
 	unsigned int waitMicroSecForUpdate;
 	MfFuncMenu proc, nextproc;
+};
+
+struct mf_menu_restore_params {
+	bool hookEnabled;
+	int  muteEnabled;
+	int  backlightOffInterval;
 };
 
 enum mf_menu_stack_ctrl {
@@ -130,8 +138,8 @@ struct mf_main_pref {
 static void mf_debug( void );
 #endif
 static bool mf_menu_get_target_threads( SceUID *thread_id_list, int *thread_id_count );
-static void mf_menu_control_thread_stat( bool stat, SceUID *thread_id_list, int thread_id_count );
-static bool mf_alloc_buffers( struct mf_frame_buffers *fb );
+static void mf_menu_change_threads_stat( bool stat, SceUID *thread_id_list, int thread_id_count );
+static bool mf_alloc_buffers( struct mf_frame_buffers *fb, bool graphics_mem, bool volatile_mem );
 static void mf_free_buffers( struct mf_frame_buffers *fb );
 static void mf_draw_frame( void );
 static void mf_menu_init_tables( MfMenuTable *menu, unsigned short menucnt );
@@ -144,7 +152,6 @@ static bool mf_menu_select_table_horizontal( MfMenuTable *menu, unsigned short t
 static bool mf_menu_stack( struct mf_menu_stack *stack, enum mf_menu_stack_ctrl ctrl, void *menu );
 static unsigned int mf_label_width( char *str );
 static void mf_root_menu( MfMenuMessage message );
-static void mf_menu_audio( bool enable );
 bool mf_menu_ctrl_engine_stat( MfMessage message, const char *label, void *var, void *unused, void *ex );
 static void mf_menu_indicator( void );
 
@@ -191,6 +198,7 @@ bool mfMenuInit( void )
 	
 	/* 設定初期化 */
 	st_pref.useVolatileMem = false;
+	st_pref.useGraphicsMem = true;
 	st_pref.remap          = NULL;
 	
 	return true;
@@ -204,9 +212,8 @@ void mfMenuDestroy( void )
 void mfMenuIniLoad( IniUID ini, char *buf, size_t len )
 {
 	unsigned short i, j;
+	const char *section = mfGetIniSection();
 	PadutilButtonName button_names[] = { MF_MENU_ALT_BUTTONS };
-	
-	inimgrGetBool( ini, "Menu", "UseVolatileMemory", &(st_pref.useVolatileMem) );
 	
 	for( i = 0, j = 0; i < MF_MENU_ALT_BUTTONS_COUNT; i++ ){
 		if( inimgrGetString( ini, "AlternativeButtons", button_names[i].name, buf, len ) > 0 ){
@@ -215,6 +222,9 @@ void mfMenuIniLoad( IniUID ini, char *buf, size_t len )
 			st_pref.remap[j].remapButtons  = button_names[i].button;
 		}
 	}
+	
+	inimgrGetBool( ini, section, "UseGraphicsMemory", &(st_pref.useGraphicsMem) );
+	inimgrGetBool( ini, section, "UseVolatileMemory", &(st_pref.useVolatileMem) );
 }
 
 void mfMenuIniSave( IniUID ini, char *buf, size_t len )
@@ -222,14 +232,15 @@ void mfMenuIniSave( IniUID ini, char *buf, size_t len )
 	unsigned short i;
 	PadutilButtonName button_names[] = { MF_MENU_ALT_BUTTONS };
 	
-	inimgrSetBool( ini, "Menu", "UseVolatileMemory", false );
-	
 	for( i = 0; i < MF_MENU_ALT_BUTTONS_COUNT; i++ ){
 		strlwr( button_names[i].name );
 		button_names[i].name[0] = toupper( button_names[i].name[0] );
 		
 		inimgrSetString( ini, "AlternativeButtons", button_names[i].name, "" );
 	}
+	
+	inimgrSetBool( ini, MF_INI_SECTION_DEFAULT, "UseGraphicsMemory", true );
+	inimgrSetBool( ini, MF_INI_SECTION_DEFAULT, "UseVolatileMemory", false );
 }
 
 void mfMenuQuit( void )
@@ -1005,27 +1016,19 @@ static void mf_root_menu( MfMenuMessage message )
 	}
 }
 
-static void mf_menu_audio( bool enable )
-{
-	unsigned int k1 = pspSdkSetK1( 0 );
-	
-	if( enable ){
-		sceSysregAudioIoEnable();
-	} else{
-		sceSysregAudioIoDisable();
-	}
-	
-	pspSdkSetK1( k1 );
-}
-
 /*-----------------------------------------------
 	メニュー メインループ
 -----------------------------------------------*/
 void mfMenuMain( SceCtrlData *pad, MfHprmKey *hk )
 {
-	bool hooked =  mfIsEnabled();
+	struct mf_menu_restore_params restore_params = {
+		mfIsEnabled(),
+		sceImposeGetParam( PSP_IMPOSE_MUTE ),
+		sceImposeGetBacklightOffTime()
+	};
 	
 	dbgprintf( "Memory block %d leaked", memoryGetAllocCount() );
+	sceDisplayWaitVblankStart();
 	
 	/* ユーザメモリからメニュー用の作業域を確保 */
 	st_params = memoryAllocEx( "MacroFireMenuParams", MEMORY_USER, 0, sizeof( struct mf_menu_params ), PSP_SMEM_High, NULL );
@@ -1037,16 +1040,19 @@ void mfMenuMain( SceCtrlData *pad, MfHprmKey *hk )
 	memset( st_params, 0, sizeof( struct mf_menu_params ) );
 	st_params->screenUpdate = true;
 	
-	/* サスペンド/リジュームするスレッドの一覧を作成し、サスペンドする */
-	sceDisplayWaitVblankStart();
-	if( ! mf_menu_get_target_threads( st_params->threads.list, &(st_params->threads.count) ) ) goto DESTROY;
-	mf_menu_control_thread_stat( MF_MENU_SUSPEND_THREADS, st_params->threads.list, st_params->threads.count );
+	/* サウンドをミュートにして、自動バックライトオフを無効にする */
+	if( ! restore_params.muteEnabled ) sceImposeSetParam( PSP_IMPOSE_MUTE, 1 );
+	sceImposeSetBacklightOffTime( 0 );
 	
-	/* サウンドをミュートにする */
-	mf_menu_audio( false );
+	/* サスペンド/リジュームするスレッドの一覧を作成し、サスペンドする */
+	if( ! mf_menu_get_target_threads( st_params->threads.list, &(st_params->threads.count) ) ) goto DESTROY;
+	mf_menu_change_threads_stat( MF_MENU_SUSPEND_THREADS, st_params->threads.list, st_params->threads.count );
+	
+	/* すぐに止まらないスレッドもある? */
+	sceDisplayWaitVblankStart();
 	
 	/* APIがフックされている場合、一時的に元に戻す */
-	if( hooked ) mfUnhook();
+	if( restore_params.hookEnabled ) mfUnhook();
 	
 	/* メニュースタックを確保 */
 	if( ! mf_menu_stack( &(st_params->stack), MF_MENU_STACK_CREATE, NULL ) ) goto DESTROY;
@@ -1064,7 +1070,7 @@ void mfMenuMain( SceCtrlData *pad, MfHprmKey *hk )
 	
 	/* フレームバッファとして使用するメモリを確保 */
 	dbgprint( "Allocating memory for frame buffers..." );
-	if( ! mf_alloc_buffers( &(st_params->frameBuffer) ) ) goto DESTROY;
+	if( ! mf_alloc_buffers( &(st_params->frameBuffer), st_pref.useGraphicsMem, st_pref.useVolatileMem ) ) goto DESTROY;
 	
 	/* クリア用背景作成 */
 	if( st_params->frameBuffer.clear ){
@@ -1122,7 +1128,7 @@ void mfMenuMain( SceCtrlData *pad, MfHprmKey *hk )
 			memset( gbGetCurrentDrawBuf(), 0, st_params->frameBuffer.frameSize );
 			mf_draw_frame();
 		} else{
-			if( ( st_params->ctrl.pad->Buttons & 0x0000FFFF ) || st_params->screenUpdate ){
+			if( ( st_params->ctrl.pad->Buttons & MF_HOTKEY_BUTTONS ) || st_params->screenUpdate ){
 				gbWakeup();
 				st_params->screenUpdate = false;
 				memset( gbGetCurrentDrawBuf(), 0, st_params->frameBuffer.frameSize );
@@ -1196,6 +1202,7 @@ void mfMenuMain( SceCtrlData *pad, MfHprmKey *hk )
 		mf_menu_stack( &(st_params->stack), MF_MENU_STACK_POP, &(st_params->proc) );
 	}
 	
+	/* ダイアログを終了 */
 	mfMenuDrawDialog( mfDialogCurrentType(), false );
 	mfDialogFinish();
 	
@@ -1210,26 +1217,22 @@ void mfMenuMain( SceCtrlData *pad, MfHprmKey *hk )
 		
 		mf_free_buffers( &(st_params->frameBuffer) );
 		
-		/* サウンドを戻す */
-		mf_menu_audio( true );
+		/* サウンドと自動バックライトオフを戻す */
+		if( ! restore_params.muteEnabled ) sceImposeSetParam( PSP_IMPOSE_MUTE, 0 );
+		sceImposeSetBacklightOffTime( restore_params.backlightOffInterval );
 		
 		/* メニュー起動前にAPIをフックしていた場合は、フックしなおす */
-		if( hooked ) mfHook();
+		if( restore_params.hookEnabled ) mfHook();
 		
 		/* 他のスレッドをリジューム */
 		sceDisplayWaitVblankStart();
-		mf_menu_control_thread_stat( MF_MENU_RESUME_THREADS, st_params->threads.list, st_params->threads.count );
+		mf_menu_change_threads_stat( MF_MENU_RESUME_THREADS, st_params->threads.list, st_params->threads.count );
 		
 		/* スレッドリスト用のメモリを解放 */
 		dbgprint( "Free memory for menu" );
 		memoryFree( st_params );
 		
 		dbgprintf( "Memory block remain count %d", memoryGetAllocCount() );
-		
-		/* LCDの点灯を待つ */
-		sceDisplayWaitVblankStart();
-		sceDisplayWaitVblankStart();
-		sceDisplayEnable();
 }
 
 void mfMenuSetInfoText( unsigned int options, char *format, ... )
@@ -1443,7 +1446,7 @@ static bool mf_menu_get_target_threads( SceUID *thread_id_list, int *thread_id_c
 	return true;
 }
 
-static void mf_menu_control_thread_stat( bool stat, SceUID *thread_id_list, int thread_id_count )
+static void mf_menu_change_threads_stat( bool stat, SceUID *thread_id_list, int thread_id_count )
 {
 	int ( *func )( SceUID ) = NULL;
 	int i;
@@ -1464,7 +1467,7 @@ static void mf_menu_control_thread_stat( bool stat, SceUID *thread_id_list, int 
 	}
 }
 
-static bool mf_alloc_buffers( struct mf_frame_buffers *fb )
+static bool mf_alloc_buffers( struct mf_frame_buffers *fb, bool graphics_mem, bool volatile_mem )
 {
 	int vram_size = sceGeEdramGetSize();
 	
@@ -1474,35 +1477,36 @@ static bool mf_alloc_buffers( struct mf_frame_buffers *fb )
 	fb->origaddr  = gbGetCurrentDisplayBuf();
 	fb->frameSize = gbGetDataFrameSize();
 	
-	if( st_pref.useVolatileMem && scePowerVolatileMemTryLock( 0, &(fb->vram), &vram_size ) == 0 ){
+	dbgprintf( "Detect current display buffer addr: %p", fb->origaddr );
+	
+	if( graphics_mem && volatile_mem && scePowerVolatileMemTryLock( 0, &(fb->vram), &vram_size ) == 0 ){
 		dbgprintf( "Memory allocated from 4MB extra RAM: %d bytes", vram_size );
-		memcpy( fb->vram, fb->vrambase, vram_size );
+		sceDmacMemcpy( fb->vram, fb->vrambase, vram_size );
 		fb->display = fb->vrambase;
 		fb->draw    = (void *)( (unsigned int)(fb->display) + fb->frameSize );
 		fb->clear   = (void *)( (unsigned int)(fb->draw) + fb->frameSize );
 		fb->volatileMem   = true;
 	} else{
-		unsigned int   free_mem  = sceKernelMaxFreeMemSize();
-		unsigned short frame_num =  free_mem / fb->frameSize;
+		unsigned char frame_num = graphics_mem ? sceKernelMaxFreeMemSize() / fb->frameSize : 0;
 		
-		if( free_mem >= vram_size ){
-			fb->vram = memoryAllocEx( "MacroFireMenuVRAMBackup", MEMORY_USER, 0, vram_size, PSP_SMEM_High, NULL );
+		if( frame_num >= 3 ){
+			fb->vram = memoryAllocEx( "MacroFireMenuVRAMBackup", MEMORY_USER, 0, fb->frameSize * 3, PSP_SMEM_High, NULL );
 			if( ! fb->vram ) return false;
 			
-			dbgprintf( "Memory allocated: %d bytes", vram_size );
-			memcpy( fb->vram, fb->vrambase, vram_size );
+			dbgprintf( "Memory allocated: %d bytes", fb->frameSize * 3 );
+			sceDmacMemcpy( fb->vram, fb->vrambase, fb->frameSize * 3 );
 			fb->display = fb->vrambase;
 			fb->draw    = (void *)( (unsigned int)(fb->display) + fb->frameSize );
 			fb->clear   = (void *)( (unsigned int)(fb->draw) + fb->frameSize );
 		} else if( frame_num >= 2 ){
 			fb->display = fb->origaddr;
-			fb->draw    = memoryAlign( 16, fb->frameSize * 2 );
+			fb->draw    = memoryAllocEx( "MacroFireMenuDrawClearBuffers", MEMORY_USER, 16, fb->frameSize * 2, PSP_SMEM_High, NULL );
 			if( ! fb->draw ) return false;
 			dbgprintf( "Memory allocated for draw/clear buffers: %d bytes", fb->frameSize *2 );
 			fb->clear = (void *)( (unsigned int)(fb->draw) + fb->frameSize );
 		} else if( frame_num >= 1 ){
 			fb->display = fb->origaddr;
-			fb->draw    = memoryAlign( 16, fb->frameSize );
+			fb->draw    = memoryAllocEx( "MacroFireMenuDrawBuffer", MEMORY_USER, 16, fb->frameSize, PSP_SMEM_High, NULL );
 			if( ! fb->draw ) return false;
 			dbgprintf( "Memory allocated for draw buffer: %d bytes", fb->frameSize );
 		} else{
@@ -1515,12 +1519,17 @@ static bool mf_alloc_buffers( struct mf_frame_buffers *fb )
 
 static void mf_free_buffers( struct mf_frame_buffers *fb )
 {
+	sceDisplayWaitVblankStart();
+	
 	if( fb->vram ){
 		dbgprint( "Restore vram buffer" );
-		sceDisplayWaitVblankStart();
-		sceDisplaySetFrameBuf( fb->origaddr, gbGetBufferWidth(), gbGetPixelFormat(), PSP_DISPLAY_SETBUF_IMMEDIATE );
-		memcpy( fb->vrambase, fb->vram, sceGeEdramGetSize() );
+		sceDmacMemcpy( fb->vrambase, fb->vram, fb->frameSize * 3 );
+	} else if( fb->clear ){
+		sceDmacMemcpy( fb->origaddr, fb->clear, fb->frameSize );
 	}
+	
+	dbgprintf( "Reset frame buffer addr: %p", fb->origaddr );
+	sceDisplaySetFrameBuf( fb->origaddr, gbGetBufferWidth(), gbGetPixelFormat(), PSP_DISPLAY_SETBUF_IMMEDIATE );
 	
 	dbgprint( "Free memory for frame buffers" );
 	if( fb->volatileMem ){
@@ -1530,25 +1539,24 @@ static void mf_free_buffers( struct mf_frame_buffers *fb )
 	} else if( fb->draw ){
 		memoryFree( fb->draw );
 	}
-	
 }
 
 static void mf_draw_frame( void )
 {
 	/* これらのセクション名は、内容が同じである場合、ポインタレベルで同じである */
-	const char *reqid = mfGetIniRequestSection();
-	const char *trgid = mfGetIniTargetSection();
+	const char *targid = mfGetIniTargetSection();
+	const char *loadid = mfGetIniSection();
 	
 	gbFillRect( 0, 0, SCR_WIDTH, gbOffsetLine( 3 ), MF_COLOR_TITLE_BAR );
 	gbFillRect( 0, SCR_HEIGHT - gbOffsetLine( 3 ), SCR_WIDTH, SCR_HEIGHT, MF_COLOR_INFO_BAR );
 	gbPrintf( gbOffsetChar( 3 ), gbOffsetLine( 1 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, MF_TITLE, MF_VERSION );
 	gbPrint( gbOffsetChar( 47 ), SCR_HEIGHT - gbOffsetLine( 1 ), ( MF_COLOR_TEXT_FG & 0x00ffffff ) | 0x33000000, MF_COLOR_TEXT_BG, MF_AUTHOR );
 	
-	gbPrintf( gbOffsetChar( 32 ), gbOffsetLine( 1 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, "[ID: %s", reqid );
-	if( reqid == trgid ){
-		gbPrint( gbOffsetChar( 32 + 5 + strlen( reqid ) ), gbOffsetLine( 1 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, "]" );
+	gbPrintf( gbOffsetChar( 32 ), gbOffsetLine( 1 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, "[ID: %s", targid );
+	if( targid == loadid ){
+		gbPrint( gbOffsetChar( 32 + 5 + strlen( targid ) ), gbOffsetLine( 1 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, "]" );
 	} else{
-		gbPrintf( gbOffsetChar( 32 + 5 + strlen( reqid ) ), gbOffsetLine( 1 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, " / Loaded: %s]", trgid );
+		gbPrintf( gbOffsetChar( 32 + 5 + strlen( targid ) ), gbOffsetLine( 1 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, " / Loaded: %s]", loadid );
 	}
 	
 	if( mfHookIncomplete() ){

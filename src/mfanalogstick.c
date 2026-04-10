@@ -46,23 +46,14 @@ void *mfAnalogStickProc( MfMessage message )
 
 void mfAnalogStickIniLoad( IniUID ini, char *buf, size_t len )
 {
-	int deadzone    = st_analogstick.deadzone;
-	int sensitivity = st_analogstick.sensitivity;
-	int originx     = st_analogstick.originX;
-	int originy     = st_analogstick.originY;
-	
+	int deadzone, sensitivity, originx, originy;
 	st_enable_movement = true;
 	
-	inimgrGetBool( ini, "AnalogStick", "Movement",    &st_enable_movement );
-	inimgrGetInt(  ini, "AnalogStick", "Deadzone",    &deadzone );
-	inimgrGetInt(  ini, "AnalogStick", "Sensitivity", &sensitivity );
-	inimgrGetInt(  ini, "AnalogStick", "OriginX",     &originx );
-	inimgrGetInt(  ini, "AnalogStick", "OriginY",     &originy );
-	
-	st_analogstick.deadzone    = deadzone;
-	st_analogstick.sensitivity = sensitivity / 100;
-	st_analogstick.originX     = originx;
-	st_analogstick.originY     = originy;
+	inimgrGetBool( ini, "AnalogStick", "Movement", &st_enable_movement );
+	if( inimgrGetInt(  ini, "AnalogStick", "Deadzone",    &deadzone )    ) st_analogstick.deadzone    = deadzone;
+	if( inimgrGetInt(  ini, "AnalogStick", "Sensitivity", &sensitivity ) ) st_analogstick.sensitivity = (float)sensitivity / 100.0f;
+	if( inimgrGetInt(  ini, "AnalogStick", "OriginX",     &originx )     ) st_analogstick.originX     = originx;
+	if( inimgrGetInt(  ini, "AnalogStick", "OriginY",     &originy )     ) st_analogstick.originY     = originy;
 }
 
 void mfAnalogStickIniSave( IniUID ini, char *buf, size_t len )

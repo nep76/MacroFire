@@ -133,7 +133,7 @@ void macroIniLoad( IniUID ini, char *buf, size_t len )
 {
 	unsigned short entry_i;
 	char entryname[32];
-	const char *section = mfGetIniTargetSection();
+	const char *section = mfGetIniSection();
 	
 	for( entry_i = 0; entry_i < MACRO_MAX_SLOT; entry_i++ ){
 		/* ƒGƒ“ƒgƒŠ–¼‚ðì¬ */

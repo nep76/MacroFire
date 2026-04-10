@@ -268,7 +268,7 @@ void mfRapidfireGetModeByName( const char *str, MfRapidfireMode *mode, bool *aut
 	} else if( strcasecmp( str, MF_RAPIDFIRE_NAME_HOLD ) == 0 ){
 		*mode    = MF_RAPIDFIRE_MODE_HOLD;
 		*autorun = false;
-	} else if( strcasecmp( str, MF_RAPIDFIRE_NAME_HOLD ) == 0 ){
+	} else if( strcasecmp( str, MF_RAPIDFIRE_NAME_AUTOHOLD ) == 0 ){
 		*mode    = MF_RAPIDFIRE_MODE_HOLD;
 		*autorun = true;
 	} else{

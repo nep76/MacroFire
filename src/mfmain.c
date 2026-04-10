@@ -8,14 +8,15 @@
 #include "mfmain.h"
 #include "psp/ovmsg.h"
 
-PSP_MODULE_INFO( "MacroFire", PSP_MODULE_KERNEL, 3, 0 );
+PSP_MODULE_INFO( "MacroFire", PSP_MODULE_KERNEL | PSP_MODULE_NO_STOP | PSP_MODULE_SINGLE_LOAD | PSP_MODULE_SINGLE_START, 3, 0 );
 
 /*=========================================================
 	ローカル関数
 =========================================================*/
 static void mf_init( void );
 static void mf_shutdown( void );
-static void mf_ini( const char *inipath );
+static void mf_ini( const char *path );
+const char *mf_ini_find_loaded_section( IniUID ini, const char *game_id, const char *target_section );
 static void mf_ini_load( IniUID ini );
 static void mf_ini_save( IniUID ini );
 static int mf_get_ctrl_buffer( MfHookAction action, unsigned int api, SceCtrlData *pad, MfHprmKey *hk );
@@ -25,8 +26,8 @@ static void mf_ctrl_data_copy( SceCtrlData *padarr, int count );
 	ローカル変数
 =========================================================*/
 static char st_game_id[11];
-static char *st_ini_request_section;
-static char *st_ini_target_section;
+static const char *st_ini_target_section;
+static const char *st_ini_loaded_section;
 
 static unsigned int st_world        = 0;
 static unsigned int st_prev_buttons = 0;
@@ -83,7 +84,7 @@ static void mf_init( void )
 	dbgprint( "Find hook address..." );
 	for( i = 0; i < hooktableEntryCount; i++ ){
 		hooktable[i].restore.addr = hookFindSyscallAddr( hookFindExportAddr( hooktable[i].module, hooktable[i].library, hooktable[i].nid ) );
-		dbgprintf( "\tNID:0x%08x Addr:%p Func:%p", hooktable[i].nid, hooktable[i].restore.addr, hooktable[i].hook );
+		dbgprintf( "\tNID:0x%08x Addr:%p Orig:%p Hook:%p", hooktable[i].nid, hooktable[i].restore.addr, hooktable[i].restore.addr ? *(hooktable[i].restore.addr): NULL, hooktable[i].hook );
 		if( hooktable[i].restore.addr ){
 			hooktable[i].restore.api = *(hooktable[i].restore.addr);
 		} else if( st_world == MF_WORLD_VSH ){
@@ -105,6 +106,10 @@ static void mf_init( void )
 	
 	/* ファンクションの初期化 */
 	dbgprint( "Sending message MF_MS_INIT to all functions..." );
+	
+	initfunc = mfAnalogStickProc( MF_MS_INIT );
+	if( initfunc ) initfunc();
+	
 	for( i = 0; i < gMftabEntryCount; i++ ){
 		if( gMftab[i].proc ){
 			initfunc = ( gMftab[i].proc )( MF_MS_INIT );
@@ -134,13 +139,58 @@ static void mf_shutdown( void )
 	mfMenuDestroy();
 }
 
+const char *mf_ini_find_loaded_section( IniUID ini, const char *game_id, const char *target_section )
+{
+	/* ゲームIDがある場合はUMDゲームなので、二段階 */
+	if( game_id[0] ){
+		if( inimgrExistSection( ini, target_section ) ){
+			return target_section;
+		}
+		target_section = MF_INI_SECTION_GAME;
+	}
+	return inimgrExistSection( ini, target_section ) ? target_section : MF_INI_SECTION_DEFAULT;
+}
+
 /*-----------------------------------------------
 	INIの読み込みと保存
 -----------------------------------------------*/
-static void mf_ini( const char *inipath )
+static void mf_ini( const char *path )
 {
-	IniUID ini = inimgrNew();
+	IniUID ini;
+	char inipath[MF_PATH_MAX];
 	
+	/* 設定ファイルのパスを決定 */
+	{
+		char *delim;
+		
+		strutilCopy(
+			inipath,
+			( ( ! path || path[0] == '\0' || strncasecmp( path, "flash", 5 ) == 0 || ! strrchr( path, '/' ) ) ? MF_INI_PATH_DEFAULT : path ),
+			sizeof( inipath ) - strlen( MF_INI_FILENAME )
+		);
+		delim = strrchr( inipath, '/' );
+		strcpy( delim + 1, MF_INI_FILENAME );
+	}
+	
+	/* 設定ファイルのロードすべきセクション名を決定 */
+	st_ini_loaded_section = MF_INI_LOAD_FAILED;
+	if( st_game_id[0] == '\0' ){
+		switch( st_world ){
+			case MF_WORLD_VSH:
+				st_ini_target_section = MF_INI_SECTION_VSH;
+				break;
+			case MF_WORLD_POPS:
+				st_ini_target_section = MF_INI_SECTION_POPS;
+				break;
+			default:
+				st_ini_target_section = MF_INI_SECTION_GAME;
+		}
+	} else{
+		st_ini_target_section = st_game_id;
+	}
+	
+	dbgprint( "Creating Inimgr" );
+	ini = inimgrNew();
 	if( ini < 0 ){
 		dbgprintf( "Failed to create IniUID: %x", ini );
 		return;
@@ -148,11 +198,15 @@ static void mf_ini( const char *inipath )
 		if( mfConvertButtonReady() ){
 			if( inimgrLoad( ini, inipath, NULL, 0, 0, 0 ) == 0 ){
 				dbgprintf( "%s found", inipath );
+				/* ロードに成功したので、ターゲットセクションが存在するかを確認 */
+				st_ini_loaded_section = mf_ini_find_loaded_section( ini, st_game_id, st_ini_target_section );
 				mf_ini_load( ini );
 			} else{
 				dbgprintf( "%s not found", inipath );
 				mf_ini_save( ini );
-				inimgrSave( ini, inipath, NULL, 0, 0, 0 );
+				if( inimgrSave( ini, inipath, NULL, 0, 0, 0 ) == 0 ){
+					st_ini_loaded_section = MF_INI_SECTION_DEFAULT;
+				}
 			}
 			mfConvertButtonFinish();
 		}
@@ -174,30 +228,10 @@ static void mf_ini_load( IniUID ini )
 	if( inimgrGetString( ini, "Main", "ToggleButtons", buf, sizeof( buf ) ) > 0 ) st_toggle_buttons = mfConvertButtonN2C( buf );
 	inimgrGetBool( ini, "Main", "StatusNotification", &status_notification );
 	
-	/* 設定ファイルのロードすべきセクション名を決定 */
-	if( st_game_id[0] == '\0' || ! inimgrExistSection( ini, st_game_id ) ){
-		switch( mfGetWorld() ){
-			case MF_WORLD_VSH:
-				st_ini_target_section = MF_INI_SECTION_VSH;
-				break;
-			case MF_WORLD_POPS:
-				st_ini_target_section = MF_INI_SECTION_POPS;
-				break;
-			case MF_WORLD_GAME:
-				st_ini_target_section = MF_INI_SECTION_GAME;
-				break;
-		}
-		st_ini_request_section = st_game_id[0] == '\0' ? st_ini_target_section : st_game_id;
-		if( ! inimgrExistSection( ini, st_ini_target_section ) ) st_ini_target_section = MF_INI_SECTION_DEFAULT;
-	} else{
-		st_ini_request_section = st_game_id;
-		st_ini_target_section  = st_game_id;
-	}
-	
 	/* セクション名を確定したので、各機能へロード要求 */
-	mfMenuIniLoad( ini, buf, sizeof( buf ) );
 	mfAnalogStickIniLoad( ini, buf, sizeof( buf ) );
-	
+	mfMenuIniLoad( ini, buf, sizeof( buf ) );
+
 	dbgprint( "Sending message MF_MS_INI_LOAD to all functions..." );
 	for( i = 0; i < gMftabEntryCount; i++ ){
 		if( gMftab[i].proc ){
@@ -225,8 +259,8 @@ static void mf_ini_save( IniUID ini )
 	
 	inimgrSetBool( ini, "Main", "StatusNotification", MF_INI_STATUS_NOTIFICATION );
 	
-	mfMenuIniSave( ini, buf, sizeof( buf ) );
 	mfAnalogStickIniSave( ini, buf, sizeof( buf ) );
+	mfMenuIniSave( ini, buf, sizeof( buf ) );
 	
 	dbgprint( "Sending message MF_MS_INI_CREATE to all functions..." );
 	for( i = 0; i < gMftabEntryCount; i++ ){
@@ -259,7 +293,7 @@ static int mf_get_ctrl_buffer( MfHookAction action, unsigned int api, SceCtrlDat
 	unsigned int k1_register;
 	int ret;
 	MfFuncHook hookfunc;
-
+	
 	k1_register = pspSdkSetK1( 0 );
 	
 	if( hooktable[api].restore.api ){
@@ -296,7 +330,7 @@ static int mf_get_ctrl_buffer( MfHookAction action, unsigned int api, SceCtrlDat
 				if( hookfunc ) hookfunc( action, pad, hk );
 			}
 		}
-		//if( caller == MF_CALLER_USER ) pad->Buttons &= MF_TARGET_BUTTONS;
+		/*if( caller == MF_CALLER_USER )*/ pad->Buttons &= MF_TARGET_BUTTONS;
 	}
 	
 	return ret;
@@ -343,18 +377,7 @@ static int mf_main( SceSize arglen, void *argp )
 	mf_init();
 	
 	dbgprint( "Checking ini" );
-	{
-		char *inipath = memoryAlloc( arglen + strlen( MF_INI_FILENAME ) );
-		if( inipath ){
-			char *dirpath = strrchr( (const char *)argp, '/' );
-			if( dirpath ){
-				strncpy( inipath, (const char *)argp, dirpath - (const char *)argp + 1 );
-				strcat( inipath, MF_INI_FILENAME );
-				mf_ini( inipath );
-			}
-			memoryFree( inipath );
-		}
-	}
+	mf_ini( (const char *)argp );
 	
 	dbgprint( "Starting main-loop" );
 	while( gRunning ){
@@ -580,6 +603,11 @@ int mfHprmReadLatch( u32 *latch )
 	return mfHprmPeekLatch( latch );
 }
 
+int mfImposeHomeButton( int unk )
+{
+	return -1;
+}
+
 /*-----------------------------------------------
 	メインAPI
 -----------------------------------------------*/
@@ -653,14 +681,14 @@ const char *mfGetGameId()
 	return st_game_id;
 }
 
-const char *mfGetIniRequestSection( void )
-{
-	return st_ini_request_section;
-}
-
 const char *mfGetIniTargetSection( void )
 {
 	return st_ini_target_section;
+}
+
+const char *mfGetIniSection( void )
+{
+	return st_ini_loaded_section;
 }
 
 unsigned int mfGetWorld( void )

@@ -33,6 +33,7 @@ int mfCtrlReadLatch( SceCtrlLatch *latch );
 int mfHprmPeekCurrentKey( u32 *key );
 int mfHprmPeekLatch( u32 *latch );
 int mfHprmReadLatch( u32 *latch );
+int mfImposeHomeButton( int unk );
 
 /*=======================================================*/
 

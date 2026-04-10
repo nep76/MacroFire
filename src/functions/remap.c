@@ -62,7 +62,7 @@ void *remapProc( MfMessage message )
 
 void remapIniLoad( IniUID ini, char *buf, size_t len )
 {
-	const char *section = mfGetIniTargetSection();
+	const char *section = mfGetIniSection();
 	
 	if( inimgrGetString( ini, section, "Remap", buf, len ) > 0 ){
 		remap_load( &st_params, (const char *)buf );

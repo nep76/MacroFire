@@ -71,12 +71,19 @@ void *rapidfireProc( MfMessage message )
 
 void rapidfireIniLoad( IniUID ini, char *buf, size_t len )
 {
-	const char *section = mfGetIniTargetSection();
+	const char *section = mfGetIniSection();
 	
 	/* 設定用メモリ確保 */
 	st_mode  = memoryAlloc( sizeof( struct rapidfire_mode ) * MF_RAPIDFIRE_NUMBER_OF_AVAIL_BUTTONS );
 	if( st_mode ){
-		if( inimgrGetString( ini, section, RAPIDFIRE_MAININI_ENTRY_NAME, buf, len ) > 0 ){
+		unsigned short i, save;
+		
+		/* MacroFireコアから設定値を読み出し、ボタンコードを取得 */
+		for( i = 0, save = 0; mfRapidfireReadEntry( st_rfuid, &(st_mode[i].button), NULL, NULL, NULL, NULL, &save ); i++ ){
+			st_mode[i].mode = RAPIDFIRE_NORMAL;
+		}
+		
+		if( inimgrGetString( ini, section, "Rapidfire", buf, len ) > 0 ){
 			rapidfire_load( buf, st_mode, &st_delay );
 			rapidfire_apply( st_mode, &st_delay );
 		}
@@ -86,7 +93,7 @@ void rapidfireIniLoad( IniUID ini, char *buf, size_t len )
 
 void rapidfireIniCreate( IniUID ini, char *buf, size_t len )
 {
-	inimgrSetString( ini, MF_INI_SECTION_DEFAULT, RAPIDFIRE_MAININI_ENTRY_NAME, "" );
+	inimgrSetString( ini, MF_INI_SECTION_DEFAULT, "Rapidfire", "" );
 }
 
 void rapidfireMain( MfHookAction action, SceCtrlData *pad, MfHprmKey *hk )
@@ -132,7 +139,7 @@ void rapidfireMenu( MfMessage message )
 			st_mode  = mfHeapAlloc( st_heap, sizeof( struct rapidfire_mode ) * MF_RAPIDFIRE_NUMBER_OF_AVAIL_BUTTONS );
 			
 			{
-				unsigned short save = 0, i = 0;
+				unsigned short i, save;
 				MfRapidfireMode mode;
 				unsigned int pdelay, rdelay;
 				bool autorun;
@@ -154,7 +161,9 @@ void rapidfireMenu( MfMessage message )
 				mfMenuSetTablePosition( menu, 1, gbOffsetChar( 5 ), gbOffsetLine( 6 ) );
 				mfMenuSetTableLabel( menu, 1, "Mode" );
 				mfMenuSetColumnWidth( menu, 1, 1, 20 );
-				while( mfRapidfireReadEntry( st_rfuid, &(st_mode[i].button), &mode, &pdelay, &rdelay, &autorun, &save ) ){
+				
+				/* MacroFireコアから設定値を読み出す */
+				for( i = 0, save = 0; mfRapidfireReadEntry( st_rfuid, &(st_mode[i].button), &mode, &pdelay, &rdelay, &autorun, &save ); i++ ){
 					if( mode == MF_RAPIDFIRE_MODE_RAPID ){
 						st_mode[i].mode = autorun ? RAPIDFIRE_AUTORAPID : RAPIDFIRE_RAPID;
 					} else if( mode == MF_RAPIDFIRE_MODE_HOLD ){
@@ -178,7 +187,6 @@ void rapidfireMenu( MfMessage message )
 						case PSP_CTRL_SELECT:   mfMenuSetTableEntry( menu, 1, 7, 2, "Select", mfCtrlDefOptions, &(st_mode[i].mode), options ); break;
 						default: continue;
 					}
-					i++;
 				}
 				
 				mfMenuSetTablePosition( menu, 2, gbOffsetChar( 5 ), gbOffsetLine( 15 ) );
@@ -395,6 +403,7 @@ static bool rapidfire_load( const char *path, struct rapidfire_mode *mode, struc
 			char button_name[16];
 			char mode_name[16];
 			int delayms;
+			
 			for( i = 0; i < MF_RAPIDFIRE_NUMBER_OF_AVAIL_BUTTONS; i++ ){
 				if( inimgrGetString( ini, RAPIDFIRE_INI_SECTION_MODE, mfConvertButtonC2N( mode[i].button, button_name, sizeof( button_name ) ), mode_name, sizeof( mode_name ) ) > 0 ){
 					mode[i].mode = rapidfire_get_mode_idn_by_name( mode_name );

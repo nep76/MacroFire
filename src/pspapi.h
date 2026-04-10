@@ -57,5 +57,12 @@ int scePowerVolatileMemUnlock( int unk );
 int sceSysregAudioIoEnable( void );
 int sceSysregAudioIoDisable( void );
 
+/*-----------------------------------------------
+	sceImposeHomeButton
+	
+	Homeボタンの実体。
+	引数の詳細は不明だが、1を渡さないとHOMEとして働かない模様。
+-----------------------------------------------*/
+int sceImposeHomeButton( int unk );
 
 #endif

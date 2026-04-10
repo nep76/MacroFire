@@ -14,8 +14,6 @@
 /*=========================================================
 	É}ÉNÉç
 =========================================================*/
-#define RAPIDFIRE_MAININI_ENTRY_NAME "Rapidfire"
-
 #define RAPIDFIRE_INI_SIGNATURE     "MACROFIRE-RAPIDFIRE"
 #define RAPIDFIRE_INI_VERSION       4
 #define RAPIDFIRE_INI_SECTION_MODE  "Mode"

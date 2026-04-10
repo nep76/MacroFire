@@ -1,5 +1,8 @@
-# 例外ハンドラを設定するデバッグ用MacroFireをビルドするには
+# 例外ハンドラを設定する:
 #     make WITH_EXCEPTION_HANDLER=1
+#
+# PSPLINK用にデバッグメッセージをprintf出力する:
+#     make WITH_PSPLINK_DEBUG=1
 #
 
 TARGET = macrofire
@@ -24,7 +27,7 @@ USE_KERNEL_LIBS = 1
 DIR_CLASSG = include
 
 INCDIR   = $(DIR_CLASSG)
-CFLAGS   = -O2 -G 0 -Wall -fno-strict-aliasing -fno-builtin-printf# -g -DDEBUG=1 -DMEMORY_DEBUG
+CFLAGS   = -O2 -G 0 -Wall -fno-strict-aliasing
 ASFLAGS  = $(CFLAGS)
 LIBDIR   = 
 LDFLAGS  = 
@@ -32,6 +35,7 @@ LIBS     = -lpsppower_driver -lpsphprm_driver -lpspge -lpsprtc -lm
 
 OBJS = exports.o \
        sceDmac.o \
+       sceImpose.o \
        mfmain.o \
        mfanalogstick.o \
        mfrapidfire.o \
@@ -63,19 +67,20 @@ OBJS = exports.o \
        $(DIR_CLASSG)/psp/cdialog/getfilename.o \
        $(DIR_CLASSG)/psp/cdialog/detectbuttons.o \
 
-ifeq ($(USE_KERNEL_LIBC),1)
-    CFLAGS += -DPSP_USE_KERNEL_LIBC
-	OBJS += sceSystemMemoryManager.o \
-            $(DIR_CLASSG)/psp/sysclib/string.o \
-            $(DIR_CLASSG)/psp/sysclib/xprintf.o \
-            $(DIR_CLASSG)/psp/sysclib/errno.o \
-            $(DIR_CLASSG)/psp/sysclib/qsort.o
-else
-	LIBS += -lpspkernel -lc -lpspuser
+ifdef WITH_PSPLINK_DEBUG
+	CFLAGS += -fno-builtin-printf -g -DDEBUG=1 -DMEMORY_DEBUG
 endif
 
 ifdef WITH_EXCEPTION_HANDLER
 	CFLAGS += -DMF_WITH_EXCEPTION_HANDLER -g
+endif
+
+ifeq ($(USE_KERNEL_LIBC),1)
+    CFLAGS += -DPSP_USE_KERNEL_LIBC
+	OBJS += sceSystemMemoryManager.o \
+            $(DIR_CLASSG)/psp/sysclib/sysclib.o
+else
+	LIBS += -lpspkernel -lc -lpspuser
 endif
 
 PSPSDK = $(shell psp-config --pspsdk-path)

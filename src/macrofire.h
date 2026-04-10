@@ -20,14 +20,16 @@
 	íËêî
 ==========================================================*/
 #define MF_TITLE        "MacroFire %s In-game menu"
-#define MF_VERSION      "3.0.4"
+#define MF_VERSION      "3.0.5"
 #define MF_AUTHOR       "ClassG (http://classg.sytes.net)"
 
+#define MF_INI_PATH_DEFAULT    "ms0:/seplugins/"
 #define MF_INI_FILENAME        "macrofire.ini"
 #define MF_INI_SECTION_DEFAULT "Default"
 #define MF_INI_SECTION_VSH     "VSH"
 #define MF_INI_SECTION_POPS    "POPS"
 #define MF_INI_SECTION_GAME    "GAME"
+#define MF_INI_LOAD_FAILED     "Built-in"
 
 #define MF_COLOR_TRANSPARENT GB_TRANSPARENT
 #define MF_COLOR_TEXT_FG     0xffffffff
@@ -140,8 +142,8 @@ void mfConvertButtonFinish( void );
 char *mfConvertButtonC2N( PadutilButtons buttons, char *buf, size_t len );
 PadutilButtons mfConvertButtonN2C( char *buttons );
 const char *mfGetGameId( void );
-const char *mfGetIniRequestSection( void );
 const char *mfGetIniTargetSection( void );
+const char *mfGetIniSection( void );
 unsigned int mfGetWorld( void );
 bool mfIsRunningApp( MfAppId app );
 int mfOverlayMessageStart( void );
