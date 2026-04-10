@@ -33,7 +33,7 @@ PadutilButtonName *padutilCreateButtonSymbols( void )
 		return st_symbols;
 	}
 	
-	st_symbols = (PadutilButtonName *)memoryAlloc( sizeof( PadutilButtonName ) * 33 );
+	st_symbols = (PadutilButtonName *)memoryAllocEx( "PadutilButtonSymbols", MEMORY_USER, 0, sizeof( PadutilButtonName ) * 33, PSP_SMEM_High, NULL );
 	if( ! st_symbols ) return NULL;
 	
 	st_symbols[0].button = padutilSetPad( PSP_CTRL_SELECT );
@@ -123,7 +123,7 @@ PadutilButtonName *padutilCreateButtonNames( void )
 		return st_names;
 	}
 	
-	st_names = (PadutilButtonName *)memoryAlloc( sizeof( PadutilButtonName ) * 33 );
+	st_names = (PadutilButtonName *)memoryAllocEx( "PadutilButtonNames", MEMORY_USER, 0, sizeof( PadutilButtonName ) * 33, PSP_SMEM_High, NULL );
 	if( ! st_names ) return NULL;
 	
 	st_names[0].button = padutilSetPad( PSP_CTRL_SELECT );
@@ -351,7 +351,7 @@ void padutilSetAnalogStickDirection( unsigned int analog_direction, PadutilCoord
 PadutilRemap *padutilCreateRemapArray( size_t count )
 {
 	int i;
-	PadutilRemap *remap = (PadutilRemap *)memoryAlloc( sizeof( PadutilRemap ) * count );
+	PadutilRemap *remap = (PadutilRemap *)memoryAllocEx( "PadutilRemapArray", MEMORY_USER, 0, sizeof( PadutilRemap ) * count, PSP_SMEM_High, NULL );
 	if( ! remap ) return NULL;
 	
 	remap[0].realButtons  = 0;

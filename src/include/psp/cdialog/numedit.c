@@ -39,7 +39,7 @@ int cdialogNumeditInit( CdialogNumeditParams *params )
 		st_params = params;
 		st_params->destroySelf = false;
 	} else{
-		st_params = (CdialogNumeditParams *)memoryAlloc( sizeof( CdialogNumeditParams ) );
+		st_params = (CdialogNumeditParams *)memoryAllocEx( "NumeditParams", MEMORY_USER, 0, sizeof( CdialogNumeditParams ), PSP_SMEM_High, NULL );
 		if( ! st_params ) return CG_ERROR_NOT_ENOUGH_MEMORY;
 		st_params->destroySelf = true;
 	}

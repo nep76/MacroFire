@@ -62,7 +62,7 @@ struct heap_allocated_memblock_header {
 	@return: HeapUID
 		ヒープを使うためのUID。
 -----------------------------------------------*/
-HeapUID heapCreateEx( const char *name, MemoryPartition partition, SceSize size );
+HeapUID heapCreateEx( const char *name, MemoryPartition partition, unsigned int align, SceSize size, int type, void *addr );
 
 /*-----------------------------------------------
 	heapCreate

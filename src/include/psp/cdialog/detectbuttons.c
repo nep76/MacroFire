@@ -40,7 +40,7 @@ int cdialogDetectbuttonsInit( CdialogDetectbuttonsParams *params )
 		st_params = params;
 		st_params->destroySelf = false;
 	} else{
-		st_params = (CdialogDetectbuttonsParams *)memoryAlloc( sizeof( CdialogDetectbuttonsParams ) );
+		st_params = (CdialogDetectbuttonsParams *)memoryAllocEx( "DetectbuttonsParams", MEMORY_USER, 0, sizeof( CdialogDetectbuttonsParams ), PSP_SMEM_High, NULL );
 		if( ! st_params ) return CG_ERROR_NOT_ENOUGH_MEMORY;
 		st_params->destroySelf = true;
 	}
@@ -129,7 +129,7 @@ int cdialogDetectbuttonsUpdate( void )
 	realbuttons = cdialogDevReadCtrlBuffer( &(st_params->base), &pad, NULL ) & st_params->data.availButtons;
 	
 	if( st_params->work.detecting ){
-		PadutilButtons target_buttons = realbuttons & ( padutilSetPad( PADUTIL_PAD_NORMAL_BUTTONS | PADUTIL_PAD_ANALOGDIR_BUTTONS ) | padutilSetHprm( PADUTIL_HPRM_NORMAL_KEYS ) );
+		PadutilButtons target_buttons = realbuttons;// & ( padutilSetPad( PADUTIL_PAD_NORMAL_BUTTONS | PADUTIL_PAD_ANALOGDIR_BUTTONS ) | padutilSetHprm( PADUTIL_HPRM_NORMAL_KEYS ) );
 		bool detect = false;
 		
 		if( ! target_buttons ){

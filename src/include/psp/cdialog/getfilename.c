@@ -44,7 +44,7 @@ int cdialogGetfilenameInit( CdialogGetfilenameParams *params )
 		st_params = params;
 		st_params->destroySelf = false;
 	} else{
-		st_params = (CdialogGetfilenameParams *)memoryAlloc( sizeof( CdialogGetfilenameParams ) );
+		st_params = (CdialogGetfilenameParams *)memoryAllocEx( "GetfilenameParams", MEMORY_USER, 0, sizeof( CdialogGetfilenameParams ), PSP_SMEM_High, NULL );
 		if( ! st_params ) return CG_ERROR_NOT_ENOUGH_MEMORY;
 		st_params->destroySelf = true;
 	}
@@ -139,7 +139,7 @@ int cdialogGetfilenameUpdate( void )
 		int ret;
 		
 		if( ! st_params->work.dirh ){
-			st_params->work.dirh = dirhNew( st_params->data.pathMax, DIRH_OPT_DOPEN_WITH_THREAD );
+			st_params->work.dirh = dirhNew( st_params->data.pathMax, DIRH_O_DOPEN_WITH_THREAD | DIRH_O_ALLOC_HIGH );
 			if( ! st_params->work.dirh ) return CG_ERROR_NOT_ENOUGH_MEMORY;
 			
 			strutilCopy( st_params->data.path, st_params->data.initialDir ? st_params->data.initialDir : CDIALOG_GETFILENAME_DEFAULT_PATH, st_params->data.pathMax );

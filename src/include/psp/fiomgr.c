@@ -342,7 +342,7 @@ int fiomgrWritefln( FiomgrHandle fh, char *buf, size_t buflen, const char *forma
 
 static int fiomgr_open( struct fiomgr_params **params, const char *path, int flags, int perm )
 {
-	*params = (struct fiomgr_params *)memoryAlloc( sizeof( struct fiomgr_params ) + sizeof( struct fiomgr_cache_params ) );
+	*params = (struct fiomgr_params *)memoryAllocEx( "FiomgrParams", MEMORY_USER, 0, sizeof( struct fiomgr_params ) + sizeof( struct fiomgr_cache_params ), flags & FH_O_ALLOC_HIGH ? PSP_SMEM_High : PSP_SMEM_Low, NULL );
 	if( ! *params ) return CG_ERROR_NOT_ENOUGH_MEMORY;
 	
 	(*params)->fd = sceIoOpen( path, flags & 0x0000FFFF, perm );

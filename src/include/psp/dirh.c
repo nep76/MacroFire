@@ -38,7 +38,7 @@ struct dirh_params {
 /*=========================================================
 	ローカル関数
 =========================================================*/
-static int dirh_make_entries( const char *dirpath, struct dirh_entry *entry, struct dirh_thread_dopen_params **thdopen, unsigned int timeout );
+static int dirh_make_entries( const char *dirpath, struct dirh_entry *entry, struct dirh_thread_dopen_params **thdopen, unsigned int timeout, bool alloc_high );
 static void dirh_clear_entries( struct dirh_entry *entry );
 static int dirh_dopen_wrapper( SceSize args, void *argp );
 static bool dirh_wait_for_dopen_thread( struct dirh_thread_dopen_params *thdopen, enum PspThreadStatus stat );
@@ -58,7 +58,7 @@ static struct dirh_thread_dopen_params *st_thdopen;
 =========================================================*/
 DirhUID dirhNew( size_t pathmax, unsigned int options )
 {
-	struct dirh_params *params = (struct dirh_params *)memoryAlloc( sizeof( struct dirh_params ) + pathmax );
+	struct dirh_params *params = (struct dirh_params *)memoryAllocEx( "DirhParams", MEMORY_USER, 0, sizeof( struct dirh_params ) + pathmax, options & DIRH_O_ALLOC_HIGH ? PSP_SMEM_High : PSP_SMEM_Low, NULL );
 	if( ! params ) return 0;
 	
 	/* 初期化 */
@@ -98,7 +98,7 @@ int dirhChdir( DirhUID uid, const char *dirpath, unsigned int timeout )
 	
 	if( params->entry.list ) dirh_clear_entries( &(params->entry) );
 	
-	return dirh_make_entries( params->cwd.path, &(params->entry), ( ( params->options & DIRH_OPT_DOPEN_WITH_THREAD ) ? &st_thdopen : NULL ), timeout );
+	return dirh_make_entries( params->cwd.path, &(params->entry), ( ( params->options & DIRH_O_DOPEN_WITH_THREAD ) ? &st_thdopen : NULL ), timeout, params->options & DIRH_O_ALLOC_HIGH ? true : false );
 }
 
 void dirhDestroy( DirhUID uid )
@@ -160,11 +160,11 @@ void dirhSeek( DirhUID uid, DirhWhence whence, int offset )
 	}
 }
 
-static int dirh_make_entries( const char *dirpath, struct dirh_entry *entry, struct dirh_thread_dopen_params **thdopen, unsigned int timeout )
+static int dirh_make_entries( const char *dirpath, struct dirh_entry *entry, struct dirh_thread_dopen_params **thdopen, unsigned int timeout, bool alloc_high )
 {
 	if( thdopen ){
 		if( ! *thdopen ){
-			*thdopen = (struct dirh_thread_dopen_params *)memoryAlloc( sizeof( struct dirh_thread_dopen_params ) );
+			*thdopen = (struct dirh_thread_dopen_params *)memoryAllocEx( "DirhDopen", MEMORY_USER, 0, sizeof( struct dirh_thread_dopen_params ), alloc_high ? PSP_SMEM_High : PSP_SMEM_Low, NULL );
 			if( *thdopen ){
 				(*thdopen)->selfThreadId = 0;
 				(*thdopen)->path         = NULL;
@@ -197,7 +197,7 @@ static int dirh_parse_dirent( const char *dirpath, struct dirh_entry *entry )
 	int ret;
 	
 	char *strings;
-	unsigned int rest, i, len;
+	unsigned int i, len;
 	
 	fd = sceIoDopen( dirpath );
 	if( ! fd ) return CG_ERROR_FAILED_TO_DOPEN;
@@ -206,7 +206,7 @@ static int dirh_parse_dirent( const char *dirpath, struct dirh_entry *entry )
 	
 	require_memsize = 0;
 	while( ( ret = sceIoDread( fd, &dirent ) ) > 0 ){
-		if( dirent.d_stat.st_attr & ( FIO_SO_IFREG | FIO_SO_IFDIR ) && strcmp( dirent.d_name, "." ) != 0 ){
+		if( ( dirent.d_stat.st_attr & ( FIO_SO_IFREG | FIO_SO_IFDIR ) ) && strcmp( dirent.d_name, "." ) != 0 ){
 			require_memsize += strlen( dirent.d_name ) + 1;
 			entry->count++;
 		}
@@ -223,10 +223,9 @@ static int dirh_parse_dirent( const char *dirpath, struct dirh_entry *entry )
 	memset( &dirent, 0, sizeof( SceIoDirent ) );
 	
 	/* ディレクトリリストを作成 */
-	rest = entry->count;
 	i = 0;
 	while( ( ret = sceIoDread( fd, &dirent ) ) > 0 ){
-		if( strcmp( dirent.d_name, "." ) != 0 && rest-- ){
+		if( strcmp( dirent.d_name, "." ) != 0 && i < entry->count ){
 			if( dirent.d_stat.st_attr & FIO_SO_IFREG ){
 				entry->list[i].type = DIRH_FILE;
 			} else if( dirent.d_stat.st_attr & FIO_SO_IFDIR ){

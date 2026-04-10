@@ -321,7 +321,7 @@ static int mf_get_ctrl_buffer( MfHookAction action, unsigned int api, SceCtrlDat
 				if( hookfunc ) hookfunc( action, pad, hk );
 			}
 		}
-		if( caller == MF_CALLER_USER ) pad->Buttons &= 0x0000FFFF;
+		if( caller == MF_CALLER_USER ) pad->Buttons &= MF_TARGET_BUTTONS;
 	}
 	
 	return ret;
@@ -750,6 +750,11 @@ bool mfOverlayMessagePrintf( const char *format, ... )
 bool mfHookIncomplete( void )
 {
 	return st_hook_incomplete;
+}
+
+HeapUID mfHeapCreate( unsigned int count, size_t size )
+{
+	return heapCreateEx( "MacroFireHeap", MEMORY_USER, 0, size + HEAP_HEADER_SIZE * count, PSP_SMEM_High, NULL );
 }
 
 /*-----------------------------------------------

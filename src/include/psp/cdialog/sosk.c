@@ -54,7 +54,7 @@ int cdialogSoskInit( CdialogSoskParams *params )
 		st_params = params;
 		st_params->destroySelf = false;
 	} else{
-		st_params = (CdialogSoskParams *)memoryAlloc( sizeof( CdialogSoskParams ) );
+		st_params = (CdialogSoskParams *)memoryAllocEx( "SoskParams", MEMORY_USER, 0, sizeof( CdialogSoskParams ), PSP_SMEM_High, NULL );
 		if( ! st_params ) return CG_ERROR_NOT_ENOUGH_MEMORY;
 		st_params->destroySelf = true;
 	}

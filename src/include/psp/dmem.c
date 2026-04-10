@@ -30,6 +30,7 @@ struct dmem_heap {
 
 struct dmem_root {
 	size_t minHeapSize;
+	int    allocType;
 	struct dmem_heap *heapList;
 	struct dmem_heap *lastUse;
 };
@@ -38,17 +39,22 @@ struct dmem_root {
 	ローカル関数
 =========================================================*/
 static size_t dmem_need_heapsize( size_t minblock, size_t requestsize );
-static struct dmem_heap *dmem_heap_new( size_t heapsize );
+static struct dmem_heap *dmem_heap_new( size_t heapsize, int type );
 
 /*=========================================================
 	関数
 =========================================================*/
-DmemUID dmemNew( size_t minblock )
+DmemUID dmemNew( size_t minblock, int type )
 {
-	struct dmem_root *root = memoryAlloc( sizeof( struct dmem_root ) );
+	struct dmem_root *root;
+	
+	if( type != PSP_SMEM_High ) type = PSP_SMEM_Low;
+	
+	root = memoryAllocEx( "DmemParams", MEMORY_USER, 0, sizeof( struct dmem_root ), type, NULL );
 	if( ! root ) return 0;
 	
 	root->minHeapSize = minblock > 0 ? minblock : DMEM_DEFAULT_MINBLOCK;
+	root->allocType   = type;
 	root->heapList    = NULL;
 	root->lastUse     = NULL;
 	
@@ -62,7 +68,7 @@ void *dmemAlloc( DmemUID uid, size_t size )
 	
 	if( ! root->lastUse ){
 		/* まだヒープが一つも無ければ最初のヒープを作成する */
-		root->heapList = dmem_heap_new( dmem_need_heapsize( root->minHeapSize, size ) );
+		root->heapList = dmem_heap_new( dmem_need_heapsize( root->minHeapSize, size ), root->allocType );
 		if( ! root->heapList ) return NULL;
 		root->lastUse = root->heapList;
 	} else if( root->lastUse->maxFreeSize < size + DMEM_HEADER_SIZE ){
@@ -77,7 +83,7 @@ void *dmemAlloc( DmemUID uid, size_t size )
 		if( ! heap ){
 			struct dmem_heap *last;
 			
-			heap = dmem_heap_new( dmem_need_heapsize( root->minHeapSize, size ) );
+			heap = dmem_heap_new( dmem_need_heapsize( root->minHeapSize, size ), root->allocType );
 			if( ! heap ) return NULL;
 			
 			for( last = root->lastUse; last->next; last = last->next );
@@ -193,10 +199,10 @@ static size_t dmem_need_heapsize( size_t minblock, size_t requestsize )
 	}
 }
 
-static struct dmem_heap *dmem_heap_new( size_t heapsize )
+static struct dmem_heap *dmem_heap_new( size_t heapsize, int type )
 {
 	struct dmem_heap *newheap;
-	HeapUID huid = heapCreate( heapsize );
+	HeapUID huid = heapCreateEx( "DmemHeap", MEMORY_USER, 0, heapsize, type, NULL );
 	if( ! huid ) return NULL;
 	
 	newheap              = heapAlloc( huid, sizeof( struct dmem_heap ) );

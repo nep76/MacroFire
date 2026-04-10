@@ -28,7 +28,8 @@ extern "C" {
 typedef intptr_t DirhUID;
 
 typedef enum {
-	DIRH_OPT_DOPEN_WITH_THREAD = 0x00000001,
+	DIRH_O_DOPEN_WITH_THREAD = 0x00000001,
+	DIRH_O_ALLOC_HIGH        = 0x00000002
 } DirhOptions;
 
 typedef enum {

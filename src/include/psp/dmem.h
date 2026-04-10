@@ -33,7 +33,7 @@ typedef uintptr_t DmemUID;
 /*=========================================================
 	ä÷êî
 =========================================================*/
-DmemUID dmemNew( size_t minblock );
+DmemUID dmemNew( size_t minblock, int type );
 void *dmemAlloc( DmemUID uid, size_t size );
 void *dmemCalloc( DmemUID uid, size_t nelem, size_t size );
 int dmemFree( DmemUID uid, void *ptr );

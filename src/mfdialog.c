@@ -267,7 +267,6 @@ bool mfDialogDetectbuttonsDraw( void )
 
 bool mfDialogDetectbuttonsResult( void )
 {
-	dbgprint( "DETECTBUTTON FINISH" );
 	return mfdialog_result( cdialogDetectbuttonsShutdownStart, cdialogDetectbuttonsGetResult, cdialogDetectbuttonsDestroy );
 }
 

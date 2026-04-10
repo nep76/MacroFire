@@ -1,3 +1,7 @@
+# 例外ハンドラを設定するデバッグ用MacroFireをビルドするには
+#     make WITH_EXCEPTION_HANDLER=1
+#
+
 TARGET = macrofire
 PSP_FW_VERSION = 380
 
@@ -20,7 +24,7 @@ USE_KERNEL_LIBS = 1
 DIR_CLASSG = include
 
 INCDIR   = $(DIR_CLASSG)
-CFLAGS   = -O2 -G 0 -Wall -fno-strict-aliasing# -g -DDEBUG=1 -DMEMORY_DEBUG
+CFLAGS   = -O2 -G 0 -Wall -fno-strict-aliasing -fno-builtin-printf# -g -DDEBUG=1 -DMEMORY_DEBUG
 ASFLAGS  = $(CFLAGS)
 LIBDIR   = 
 LDFLAGS  = 

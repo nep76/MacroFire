@@ -48,7 +48,7 @@ static void inimgr_delete_entry( struct inimgr_params *params, struct inimgr_sec
 IniUID inimgrNew( void )
 {
 	struct inimgr_params *params;
-	DmemUID dmem = dmemNew( 0 );
+	DmemUID dmem = dmemNew( 0, PSP_SMEM_High );
 	
 	if( ! dmem ) return CG_ERROR_NOT_ENOUGH_MEMORY;
 	
@@ -126,7 +126,7 @@ int inimgrLoad( IniUID uid, const char *inipath, const char *sig, unsigned char 
 	struct inimgr_entry         *current_entry    = NULL;
 	struct inimgr_callback      *callback         = NULL;
 	
-	fh = fiomgrOpen( inipath, FH_O_RDONLY, 0777 );
+	fh = fiomgrOpen( inipath, FH_O_RDONLY | FH_O_ALLOC_HIGH, 0777 );
 	if( fh < 0 ) return CG_ERROR_INVALID_ARGUMENT;
 	
 	/* シグネチャとバージョンをチェック */
@@ -287,7 +287,7 @@ int inimgrSave( IniUID uid, const char *inipath, const char *sig, unsigned char 
 	struct   inimgr_entry    *entry;
 	struct   inimgr_callback *callback;
 	
-	fh = fiomgrOpen( inipath, FH_O_WRONLY | FH_O_CREAT | FH_O_TRUNC, 0777 );
+	fh = fiomgrOpen( inipath, FH_O_WRONLY | FH_O_CREAT | FH_O_TRUNC | FH_O_ALLOC_HIGH, 0777 );
 	if( fh < 0 ) return CG_ERROR_INVALID_ARGUMENT;
 	
 	/* シグネチャ */
@@ -318,7 +318,7 @@ int inimgrSave( IniUID uid, const char *inipath, const char *sig, unsigned char 
 		callback = inimgr_find_callback( params, section->name );
 		
 		/* デフォルトセクションはセクション名を書き込まない, セクション名に"*"サフィックスがなければセクション名を書き込む */
-		if( strcasecmp( section->name, INIMGR_DEFAULT_SECTION_NAME ) != 0 && ( ! callback || ! callback->cmplen ) ){
+		if( strcasecmp( section->name, INIMGR_DEFAULT_SECTION_NAME ) != 0 && ( ! callback || callback->cmplen < 0 ) ){
 			int len = inimgrMakeSection( buf, sizeof( buf ), section->name );
 			
 			if( fiomgrTell( fh ) != 0 ) fiomgrWriteln( fh, "", 0 );

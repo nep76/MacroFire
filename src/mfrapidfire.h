@@ -48,7 +48,7 @@ void mfRapidfireSetHold( MfRapidfireUID uid, unsigned int buttons, bool autorun 
 void mfRapidfireClear( MfRapidfireUID uid, unsigned int buttons );
 bool mfRapidfireGetEntry( MfRapidfireUID uid, enum PspCtrlButtons button, MfRapidfireMode *mode, unsigned int *pdelay, unsigned int *rdelay, bool *autorun );
 bool mfRapidfireReadEntry( MfRapidfireUID uid, unsigned int *button, MfRapidfireMode *mode, unsigned int *pdelay, unsigned int *rdelay, bool *autorun, unsigned short *save );
-void mfRapidfireExec( MfRapidfireUID uid, SceCtrlData *pad );
+void mfRapidfireExec( MfRapidfireUID uid, MfHookAction action, SceCtrlData *pad );
 void mfRapidfireReset( void );
 void mfRapidfireGetModeByName( const char *str, MfRapidfireMode *mode, bool *autorun );
 const char *mfRapidfireGetNameByMode( MfRapidfireMode mode, bool autorun );

@@ -33,7 +33,7 @@ int cdialogMessageInit( CdialogMessageParams *params )
 		st_params = params;
 		st_params->destroySelf = false;
 	} else{
-		st_params = (CdialogMessageParams *)memoryAlloc( sizeof( CdialogMessageParams ) );
+		st_params = (CdialogMessageParams *)memoryAllocEx( "MessageParams", MEMORY_USER, 0, sizeof( CdialogMessageParams ), PSP_SMEM_High, NULL );
 		if( ! st_params ) return CG_ERROR_NOT_ENOUGH_MEMORY;
 		st_params->destroySelf = true;
 	}

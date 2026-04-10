@@ -188,7 +188,7 @@ bool mfRapidfireReadEntry( MfRapidfireUID uid, unsigned int *button, MfRapidfire
 	return true;
 }
 
-void mfRapidfireExec( MfRapidfireUID uid, SceCtrlData *pad )
+void mfRapidfireExec( MfRapidfireUID uid, MfHookAction action, SceCtrlData *pad )
 {
 	unsigned short i;
 	uint64_t cur_tick;
@@ -198,7 +198,7 @@ void mfRapidfireExec( MfRapidfireUID uid, SceCtrlData *pad )
 	sceRtcGetCurrentTick( &cur_tick );
 	delay = ( cur_tick - params->lastTick ) / 1000;
 	
-	if( mfGetWorld() == MF_WORLD_VSH && mfIsRunningApp( MF_APP_WEBBROWSER ) ) return;
+	if( mfIsRunningApp( MF_APP_WEBBROWSER ) ) return;
 	
 	for( i = 0; i < MF_RAPIDFIRE_NUMBER_OF_AVAIL_BUTTONS; i++ ){
 		if( params->pref[i].mode == MF_RAPIDFIRE_MODE_HOLD && st_progress[i].mode < MF_RAPIDFIRE_MODE_HOLD ){
@@ -225,7 +225,7 @@ void mfRapidfireExec( MfRapidfireUID uid, SceCtrlData *pad )
 			uint64_t cur_tick;
 			sceRtcGetCurrentTick( &cur_tick );
 			
-			if( delay > ( ( params->pref[i].bitFlags & MF_RAPIDFIRE_FLAGS_RAPID_PRESS ) ? params->pref[i].pressDelay : params->pref[i].releaseDelay ) ){
+			if( action == MF_UPDATE && ( delay > ( ( params->pref[i].bitFlags & MF_RAPIDFIRE_FLAGS_RAPID_PRESS ) ? params->pref[i].pressDelay : params->pref[i].releaseDelay ) ) ){
 				params->lastTick = cur_tick;
 				params->pref[i].bitFlags ^= MF_RAPIDFIRE_FLAGS_RAPID_PRESS;
 			}

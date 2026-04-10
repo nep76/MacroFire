@@ -16,7 +16,7 @@
 	íËêî
 ==========================================================*/
 #define MF_TITLE        "MacroFire %s In-game menu"
-#define MF_VERSION      "3.0.2"
+#define MF_VERSION      "3.0.3"
 #define MF_AUTHOR       "ClassG (http://classg.sytes.net)"
 
 #define MF_INI_FILENAME        "macrofire.ini"
@@ -145,6 +145,11 @@ void mfOverlayMessageExit( void );
 bool mfOverlayMessageIsRunning( void );
 bool mfOverlayMessagePrintf( const char *format, ... );
 bool mfHookIncomplete( void );
+HeapUID mfHeapCreate( unsigned int count, size_t size );
+#define mfHeapAlloc   heapAlloc
+#define mfHeapCalloc  heapCalloc
+#define mfHeapFree    heapFree
+#define mfHeapDestroy heapDestroy
 
 #ifndef MFEXCLUDE_DIALOG
 #include "mfdialog.h"

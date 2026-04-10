@@ -145,7 +145,8 @@ static bool mf_menu_stack( struct mf_menu_stack *stack, enum mf_menu_stack_ctrl 
 static unsigned int mf_label_width( char *str );
 static void mf_root_menu( MfMenuMessage message );
 static void mf_menu_audio( bool enable );
-static void mf_indicator( void );
+bool mf_menu_ctrl_engine_stat( MfMessage message, const char *label, void *var, void *unused, void *ex );
+static void mf_menu_indicator( void );
 
 /*=========================================================
 	ローカル変数
@@ -944,10 +945,10 @@ static void mf_root_menu( MfMenuMessage message )
 				4, 1,
 				gMftabEntryCount, 1
 			);
-			pheap = heapCreate( sizeof( struct mf_main_pref ) + sizeof( MfCtrlDefGetButtonsPref ) + HEAP_HEADER_SIZE * 2 );
+			pheap = mfHeapCreate( 2, sizeof( struct mf_main_pref ) + sizeof( MfCtrlDefGetButtonsPref ) );
 			if( ! menu || ! pheap ){
 				if( menu  ) mfMenuDestroyTables( menu );
-				if( pheap ) heapDestroy( pheap );
+				if( pheap ) mfHeapDestroy( pheap );
 				return;
 			}
 			
@@ -955,8 +956,8 @@ static void mf_root_menu( MfMenuMessage message )
 				unsigned short row;
 				void *menuproc;
 				
-				MfCtrlDefGetButtonsPref *hotkey_pref = heapCalloc( pheap, sizeof( MfCtrlDefGetButtonsPref ) );
-				main_pref = heapCalloc( pheap, sizeof( struct mf_main_pref ) );
+				MfCtrlDefGetButtonsPref *hotkey_pref = mfHeapCalloc( pheap, sizeof( MfCtrlDefGetButtonsPref ) );
+				main_pref = mfHeapCalloc( pheap, sizeof( struct mf_main_pref ) );
 				main_pref->engine      = mfIsEnabled();
 				main_pref->menu        = mfGetMenuButtons();
 				main_pref->toggle      = mfGetToggleButtons();
@@ -965,7 +966,7 @@ static void mf_root_menu( MfMenuMessage message )
 				hotkey_pref->availButtons = MF_HOTKEY_BUTTONS;
 				
 				mfMenuSetTablePosition( menu, 1, gbOffsetChar( 5 ), gbOffsetLine( 4 ) + 2 );
-				mfMenuSetTableEntry( menu, 1, 1, 1, "MacroFire Engine", mfCtrlDefBool, &(main_pref->engine), NULL );
+				mfMenuSetTableEntry( menu, 1, 1, 1, "MacroFire Engine", mf_menu_ctrl_engine_stat, &(main_pref->engine), NULL );
 				
 				mfMenuSetTablePosition( menu, 2, gbOffsetChar( 5 ), gbOffsetLine( 6 ) + 2 );
 				mfMenuSetTableLabel( menu, 2, "MacroFire preference" );
@@ -987,7 +988,6 @@ static void mf_root_menu( MfMenuMessage message )
 			mfMenuInitTables( menu, 3 );
 			break;
 		case MF_MM_TERM:
-			main_pref->engine ? mfEnable() : mfDisable();
 			mfSetMenuButtons( main_pref->menu );
 			mfSetToggleButtons( main_pref->toggle );
 			
@@ -998,7 +998,7 @@ static void mf_root_menu( MfMenuMessage message )
 			}
 			
 			mfMenuDestroyTables( menu );
-			heapDestroy( pheap );
+			mfHeapDestroy( pheap );
 			return;
 		default:
 			if( ! mfMenuDrawTables( menu, 3, MF_MENU_NO_OPTIONS ) ) mfMenuProc( NULL );
@@ -1028,7 +1028,7 @@ void mfMenuMain( SceCtrlData *pad, MfHprmKey *hk )
 	dbgprintf( "Memory block %d leaked", memoryGetAllocCount() );
 	
 	/* ユーザメモリからメニュー用の作業域を確保 */
-	st_params = memoryAlloc( sizeof( struct mf_menu_params ) );
+	st_params = memoryAllocEx( "MacroFireMenuParams", MEMORY_USER, 0, sizeof( struct mf_menu_params ), PSP_SMEM_High, NULL );
 	dbgprintf( "Allocating memory for menu: %p: %d bytes", st_params, sizeof( struct mf_menu_params ) );
 	if( ! st_params ){
 		dbgprint( "Not enough available memory for menu" );
@@ -1142,7 +1142,7 @@ void mfMenuMain( SceCtrlData *pad, MfHprmKey *hk )
 		if( st_params->forcedQuit || ! st_params->proc || ( ! st_params->noqq && ( st_params->ctrl.pad->Buttons & ( PSP_CTRL_START | PSP_CTRL_HOME ) ) ) ) break;
 		
 		/* インジケータ表示 */
-		mf_indicator();
+		mf_menu_indicator();
 		
 		/* 情報バーをクリア */
 		st_params->info.text[0] = '\0';
@@ -1307,7 +1307,7 @@ MfMenuTable *mfMenuCreateTables( unsigned short tables, ... )
 	va_end( ap );
 	
 	dbgprintf( "Allocating memory for menu-tables: %d bytes", allocsize );
-	table = (MfMenuTable *)memoryAlloc( allocsize );
+	table = (MfMenuTable *)memoryAllocEx( "MacroFireMenuTables", MEMORY_USER, 0, allocsize, PSP_SMEM_High, NULL );
 	if( ! table ){
 		dbgprint( "Failed to allocate memory" );
 		return NULL;
@@ -1354,7 +1354,23 @@ void mfMenuDestroyTables( MfMenuTable *table )
 	memoryFree( table );
 }
 
-static void mf_indicator( void )
+bool mf_menu_ctrl_engine_stat( MfMessage message, const char *label, void *var, void *unused, void *ex )
+{
+	bool prev_stat = *((bool *)var);
+	bool ret = mfCtrlDefBool( message, label, var, unused, ex );
+	
+	if( prev_stat != *((bool *)var) ){
+		if( *((bool *)var) ){
+			mfEnable();
+		} else{
+			mfDisable();
+		}
+	}
+	
+	return ret;
+}
+
+static void mf_menu_indicator( void )
 {
 	static char lst_working_indicator[] = "|/-\\";
 	static int  lst_working_indicator_index = 0;
@@ -1370,7 +1386,7 @@ static bool mf_menu_stack( struct mf_menu_stack *stack, enum mf_menu_stack_ctrl 
 		case MF_MENU_STACK_CREATE:
 			stack->index = 0;
 			stack->size  = MF_MENU_STACK_SIZE( MF_MENU_STACK_NUM );
-			stack->memory = memoryAlloc( stack->size );
+			stack->memory = memoryAllocEx( "MacroFireMenuStack", MEMORY_USER, 0, stack->size, PSP_SMEM_High, NULL );
 			dbgprintf( "Allocating memory for menu-stack: %p: %d bytes", stack->memory, stack->size );
 			return stack->memory ? true : false;
 		case MF_MENU_STACK_PUSH:
@@ -1470,7 +1486,7 @@ static bool mf_alloc_buffers( struct mf_frame_buffers *fb )
 		unsigned short frame_num =  free_mem / fb->frameSize;
 		
 		if( free_mem >= vram_size ){
-			fb->vram = memoryAlloc( vram_size );
+			fb->vram = memoryAllocEx( "MacroFireMenuVRAMBackup", MEMORY_USER, 0, vram_size, PSP_SMEM_High, NULL );
 			if( ! fb->vram ) return false;
 			
 			dbgprintf( "Memory allocated: %d bytes", vram_size );

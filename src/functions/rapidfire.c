@@ -92,7 +92,7 @@ void rapidfireIniCreate( IniUID ini, char *buf, size_t len )
 void rapidfireMain( MfHookAction action, SceCtrlData *pad, MfHprmKey *hk )
 {
 	if( mfIsRunningApp( MF_APP_WEBBROWSER ) ) return;
-	mfRapidfireExec( st_rfuid, pad );
+	mfRapidfireExec( st_rfuid, action, pad );
 }
 
 void rapidfireMenu( MfMessage message )
@@ -117,20 +117,19 @@ void rapidfireMenu( MfMessage message )
 				2, 1,
 				2, 1
 			);
-			st_heap = heapCreate(
+			st_heap = mfHeapCreate( 4,
 				sizeof( struct rapidfire_mode ) * 12 +
 				sizeof( char ** ) * 6                +
 				sizeof( MfCtrlDefGetNumberPref )     +
-				MF_PATH_MAX +
-				HEAP_HEADER_SIZE * 4
+				MF_PATH_MAX
 			);
 			if( ! menu || ! st_heap ){
 				if( menu ) mfMenuDestroyTables( menu );
-				if( st_heap ) heapDestroy( st_heap );
+				if( st_heap ) mfHeapDestroy( st_heap );
 				return;
 			}
 			
-			st_mode  = heapAlloc( st_heap, sizeof( struct rapidfire_mode ) * MF_RAPIDFIRE_NUMBER_OF_AVAIL_BUTTONS );
+			st_mode  = mfHeapAlloc( st_heap, sizeof( struct rapidfire_mode ) * MF_RAPIDFIRE_NUMBER_OF_AVAIL_BUTTONS );
 			
 			{
 				unsigned short save = 0, i = 0;
@@ -138,8 +137,8 @@ void rapidfireMenu( MfMessage message )
 				unsigned int pdelay, rdelay;
 				bool autorun;
 				
-				MfCtrlDefGetNumberPref *delaypref = heapCalloc( st_heap, sizeof( MfCtrlDefGetNumberPref ) );
-				const char **options = heapAlloc( st_heap, sizeof( char ** ) * 6 );
+				MfCtrlDefGetNumberPref *delaypref = mfHeapCalloc( st_heap, sizeof( MfCtrlDefGetNumberPref ) );
+				const char **options = mfHeapAlloc( st_heap, sizeof( char ** ) * 6 );
 				
 				delaypref->unit = "ms";
 				delaypref->max   = 999;
@@ -197,7 +196,7 @@ void rapidfireMenu( MfMessage message )
 		case MF_MM_TERM:
 			rapidfire_apply( st_mode, &st_delay );
 			mfMenuDestroyTables( menu );
-			heapDestroy( st_heap );
+			mfHeapDestroy( st_heap );
 			return;
 		default:
 			gbPrint( gbOffsetChar( 3 ), gbOffsetLine(  4 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, "Please choose a rapidfire mode per buttons." );
@@ -279,10 +278,10 @@ static void rapidfire_menu_save( MfMenuMessage message )
 	static char *path;
 	
 	if( message == MF_MM_INIT ){
-		path = heapAlloc( st_heap, MF_PATH_MAX );
+		path = mfHeapAlloc( st_heap, MF_PATH_MAX );
 		
 		if( ! mfDialogGetfilenameInit( "Save rapidfire preference", "ms0:", "rapidfire.ini", path, 255, CDIALOG_GETFILENAME_SAVE | CDIALOG_GETFILENAME_OVERWRITEPROMPT  ) ){
-			heapFree( st_heap, path );
+			mfHeapFree( st_heap, path );
 			path = NULL;
 			mfMenuExitExtra();
 		}
@@ -290,7 +289,7 @@ static void rapidfire_menu_save( MfMenuMessage message )
 		if( mfDialogCurrentType() ){
 			if( ! mfDialogGetfilenameDraw() ){
 				if( ! mfDialogGetfilenameResult() ){
-					heapFree( st_heap, path );
+					mfHeapFree( st_heap, path );
 					path = NULL;
 				} else{
 					mfMenuSetInfoText( MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "Saving %s...", path );
@@ -298,7 +297,7 @@ static void rapidfire_menu_save( MfMenuMessage message )
 			}
 		} else if( path ){
 			rapidfire_save( path, st_mode, &st_delay );
-			heapFree( st_heap, path );
+			mfHeapFree( st_heap, path );
 			path = NULL;
 		} else if( ! path ){
 			mfMenuExitExtra();
@@ -311,10 +310,10 @@ static void rapidfire_menu_load( MfMenuMessage message )
 	static char *path;
 	
 	if( message == MF_MM_INIT ){
-		path = heapAlloc( st_heap, MF_PATH_MAX );
+		path = mfHeapAlloc( st_heap, MF_PATH_MAX );
 		
 		if( ! mfDialogGetfilenameInit( "Load rapidfire preference", "ms0:", "", path, 255, CDIALOG_GETFILENAME_OPEN | CDIALOG_GETFILENAME_FILEMUSTEXIST ) ){
-			heapFree( st_heap, path );
+			mfHeapFree( st_heap, path );
 			path = NULL;
 			mfMenuExitExtra();
 		}
@@ -322,7 +321,7 @@ static void rapidfire_menu_load( MfMenuMessage message )
 		if( mfDialogCurrentType() ){
 			if( ! mfDialogGetfilenameDraw() ){
 				if( ! mfDialogGetfilenameResult() ){
-					heapFree( st_heap, path );
+					mfHeapFree( st_heap, path );
 					path = NULL;
 				} else{
 					mfMenuSetInfoText( MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "Loading %s...", path );
@@ -330,7 +329,7 @@ static void rapidfire_menu_load( MfMenuMessage message )
 			}
 		} else if( path ){
 			rapidfire_load( path, st_mode, &st_delay );
-			heapFree( st_heap, path );
+			mfHeapFree( st_heap, path );
 			path = NULL;
 		} else if( ! path ){
 			mfMenuExitExtra();
@@ -403,6 +402,8 @@ static bool rapidfire_load( const char *path, struct rapidfire_mode *mode, struc
 					mode[i].mode = RAPIDFIRE_NORMAL;
 				}
 			}
+			mfConvertButtonFinish();
+			
 			if( inimgrGetInt( ini, RAPIDFIRE_INI_SECTION_DELAY, RAPIDFIRE_INI_ENTRY_PD, &delayms ) ) delay->pressDelay = delayms;
 			if( inimgrGetInt( ini, RAPIDFIRE_INI_SECTION_DELAY, RAPIDFIRE_INI_ENTRY_RD, &delayms ) ) delay->releaseDelay = delayms;
 			

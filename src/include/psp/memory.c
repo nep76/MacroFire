@@ -170,7 +170,7 @@ void *memoryAllocEx( const char *name, MemoryPartition partition, unsigned int a
 	memcpy( (void *)( (uintptr_t)memblock - sizeof( struct memory_header ) ), (void *)&header, sizeof( struct memory_header ) );
 	
 #ifdef MEMORY_DEBUG
-	printf( "MemoryAlloc %s: BlockID: %x, HeadAddr: %p\n", name, header.blockId, memblock );
+	printf( "MemoryAlloc %s: BlockID: %x, HeadAddr: %p, Size: %u\n", name, header.blockId, memblock, header.size );
 	st_alloc_count++;
 #endif
 	

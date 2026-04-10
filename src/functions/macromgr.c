@@ -34,7 +34,7 @@ MacromgrUID macromgrNew( void )
 	DmemUID uid;
 	struct macromgr_params *params;
 	
-	uid = dmemNew( 0 );
+	uid = dmemNew( 0, PSP_SMEM_Low );
 	if( ! uid ) return 0;
 	
 	params = (struct macromgr_params *)dmemAlloc( uid, sizeof( struct macromgr_params ) );
@@ -61,16 +61,16 @@ MacromgrCommand *macromgrSeek( MacromgrUID uid, unsigned int offset, MacromgrWhe
 	switch( whence ){
 		case MACROMGR_SEEK_SET:
 			cmd = params->macro;
-			while( offset-- ) cmd = cmd->next;
+			while( offset-- && cmd ) cmd = cmd->next;
 			break;
 		case MACROMGR_SEEK_END:
 			cmd = params->macro;
 			while( cmd->next ) cmd = cmd->next;
-			while( offset-- ) cmd = cmd->prev;
+			while( offset-- && cmd ) cmd = cmd->prev;
 			break;
 		case MACROMGR_SEEK_CUR:
 			cmd = cur;
-			while( offset--) cmd = cmd->next;
+			while( offset-- && cmd ) cmd = cmd->next;
 			break;
 	}
 	

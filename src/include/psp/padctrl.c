@@ -30,7 +30,7 @@ static void padctrl_proc( PadctrlUID uid, SceCtrlData *pad, int count );
 =========================================================*/
 PadctrlUID padctrlNew( void )
 {
-	struct padctrl_params *params = memoryAlloc( sizeof( struct padctrl_params ) );
+	struct padctrl_params *params = memoryAllocEx( "PadctrlParams", MEMORY_USER, 0, sizeof( struct padctrl_params ), PSP_SMEM_High, NULL );
 	if( ! params ) return 0;
 	
 	sceCtrlSetSamplingMode( PSP_CTRL_MODE_ANALOG );

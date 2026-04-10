@@ -235,7 +235,7 @@ static bool remap_add( struct remap_params *params )
 	
 	if( ! params->remapList ){
 		dbgprint( "New entry" );
-		params->dmem      = dmemNew( 512 );
+		params->dmem      = dmemNew( 512, PSP_SMEM_Low );
 		params->remapList = dmemAlloc( params->dmem, sizeof( PadutilRemap ) );
 		new_entry         = params->remapList;
 	} else{
@@ -313,8 +313,10 @@ static bool remap_save( struct remap_params *params, const char *path )
 			mfMenuSetInfoText( MF_MENU_INFOTEXT_ERROR | MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "inimgr Error: %X", ret );
 			mfMenuWait( MF_ERROR_DELAY );
 		} else{
+			inimgrDestroy( ini );
 			return true;
 		}
+		inimgrDestroy( ini );
 	} else{
 		mfMenuSetInfoText( MF_MENU_INFOTEXT_ERROR | MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "inimgr Error: Not enough memory." );
 		mfMenuWait( MF_ERROR_DELAY );
@@ -378,8 +380,6 @@ static int remap_loader( InimgrCallbackMode mode, InimgrCallbackParams *cbp, cha
 	while( inimgrCbReadln( cbp, buf, buflen ) ){
 		strutilRemoveChar( buf, "\x20\t" );
 		if( ! inimgrParseEntry( buf, &name, &value ) ) continue;
-		
-		printf( "ENTRY: %s %s\n", name, value );
 		
 		if( strcasecmp( name, "RealButtons" ) == 0 ){
 			if( ! params->selected->realButtons ){
@@ -446,7 +446,7 @@ static void remap_menu_save( MfMenuMessage message )
 	static char *path;
 	
 	if( message == MF_MM_INIT ){
-		path = memoryAlloc( MF_PATH_MAX );
+		path = memoryAllocEx( "RemapSave", MEMORY_USER, 0, MF_PATH_MAX, PSP_SMEM_High, NULL );
 		
 		if( ! mfDialogGetfilenameInit( "Save remap preference", "ms0:", "remap.ini", path, 255, CDIALOG_GETFILENAME_SAVE | CDIALOG_GETFILENAME_OVERWRITEPROMPT  ) ){
 			memoryFree( path );
@@ -478,7 +478,7 @@ static void remap_menu_load( MfMenuMessage message )
 	static char *path;
 	
 	if( message == MF_MM_INIT ){
-		path = memoryAlloc( MF_PATH_MAX );
+		path = memoryAllocEx( "RemapLoad", MEMORY_USER, 0, MF_PATH_MAX, PSP_SMEM_High, NULL );
 		
 		if( ! mfDialogGetfilenameInit( "Load remap preference", "ms0:", "", path, 255, CDIALOG_GETFILENAME_OPEN | CDIALOG_GETFILENAME_FILEMUSTEXIST ) ){
 			memoryFree( path );

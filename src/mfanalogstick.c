@@ -100,17 +100,17 @@ void mfAnalogStickMenu( MfMenuMessage message )
 				1,
 				7, 1
 			);
-			pheap = heapCreate( sizeof( MfCtrlDefGetNumberPref ) * 3 + HEAP_HEADER_SIZE * 3 );
+			pheap = mfHeapCreate( 3, sizeof( MfCtrlDefGetNumberPref ) * 3 );
 			if( ! menu || ! pheap ){
 				if( menu ) mfMenuDestroyTables( menu );
-				if( pheap ) heapDestroy( pheap );
+				if( pheap ) mfHeapDestroy( pheap );
 				return;
 			}
 			
 			{
-				MfCtrlDefGetNumberPref *pref_deadzone    = heapCalloc( pheap, sizeof( MfCtrlDefGetNumberPref ) );
-				MfCtrlDefGetNumberPref *pref_sensitivity = heapCalloc( pheap, sizeof( MfCtrlDefGetNumberPref ) );
-				MfCtrlDefGetNumberPref *pref_origin      = heapCalloc( pheap, sizeof( MfCtrlDefGetNumberPref ) );
+				MfCtrlDefGetNumberPref *pref_deadzone    = mfHeapCalloc( pheap, sizeof( MfCtrlDefGetNumberPref ) );
+				MfCtrlDefGetNumberPref *pref_sensitivity = mfHeapCalloc( pheap, sizeof( MfCtrlDefGetNumberPref ) );
+				MfCtrlDefGetNumberPref *pref_origin      = mfHeapCalloc( pheap, sizeof( MfCtrlDefGetNumberPref ) );
 				
 				pref_deadzone->unit  = "(0-182)";
 				pref_deadzone->max   = 182;
@@ -136,7 +136,7 @@ void mfAnalogStickMenu( MfMenuMessage message )
 			break;
 		case MF_MM_TERM:
 			mfMenuDestroyTables( menu );
-			heapDestroy( pheap );
+			mfHeapDestroy( pheap );
 			return;
 		default:
 			st_analogstick.sensitivity = sensitivity / 100.0f;

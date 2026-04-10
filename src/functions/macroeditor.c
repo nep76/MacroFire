@@ -72,7 +72,7 @@ bool macroeditorInit( MacromgrUID uid )
 	
 	if( ! uid ) return false;
 	
-	st_params = memoryAlloc( sizeof( struct macroeditor_params ) );
+	st_params = memoryAllocEx( "MacroFireMacroeditor", MEMORY_USER, 0, sizeof( struct macroeditor_params ), PSP_SMEM_High, NULL );
 	if( ! st_params ) return false;
 	
 	st_params->macro       = uid;
