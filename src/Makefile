@@ -46,6 +46,7 @@ LIBS     = -lpsppower_driver -lpsphprm_driver -lpspge -lpsprtc -lpsputility -lm
 
 OBJS = exports.o \
        sceDmac.o \
+       sceUtility.o \
        mfmain.o \
        mfanalogstick.o \
        mfrapidfire.o \
