@@ -39,8 +39,8 @@ extern "C" {
 		コピーした文字数を返す。
 		ヌル文字も数える。
 */
-int strutilCopy( char *dest, const char *src, size_t max );
-int strutilNCopy( char *dest, const char *src, size_t n, size_t max );
+int strutilCopy( char *__restrict__ dest, const char *__restrict__ src, size_t max );
+int strutilNCopy( char *__restrict__ dest, const char *__restrict__ src, size_t n, size_t max );
 
 /*
 	strutilCat
@@ -64,8 +64,8 @@ int strutilNCopy( char *dest, const char *src, size_t n, size_t max );
 		結合後の文字数を返す。
 		ヌル文字も数える。
 */
-int strutilCat( char *dest, const char *src, size_t max );
-int strutilNCat( char *dest, const char *src, size_t n, size_t max );
+int strutilCat( char *__restrict__ dest, const char *__restrict__ src, size_t max );
+int strutilNCat( char *__restrict__ dest, const char *__restrict__ src, size_t n, size_t max );
 
 /*
 	strutilCounterPbrk
@@ -82,7 +82,7 @@ int strutilNCat( char *dest, const char *src, size_t n, size_t max );
 	@return: char*
 		"文字列src中で、文字群searchに含まれない文字が最初に見つかった位置。
 */
-char *strutilCounterPbrk( const char *src, const char *search );
+char *strutilCounterPbrk( const char *__restrict__ src, const char *__restrict__ search );
 
 /*
 	strutilCounterReversePbrk
@@ -98,7 +98,7 @@ char *strutilCounterPbrk( const char *src, const char *search );
 	@return: char*
 		"文字列src中で、文字群searchに含まれない文字が最初に見つかった位置。
 */
-char *strutilCounterReversePbrk( const char *src, const char *search );
+char *strutilCounterReversePbrk( const char *__restrict__ src, const char *__restrict__ search );
 
 /*
 	strutilRemoveChar 
@@ -112,7 +112,7 @@ char *strutilCounterReversePbrk( const char *src, const char *search );
 		取り除く文字を指定。
 		文字列で指定するが、取り除きたい文字を全て書き出す。
 */
-void strutilRemoveChar( char *str, const char *search );
+void strutilRemoveChar( char *__restrict__ str, const char *__restrict__ search );
 
 /*
 	strutilToUpperFirst
@@ -154,7 +154,7 @@ char *strutilToLowerFirst( char *str );
 	@return: unsigned int
 		発見した文字数。
 */
-unsigned int strutilCountChar( char *str, char c );
+unsigned int strutilCountChar( const char *str, char c );
 
 #ifdef __cplusplus
 }

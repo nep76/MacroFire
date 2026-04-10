@@ -67,7 +67,7 @@ int ovmsgInit( void )
 	st_params->w = 0;
 	st_params->h = 0;
 	st_params->fgcolor = 0xffeeeeee;
-	st_params->bgcolor = 0x880000ff;
+	st_params->bgcolor = 0x88000000;
 	st_params->str = (char *)( (uintptr_t)st_params + sizeof( struct ovmsg_params ) );
 	
 	st_params->running = true;
@@ -107,15 +107,17 @@ int ovmsgThreadMain( SceSize arglen, void *argp )
 		
 		st_params->displaySec = ( st_params->w - 1 ) / 7;
 		if( st_params->displaySec < 3 ) st_params->displaySec = 3;
-		
+#ifdef PB_SJIS_SUPPORT
+		st_params->w = pbMeasureString( st_params->str ) + pbOffsetChar( 1 );
+#else
 		st_params->w = pbOffsetChar( st_params->w );
+#endif
 		st_params->h = pbOffsetLine( st_params->h );
 		
 		while( ovmsg_get_status( st_params ) != OVMSG_INTERRUPT && ( sceKernelLibcTime( NULL ) - st_params->displayStart < st_params->displaySec ) ){
 			if( sceDisplayGetFrameBuf( &addr, &width, &pixelformat, PSP_DISPLAY_SETBUF_IMMEDIATE ) == 0 && addr && width ){
 				pbSetDisplayBuffer( pixelformat, addr, width );
 				pbApply();
-				pbSync( PB_BUFSYNC_IMMEDIATE );
 				pbFillRectRel( st_params->x, st_params->y, st_params->w, st_params->h, st_params->bgcolor );
 				pbPrint( st_params->x + ( pbOffsetChar( 1 ) >> 1 ), st_params->y + ( pbOffsetLine( 1 ) >> 1 ), st_params->fgcolor, PB_TRANSPARENT, st_params->str );
 			}

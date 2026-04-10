@@ -44,6 +44,8 @@
 #define MF_STR_HOME_STAT_NOTIFICATION       "エンジン状態の通知"
 #define MF_STR_HOME_ANALOG_STICK_ADJUSTMENT "アナログスティックの感度調整"
 #define MF_STR_HOME_FUNCTION                "機能\ "
+#define MF_STR_HOME_RETURN_TO_GAME          "ゲームを再開します..."
+#define MF_STR_HOME_NOT_PERFECT_WORK        "MacroFireは正常に動作していません。"
 
 #define MF_STR_FUNCTION_REMAP     "ボタン再割り当て設定"
 #define MF_STR_FUNCTION_RAPIDFIRE "連射設定"
@@ -133,5 +135,16 @@
 #define MF_STR_MACRO_DIAGGETFN_SAVE "マクロの保存"
 #define MF_STR_MACRO_DIAGGETFN_LOAD "マクロの読み込み"
 #define MF_STR_MACRO_ENGINE_IS_OFF  "MacroFire エンジンが無効になっています。"
+
+#define MF_STR_MACROEDITOR_CTRL_EDIT                       "編集"
+#define MF_STR_MACROEDITOR_CTRL_CHANGE                     "変更"
+#define MF_STR_MACROEDITOR_CTRL_DELETE                     "削除"
+#define MF_STR_MACROEDITOR_CTRL_INS_BEFORE                 "前に挿入"
+#define MF_STR_MACROEDITOR_CTRL_INS_AFTER                  "後に挿入"
+#define MF_STR_MACROEDITOR_CMD_RAPIDFIRE_START_EDIT_BUTTON "ボタンを編集"
+#define MF_STR_MACROEDITOR_CMD_RAPIDFIRE_START_EDIT_PD     "ボタンを押した状態を維持する時間を編集(PD)"
+#define MF_STR_MACROEDITOR_CMD_RAPIDFIRE_START_EDIT_RD     "ボタンを放した状態を維持する時間を編集(RD)"
+#define MF_STR_MACROEDITOR_CMD_ANALOG_MOVE_EDIT_X          "X座標を編集"
+#define MF_STR_MACROEDITOR_CMD_ANALOG_MOVE_EDIT_Y          "Y座標を編集"
 
 #endif

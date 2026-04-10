@@ -44,6 +44,8 @@
 #define MF_STR_HOME_STAT_NOTIFICATION       "Engine status notification"
 #define MF_STR_HOME_ANALOG_STICK_ADJUSTMENT "Analog stick sensitivity adjustment"
 #define MF_STR_HOME_FUNCTION                "Functions"
+#define MF_STR_HOME_RETURN_TO_GAME          "Returning to the game..."
+#define MF_STR_HOME_NOT_PERFECT_WORK        "MacroFire is not working perfectly."
 
 #define MF_STR_FUNCTION_REMAP     "Remap settings"
 #define MF_STR_FUNCTION_RAPIDFIRE "Rapidfire settings"
@@ -133,5 +135,16 @@
 #define MF_STR_MACRO_DIAGGETFN_SAVE "Save macro"
 #define MF_STR_MACRO_DIAGGETFN_LOAD "Load macro"
 #define MF_STR_MACRO_ENGINE_IS_OFF  "MacroFire Engine is currently off."
+
+#define MF_STR_MACROEDITOR_CTRL_EDIT                       "Edit"
+#define MF_STR_MACROEDITOR_CTRL_CHANGE                     "Change"
+#define MF_STR_MACROEDITOR_CTRL_DELETE                     "Delete"
+#define MF_STR_MACROEDITOR_CTRL_INS_BEFORE                 "Insert before"
+#define MF_STR_MACROEDITOR_CTRL_INS_AFTER                  "Insert after"
+#define MF_STR_MACROEDITOR_CMD_RAPIDFIRE_START_EDIT_BUTTON "Edit buttons"
+#define MF_STR_MACROEDITOR_CMD_RAPIDFIRE_START_EDIT_PD     "Edit press delay(PD)"
+#define MF_STR_MACROEDITOR_CMD_RAPIDFIRE_START_EDIT_RD     "Edit release delay(RD)"
+#define MF_STR_MACROEDITOR_CMD_ANALOG_MOVE_EDIT_X          "Edit X-coordinate"
+#define MF_STR_MACROEDITOR_CMD_ANALOG_MOVE_EDIT_Y          "Edit Y-coordinate"
 
 #endif

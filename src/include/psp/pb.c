@@ -102,6 +102,7 @@ struct pb_params {
 static color_convert pb_get_color_converter( int format );
 static color_convert pb_get_color_blender( int format );
 static void *pb_buf_addr( struct pb_frame_buffer *fb, int x, int y );
+static void pb_set_framebuf_conf( struct pb_frame_buffer *fb, unsigned int opt );
 
 #ifdef PB_SJIS_SUPPORT
 static unsigned short pb_get_glyph_index_by_sjis( unsigned char sjis_hi, unsigned char sjis_lo );
@@ -245,29 +246,16 @@ bool pbIsEnabled( unsigned int opt )
 
 int pbApply( void )
 {
-	if( ! st_params.display->addr ) return CG_ERROR_INVALID_ARGUMENT;
-	if( ! st_params.draw->addr ) *(st_params.draw) = *(st_params.display);
-	
-	st_params.display->pixelSize = pbGetPixelDataSize( st_params.display->format );
-	st_params.draw->pixelSize    = pbGetPixelDataSize( st_params.draw->format );
-	
-	st_params.display->lineSize = st_params.display->width * st_params.display->pixelSize;
-	st_params.draw->lineSize    = st_params.draw->width * st_params.draw->pixelSize;
-	
-	if( st_params.options & PB_NO_CACHE ){
-		if( st_params.display->addr ) st_params.display->addr = (void *)( (uintptr_t)st_params.display->addr | PB_DISABLE_CACHE );
-		if( st_params.draw->addr    ) st_params.draw->addr    = (void *)( (uintptr_t)st_params.draw->addr | PB_DISABLE_CACHE );
+	if( ! st_params.display->addr ){
+		return CG_ERROR_INVALID_ARGUMENT;
 	} else{
-		st_params.display->addr = (void *)( (uintptr_t)st_params.display->addr & ~PB_DISABLE_CACHE );
-		st_params.draw->addr    = (void *)( (uintptr_t)st_params.draw->addr & ~PB_DISABLE_CACHE );
+		pb_set_framebuf_conf( st_params.display, st_params.options );
 	}
 	
-	if( st_params.options & PB_BLEND ){
-		st_params.display->colorConv = pb_get_color_blender( st_params.display->format );
-		st_params.draw->colorConv    = pb_get_color_blender( st_params.draw->format );
+	if( st_params.options & PB_DOUBLE_BUFFER ){
+		pb_set_framebuf_conf( st_params.draw, st_params.options );
 	} else{
-		st_params.display->colorConv = pb_get_color_converter( st_params.display->format );
-		st_params.draw->colorConv    = pb_get_color_converter( st_params.draw->format );
+		*(st_params.draw) = *(st_params.display);
 	}
 	
 	return 0;
@@ -280,7 +268,7 @@ int pbSync( int bufsync )
 
 void *pbSwapBuffers( int bufsync )
 {
-	if( st_params.draw != st_params.display ){
+	if( st_params.draw->addr != st_params.display->addr ){
 		struct pb_frame_buffer *swap = st_params.display;
 		st_params.display = st_params.draw;
 		st_params.draw = swap;
@@ -351,6 +339,8 @@ int pbPrint( int x, int y, unsigned int fg, unsigned int bg, const char *str )
 	unsigned char  glyph_line_data, chr_width, chr_width_bytes;
 	unsigned short glyph_x, glyph_y;
 	unsigned int   color;
+	
+	if( st_params.options & PB_NO_DRAW ) return 0;
 	
 #ifndef PB_SJIS_SUPPORT
 	chr_width       = PB_CHAR_WIDTH;
@@ -427,7 +417,7 @@ void pbPoint( int x, int y, unsigned int color )
 {
 	uintptr_t draw_addr;
 	
-	if( color == PB_TRANSPARENT ) return;
+	if( color == PB_TRANSPARENT || st_params.options & PB_NO_DRAW ) return;
 	
 	draw_addr = (uintptr_t)pb_buf_addr( st_params.draw, x, y );
 	PB_PUT_PIXEL( draw_addr, color );
@@ -438,7 +428,7 @@ void pbLine( int sx, int sy, int ex, int ey, uint32_t color )
 	uintptr_t draw_addr;
 	int       e, dx, dy;
 	
-	if( color == PB_TRANSPARENT ) return;
+	if( color == PB_TRANSPARENT || st_params.options & PB_NO_DRAW ) return;
 	
 	if( sx > ex ) PB_SWAP( &sx, &ex );
 	if( sy > ey ) PB_SWAP( &sy, &ey );
@@ -481,7 +471,7 @@ void pbLine( int sx, int sy, int ex, int ey, uint32_t color )
 
 void pbLineRect( int sx, int sy, int ex, int ey, uint32_t color )
 {
-	if( color == PB_TRANSPARENT ) return;
+	if( color == PB_TRANSPARENT || st_params.options & PB_NO_DRAW ) return;
 	
 	pbLine( sx, sy, ex, sy, color );
 	pbLine( ex, sy, ex, ey, color );
@@ -495,7 +485,7 @@ void pbFillRect( int sx, int sy, int ex, int ey, uint32_t color )
 	unsigned int offset;
 	int          w, h, x;
 	
-	if( color == PB_TRANSPARENT ) return;
+	if( color == PB_TRANSPARENT || st_params.options & PB_NO_DRAW ) return;
 	
 	if( sx > ex ) PB_SWAP( &sx, &ex );
 	if( sy > ey ) PB_SWAP( &sy, &ey );
@@ -519,7 +509,7 @@ void pbLineCircle( int x, int y, unsigned int radius, uint32_t color )
 	int cx = 0, cy = radius;
 	int d = 3 - 2 * radius;
 	
-	if( color == PB_TRANSPARENT || ! radius ) return;
+	if( color == PB_TRANSPARENT || st_params.options & PB_NO_DRAW || ! radius ) return;
 	
 	/* 開始点 */
 	pbPoint( x, y + radius, color ); /* ( 0, R) */
@@ -542,6 +532,25 @@ void pbLineCircle( int x, int y, unsigned int radius, uint32_t color )
 		pbPoint( x - cx, y - cy, color ); /* 225-270 度 */
 		pbPoint( x + cx, y - cy, color ); /* 270-315 度 */
 		pbPoint( x + cy, y - cx, color ); /* 315-360 度 */
+	}
+}
+
+/*-----------------------------------------------
+	フレームバッファ設定
+-----------------------------------------------*/
+static void pb_set_framebuf_conf( struct pb_frame_buffer *fb, unsigned int opt )
+{
+	fb->pixelSize = pbGetPixelDataSize( fb->format );
+	fb->lineSize = fb->width * fb->pixelSize;
+	if( opt & PB_NO_CACHE ){
+		fb->addr = (void *)( (uintptr_t)fb->addr | PB_DISABLE_CACHE );
+	} else{
+		fb->addr = (void *)( (uintptr_t)fb->addr & ~PB_DISABLE_CACHE );
+	}
+	if( opt & PB_BLEND ){
+		fb->colorConv = pb_get_color_blender( fb->format );
+	} else{
+		fb->colorConv = pb_get_color_converter(fb->format );
 	}
 }
 

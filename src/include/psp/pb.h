@@ -89,8 +89,10 @@ extern "C" {
 	å^êÈåæ
 =========================================================*/
 typedef enum {
-	PB_NO_CACHE    = 0x00000001,
-	PB_BLEND       = 0x00000002,
+	PB_NO_CACHE      = 0x00000001,
+	PB_BLEND         = 0x00000002,
+	PB_DOUBLE_BUFFER = 0x00000004,
+	PB_NO_DRAW       = 0x80000000
 } PbOptions;
 
 

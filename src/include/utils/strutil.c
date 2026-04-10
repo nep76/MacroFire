@@ -4,7 +4,7 @@
 
 #include "strutil.h"
 
-int strutilCopy( char *dest, const char *src, size_t max )
+int strutilCopy( char *__restrict__ dest, const char *__restrict__ src, size_t max )
 {
 	int workmax;
 	
@@ -21,12 +21,12 @@ int strutilCopy( char *dest, const char *src, size_t max )
 	return max - workmax;
 }
 
-int strutilNCopy( char *dest, const char *src, size_t n, size_t max )
+int strutilNCopy( char *__restrict__ dest, const char *__restrict__ src, size_t n, size_t max )
 {
 	return strutilCopy( dest, src, n + 1 > max ? max : n + 1 );
 }
 
-int strutilCat( char *dest, const char *src, size_t max )
+int strutilCat( char *__restrict__ dest, const char *__restrict__ src, size_t max )
 {
 	size_t off = strlen( dest );
 	
@@ -38,7 +38,7 @@ int strutilCat( char *dest, const char *src, size_t max )
 	return off;
 }
 
-int strutilNCat( char *dest, const char *src, size_t n, size_t max )
+int strutilNCat( char *__restrict__ dest, const char *__restrict__ src, size_t n, size_t max )
 {
 	size_t off = strlen( dest );
 	
@@ -50,7 +50,7 @@ int strutilNCat( char *dest, const char *src, size_t n, size_t max )
 	return off;
 }
 
-char *strutilCounterPbrk( const char *src, const char *search )
+char *strutilCounterPbrk( const char *__restrict__ src, const char *__restrict__ search )
 {
 	bool find = false;
 	
@@ -77,7 +77,7 @@ char *strutilCounterPbrk( const char *src, const char *search )
 	}
 }
 
-char *strutilCounterReversePbrk( const char *src, const char *search )
+char *strutilCounterReversePbrk( const char *__restrict__ src, const char *__restrict__ search )
 {
 	int src_index, search_index, search_len;
 	bool find = false;
@@ -106,7 +106,7 @@ char *strutilCounterReversePbrk( const char *src, const char *search )
 	}
 }
 
-void strutilRemoveChar( char *str, const char *search )
+void strutilRemoveChar( char *__restrict__ str, const char *__restrict__ search )
 {
 	int offset     = 0;
 	int ins_offset = 0;
@@ -133,10 +133,10 @@ char *strutilToLowerFirst( char *str )
 	return str;
 }
 
-unsigned int strutilCountChar( char *str, char c )
+unsigned int strutilCountChar( const char *str, char c )
 {
 	unsigned int cnt = 0;
-	char *save = str;
+	const char *save = str;
 	
 	while( ( save = strchr( save, c ) ) ) cnt++;
 	

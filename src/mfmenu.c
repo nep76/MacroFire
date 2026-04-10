@@ -1096,7 +1096,6 @@ void mfMenuMain( SceCtrlData *pad, MfHprmKey *hk )
 		if( st_params->frameBuffer.clear ){
 			/* 描画準備 */
 			pbSetDisplayBuffer( st_params->frameBuffer.pixelFormat, st_params->frameBuffer.clear, st_params->frameBuffer.bufferWidth );
-			pbSetDrawBuffer( PB_UNDEF_FRAMEBUF );
 			pbApply();
 			
 			/* 現在表示されている画面をクリア用背景にコピー */
@@ -1106,8 +1105,14 @@ void mfMenuMain( SceCtrlData *pad, MfHprmKey *hk )
 			pbFillRect( 0, 0, SCR_WIDTH, SCR_HEIGHT, MF_COLOR_BG );
 			mf_draw_frame();
 		}
+		
+		/* ダブルバッファリングを有効化 */
+		if( st_params->frameBuffer.draw ){
+			pbSetDrawBuffer( st_params->frameBuffer.pixelFormat, st_params->frameBuffer.draw, st_params->frameBuffer.bufferWidth );
+			pbEnable( PB_DOUBLE_BUFFER );
+		}
 		pbSetDisplayBuffer( st_params->frameBuffer.pixelFormat, st_params->frameBuffer.display, st_params->frameBuffer.bufferWidth );
-		pbSetDrawBuffer( st_params->frameBuffer.pixelFormat, st_params->frameBuffer.draw, st_params->frameBuffer.bufferWidth );
+		
 		
 		/* 設定したフレームバッファで描画準備 */
 		pbApply();
@@ -1146,17 +1151,20 @@ void mfMenuMain( SceCtrlData *pad, MfHprmKey *hk )
 		/* 背景を描画 */
 		if( st_params->frameBuffer.clear ){
 			sceDmacMemcpy( pbGetCurrentDrawBufferAddr(), st_params->frameBuffer.clear, st_params->frameBuffer.frameSize );
+			mf_menu_indicator();
 		} else if( st_params->frameBuffer.draw ){
 			memset( pbGetCurrentDrawBufferAddr(), 0, st_params->frameBuffer.frameSize );
 			mf_draw_frame();
+			mf_menu_indicator();
 		} else{
 			if( ( st_params->ctrl.pad->Buttons & MF_HOTKEY_BUTTONS ) || st_params->screenUpdate ){
-				//pbWakeup();
+				pbDisable( PB_NO_DRAW );
 				st_params->screenUpdate = false;
 				memset( pbGetCurrentDrawBufferAddr(), 0, st_params->frameBuffer.frameSize );
 				mf_draw_frame();
+				mf_menu_indicator();
 			} else{
-				//pbSleep();
+				pbEnable( PB_NO_DRAW );
 			}
 		}
 		
@@ -1168,9 +1176,6 @@ void mfMenuMain( SceCtrlData *pad, MfHprmKey *hk )
 #endif
 		
 		if( st_params->forcedQuit || ! st_params->proc || ( ! st_params->noqq && ( st_params->ctrl.pad->Buttons & ( PSP_CTRL_START | PSP_CTRL_HOME ) ) ) ) break;
-		
-		/* インジケータ表示 */
-		mf_menu_indicator();
 		
 		/* 情報バーをクリア */
 		st_params->info.text[0] = '\0';
@@ -1213,7 +1218,7 @@ void mfMenuMain( SceCtrlData *pad, MfHprmKey *hk )
 		}
 	}
 	
-	pbPrint( pbOffsetChar( 30 ), pbOffsetLine( 17 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, "Returning to the game..." );
+	pbPrint( pbOffsetChar( 30 ), pbOffsetLine( 17 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, MF_STR_HOME_RETURN_TO_GAME );
 	sceDisplayWaitVblankStart();
 	pbSwapBuffers( PB_BUFSYNC_IMMEDIATE );
 	sceKernelDelayThread( 300000 );
@@ -1582,7 +1587,7 @@ static void mf_draw_frame( void )
 	}
 	
 	if( mfHookIncomplete() ){
-		pbPrint( pbOffsetChar( 44 ), pbOffsetLine( 2 ) + ( pbOffsetLine( 1 ) >> 1 ), MF_COLOR_EX4, MF_COLOR_TEXT_BG, "MacroFire is not working perfectly." );
+		pbPrint( pbOffsetChar( 44 ), pbOffsetLine( 2 ) + ( pbOffsetLine( 1 ) >> 1 ), MF_COLOR_EX4, MF_COLOR_TEXT_BG, MF_STR_HOME_NOT_PERFECT_WORK );
 	}
 	
 #ifdef MF_WITH_EXCEPTION_HANDLER

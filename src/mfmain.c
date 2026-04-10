@@ -64,7 +64,7 @@ static void mf_init( void )
 	*/
 	dbgprint( "Detecting world..." );
 	st_world = MF_WORLD_GAME;
-	for( i = 0; i < 5; i++ ){
+	for( i = 0; i < 6; i++ ){
 		if( sceKernelFindModuleByName( "sceVshBridge_Driver" ) != NULL ){
 			st_world = MF_WORLD_VSH;
 			break;
@@ -354,7 +354,7 @@ static void mf_sending_toggle_message( bool engine )
 	MfFuncToggle togglefunc;
 	
 	if( mfOverlayMessageIsRunning() ){
-		mfOverlayMessagePrintf( "MacroFire Engine: %s", engine ? "ON" : "OFF" );
+		mfOverlayMessagePrintf( "%s: %s", MF_STR_HOME_MACROFIRE_ENGINE, engine ? MF_STR_CTRL_ON : MF_STR_CTRL_OFF );
 	}
 	
 	dbgprint( "Sending message MF_MS_TOGGLE to all functions..." );

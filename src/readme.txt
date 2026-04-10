@@ -1,12 +1,8 @@
 コンパイルするにはPSPSDKが必要です。PS2SDKではできません。
 
-単純にmakeを実行しても配布しているmacrofire.prxよりも容量の大きいものが作成されます。
-配布しているPRXは、CFW 4.01M33に同梱されているpsp-packerによって圧縮しています。
+通常版のビルド:                        make
+日本語版のビルド:                      make WITH_JAPANESE=1
+日本語版(JIS第二水準サポート)のビルド: make WITH_JAPANESE=1 WITH_JIS_LEVEL2=1
 
-psp-packerを使って圧縮したい場合は、Dark_AleX氏の公式サイト http://www.dark-alex.org より
-4.01M33をダウンロードしてpsp-packerを入手してください。
-
-
-通常版のビルド: make
-デバッグ用のビルド: make WITH_EXCEPTION_HANDLER=1
+デバッグ用のビルド:              make WITH_EXCEPTION_HANDLER=1
 PSPLINKへのデバッグ文字列出力用: make WITH_PSPLINK_DEBUG=1
