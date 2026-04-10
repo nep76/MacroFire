@@ -173,15 +173,13 @@ static void mf_ini_load( IniUID ini )
 	
 	inimgrGetBool( ini, "Main", "Startup", &st_is_enabled );
 	
-	if( inimgrGetString( ini, "Main", "MenuButtons", buf, sizeof( buf ) ) == 0 ){
+	if( inimgrGetString( ini, "Main", "MenuButtons", buf, sizeof( buf ) ) > 0 ){
 		st_menu_buttons = mfConvertButtonN2C( buf );
 	}
 	
-	if( inimgrGetString( ini, "Main", "ToggleButtons", buf, sizeof( buf ) ) == 0 ){
+	if( inimgrGetString( ini, "Main", "ToggleButtons", buf, sizeof( buf ) ) > 0 ){
 		st_toggle_buttons = mfConvertButtonN2C( buf );
 	}
-	
-	st_toggle_buttons = PSP_CTRL_NOTE;
 	
 	inimgrGetBool( ini, "Main", "StatusNotification", &status_notification );
 	
@@ -370,7 +368,18 @@ static int mf_main( SceSize arglen, void *argp )
 	mf_init();
 	
 	dbgprint( "Checking ini" );
-	mf_ini( MF_INI_FILENAME );
+	{
+		char *inipath = memoryAlloc( arglen + strlen( MF_INI_FILENAME ) );
+		if( inipath ){
+			char *dirpath = strrchr( (const char *)argp, '/' );
+			if( dirpath ){
+				strncpy( inipath, (const char *)argp, dirpath - (const char *)argp + 1 );
+				strcat( inipath, MF_INI_FILENAME );
+				mf_ini( inipath );
+			}
+			memoryFree( inipath );
+		}
+	}
 	
 	dbgprint( "Starting main-loop" );
 	while( gRunning ){
@@ -746,6 +755,83 @@ bool mfHookIncomplete( void )
 /*-----------------------------------------------
 	エントリポイント
 -----------------------------------------------*/
+#ifdef MF_WITH_EXCEPTION_HANDLER
+static const unsigned char regName[32][5] =
+{
+    "zr", "at", "v0", "v1", "a0", "a1", "a2", "a3",
+    "t0", "t1", "t2", "t3", "t4", "t5", "t6", "t7", 
+    "s0", "s1", "s2", "s3", "s4", "s5", "s6", "s7",
+    "t8", "t9", "k0", "k1", "gp", "sp", "fp", "ra"
+};
+
+static const char *codeTxt[32] =
+{
+	"Interrupt", "TLB modification", "TLB load/inst fetch", "TLB store",
+	"Address load/inst fetch", "Address store", "Bus error (instr)",
+	"Bus error (data)", "Syscall", "Breakpoint", "Reserved instruction",
+	"Coprocessor unusable", "Arithmetic overflow", "Unknown 13", "Unknown 14",
+	"FPU Exception", "Unknown 16", "Unknown 17", "Unknown 18",
+	"Unknown 20", "Unknown 21", "Unknown 22", "Unknown 23",
+	"Unknown 24", "Unknown 25", "Unknown 26", "Unknown 27",
+	"Unknown 28", "Unknown 29", "Unknown 30", "Unknown 31"
+};
+
+void mf_exception( PspDebugRegBlock *regs )
+{
+	SceUID fd;
+	int i;
+	
+	fd = sceIoOpen( "ms0:/macrofire_error.txt", PSP_O_WRONLY | PSP_O_CREAT | PSP_O_TRUNC, 0777 );
+	if( fd ){
+		char buf[256];
+		SceModule *mod;
+		SceKernelModuleInfo modinfo;
+		unsigned int baseaddr = 0;
+		
+		mod = sceKernelFindModuleByAddress( regs->epc );
+		if( mod )
+		{
+			memset( &modinfo, 0, sizeof( SceKernelModuleInfo ) );
+			modinfo.size = sizeof( SceKernelModuleInfo );
+			
+			if( sceKernelQueryModuleInfo( mod->modid, &modinfo ) == 0 ){
+				baseaddr = modinfo.text_addr;
+			}
+		}
+		
+		snprintf( buf, sizeof( buf ), "MacroFire Version %s\n", MF_VERSION );
+		sceIoWrite( fd, buf, strlen( buf ) );
+		snprintf( buf, sizeof( buf ), "Exception - %s\n", codeTxt[(regs->cause >> 2) & 31] );
+		sceIoWrite( fd, buf, strlen( buf ) );
+		snprintf( buf, sizeof( buf ), "EPC       - %08X\n", regs->epc );
+		sceIoWrite( fd, buf, strlen( buf ) );
+		snprintf( buf, sizeof( buf ), "Cause     - %08X\n", regs->cause );
+		sceIoWrite( fd, buf, strlen( buf ) );
+		snprintf( buf, sizeof( buf ), "Status    - %08X\n", regs->status );
+		sceIoWrite( fd, buf, strlen( buf ) );
+		snprintf( buf, sizeof( buf ), "BadVAddr  - %08X\n", regs->badvaddr );
+		sceIoWrite( fd, buf, strlen( buf ) );
+		snprintf( buf, sizeof( buf ), "BaseAddr  - %08X\n", baseaddr );
+		sceIoWrite( fd, buf, strlen( buf ) );
+		for(i = 0; i < 32; i+=4)
+		{
+			snprintf( buf, sizeof( buf ), "%s:%08X %s:%08X %s:%08X %s:%08X\n",
+				regName[i],
+				regs->r[i],
+				regName[i+1],
+				regs->r[i+1],
+				regName[i+2],
+				regs->r[i+2],
+				regName[i+3],
+				regs->r[i+3]
+			);
+			sceIoWrite( fd, buf, strlen( buf ) );
+		}
+		sceIoClose( fd );
+	}
+}
+#endif
+
 int module_start( SceSize arglen, void *argp )
 {
 	SceUID thid;
@@ -753,6 +839,10 @@ int module_start( SceSize arglen, void *argp )
 	dbgprintf( "MacroFire %s - Build %s", MF_VERSION, __DATE__ );
 	dbgprint( "pen@classg (http://classg.sytes.net)" );
 	dbgprint( "------------------------------------" );
+	
+#ifdef MF_WITH_EXCEPTION_HANDLER
+	pspDebugInstallErrorHandler( mf_exception );
+#endif
 	
 	thid = sceKernelCreateThread( "MacroFire", mf_main, 32, 0xF00, 0, 0 );
 	if( thid > 0 ) sceKernelStartThread( thid, arglen, argp );

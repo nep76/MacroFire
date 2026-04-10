@@ -208,7 +208,7 @@ void mfMenuIniLoad( IniUID ini, char *buf, size_t len )
 	inimgrGetBool( ini, "Menu", "UseVolatileMemory", &(st_pref.useVolatileMem) );
 	
 	for( i = 0, j = 0; i < MF_MENU_ALT_BUTTONS_COUNT; i++ ){
-		if( inimgrGetString( ini, "AlternativeButtons", button_names[i].name, buf, len ) ){
+		if( inimgrGetString( ini, "AlternativeButtons", button_names[i].name, buf, len ) > 0 ){
 			if( ! st_pref.remap ) st_pref.remap = padutilCreateRemapArray( MF_MENU_ALT_BUTTONS_COUNT );
 			st_pref.remap[j].realButtons = mfConvertButtonN2C( buf );
 			st_pref.remap[j].remapButtons  = button_names[i].button;
@@ -1538,4 +1538,8 @@ static void mf_draw_frame( void )
 	if( mfHookIncomplete() ){
 		gbPrint( gbOffsetChar( 44 ), gbOffsetLine( 2 ) + ( gbOffsetLine( 1 ) >> 1 ), MF_COLOR_EX4, MF_COLOR_TEXT_BG, "MacroFire is not working perfectly." );
 	}
+	
+#ifdef MF_WITH_EXCEPTION_HANDLER
+		gbPrint( 0, 0, MF_COLOR_EX4, MF_COLOR_TEXT_BG, "<for DEBUG>" );
+#endif
 }

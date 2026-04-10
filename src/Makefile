@@ -17,13 +17,14 @@ PRX_EXPORTS = exports.exp
 # 優先的にカーネルモードの方(psp***_driver)をリンクしようとするみたい。
 USE_KERNEL_LIBS = 1
 
-CLASSG_LIBS = include
+DIR_CLASSG = include
 
-INCDIR   = $(CLASSG_LIBS)
+INCDIR   = $(DIR_CLASSG)
 CFLAGS   = -O2 -G 0 -Wall -fno-strict-aliasing# -g -DDEBUG=1 -DMEMORY_DEBUG
 ASFLAGS  = $(CFLAGS)
 LIBDIR   = 
 LDFLAGS  = 
+DEFINES  = 
 
 # newlibを使う場合、libpspuserをリンクしないとsceKernelFreeMemSizeのリンクに失敗する。
 # libpspuserより先にlibpspkernelをリンクしないと、システムコントロール系のシンボルに
@@ -43,25 +44,29 @@ OBJS = exports.o \
        functions/macromgr.o \
        functions/macro.o \
        functions/macroeditor.o \
-       $(CLASSG_LIBS)/utils/strutil.o \
-       $(CLASSG_LIBS)/utils/inimgr.o \
-       $(CLASSG_LIBS)/psp/memory.o \
-       $(CLASSG_LIBS)/psp/heap.o \
-       $(CLASSG_LIBS)/psp/dmem.o \
-       $(CLASSG_LIBS)/psp/gb.o \
-       $(CLASSG_LIBS)/psp/pathexpand.o \
-       $(CLASSG_LIBS)/psp/dirh.o \
-       $(CLASSG_LIBS)/psp/fiomgr.o \
-       $(CLASSG_LIBS)/psp/ovmsg.o \
-       $(CLASSG_LIBS)/psp/hook.o \
-       $(CLASSG_LIBS)/psp/padctrl.o \
-       $(CLASSG_LIBS)/psp/padutil.o \
-       $(CLASSG_LIBS)/psp/cdialog.o \
-       $(CLASSG_LIBS)/psp/cdialog/message.o \
-       $(CLASSG_LIBS)/psp/cdialog/sosk.o \
-       $(CLASSG_LIBS)/psp/cdialog/numedit.o \
-       $(CLASSG_LIBS)/psp/cdialog/getfilename.o \
-       $(CLASSG_LIBS)/psp/cdialog/detectbuttons.o \
+       $(DIR_CLASSG)/utils/strutil.o \
+       $(DIR_CLASSG)/utils/inimgr.o \
+       $(DIR_CLASSG)/psp/hook.o \
+       $(DIR_CLASSG)/psp/memory.o \
+       $(DIR_CLASSG)/psp/heap.o \
+       $(DIR_CLASSG)/psp/dmem.o \
+       $(DIR_CLASSG)/psp/gb.o \
+       $(DIR_CLASSG)/psp/pathexpand.o \
+       $(DIR_CLASSG)/psp/dirh.o \
+       $(DIR_CLASSG)/psp/fiomgr.o \
+       $(DIR_CLASSG)/psp/ovmsg.o \
+       $(DIR_CLASSG)/psp/padctrl.o \
+       $(DIR_CLASSG)/psp/padutil.o \
+       $(DIR_CLASSG)/psp/cdialog.o \
+       $(DIR_CLASSG)/psp/cdialog/message.o \
+       $(DIR_CLASSG)/psp/cdialog/sosk.o \
+       $(DIR_CLASSG)/psp/cdialog/numedit.o \
+       $(DIR_CLASSG)/psp/cdialog/getfilename.o \
+       $(DIR_CLASSG)/psp/cdialog/detectbuttons.o \
+
+ifdef WITH_EXCEPTION_HANDLER
+	CFLAGS += -DMF_WITH_EXCEPTION_HANDLER -g
+endif
 
 PSPSDK = $(shell psp-config --pspsdk-path)
 include $(PSPSDK)/lib/build_prx.mak

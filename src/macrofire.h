@@ -16,10 +16,10 @@
 	íËêî
 ==========================================================*/
 #define MF_TITLE        "MacroFire %s In-game menu"
-#define MF_VERSION      "3.0.1"
+#define MF_VERSION      "3.0.2"
 #define MF_AUTHOR       "ClassG (http://classg.sytes.net)"
 
-#define MF_INI_FILENAME        "ms0:/seplugins/macrofire.ini"
+#define MF_INI_FILENAME        "macrofire.ini"
 #define MF_INI_SECTION_DEFAULT "Default"
 #define MF_INI_SECTION_VSH     "VSH"
 #define MF_INI_SECTION_POPS    "POPS"

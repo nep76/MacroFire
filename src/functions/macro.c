@@ -121,6 +121,7 @@ void *macroProc( MfMessage message )
 		default:
 			break;
 	}
+	
 	return NULL;
 }
 
@@ -341,6 +342,7 @@ static bool macro_slot_control( MfMessage message, const char *label, void *var,
 						break;
 					default:
 						if( params->macro ){
+							printf( "%x\n", params->macro );
 							state = "(Available)";
 						} else{
 							state = "";
@@ -803,6 +805,7 @@ static void macro_trace_prepare( struct macro_params *params, MacromgrCommand *s
 	
 	params->mode     = MACRO_TRACE;
 	params->temp.cmd = start;
+	sceRtcGetCurrentTick( &(params->temp.common.rtc) );
 }
 
 static void macro_trace_stop( struct macro_params *params )
@@ -812,8 +815,9 @@ static void macro_trace_stop( struct macro_params *params )
 	mfRapidfireDestroy( params->temp.trace.rfUid );
 	params->temp.trace.rfUid = 0;
 	
-	params->mode     = MACRO_NTD;
-	params->temp.cmd = NULL;
+	params->mode            = MACRO_NTD;
+	params->temp.cmd        = NULL;
+	params->temp.common.rtc = 0;
 }
 
 static bool macro_trace( struct macro_params *params, SceCtrlData *pad )
@@ -822,33 +826,33 @@ static bool macro_trace( struct macro_params *params, SceCtrlData *pad )
 	MacromgrAction action;
 	MacromgrData   data;
 	MacromgrData   sub;
-	uint64_t       current_tick;
 	
 	do {
 		macromgrGetCommand( params->temp.cmd, &action, &data, &sub );
 		if( ! data ) continue;
 		
 		switch( action ){
-			case MACROMGR_DELAY:
-				sceRtcGetCurrentTick( &current_tick );
-				
-				/* ディレイにきた段階でparams->temp.common.rtcが0の場合は待機開始なので開始時間をセット */
-				if( ! params->temp.common.rtc ) params->temp.common.rtc = current_tick;
-				
-				if( ( ( current_tick - params->temp.common.rtc ) / 1000 ) >= data ){
-					/* ディレイを待機しきったら次のディレイのために、params->temp.common.rtcを0にリセット */
-					params->temp.common.rtc = 0;
-					continue;
-				} else{
-					break;
+			case MACROMGR_DELAY: {
+					uint64_t current_tick;
+					sceRtcGetCurrentTick( &current_tick );
+					
+					if( ( ( current_tick - params->temp.common.rtc ) / 1000 ) >= data ){
+						/* ディレイを待機しきったら次のディレイのために、params->temp.common.rtcを0にリセット */
+						params->temp.common.rtc = 0;
+						continue;
+					}
 				}
+				break;
 			case MACROMGR_BUTTONS_PRESS:
+				if( ! data ) continue;
 				params->temp.common.lastButtons |= data;
 				break;
 			case MACROMGR_BUTTONS_RELEASE:
+				if( ! data ) continue;
 				params->temp.common.lastButtons ^= data;
 				break;
 			case MACROMGR_BUTTONS_CHANGE:
+				if( ! data ) continue;
 				params->temp.common.lastButtons = data;
 				break;
 			case MACROMGR_ANALOG_MOVE:
@@ -856,6 +860,7 @@ static bool macro_trace( struct macro_params *params, SceCtrlData *pad )
 				params->temp.common.analogY = MACROMGR_GET_ANALOG_Y( data );
 				break;
 			case MACROMGR_RAPIDFIRE_START:
+				if( ! data ) continue;
 				mfRapidfireSetRapid(
 					params->temp.trace.rfUid,
 					data,
@@ -865,6 +870,7 @@ static bool macro_trace( struct macro_params *params, SceCtrlData *pad )
 				);
 				break;
 			case MACROMGR_RAPIDFIRE_STOP:
+				if( ! data ) continue;
 				mfRapidfireClear( params->temp.trace.rfUid, data );
 				break;
 			default:
@@ -888,7 +894,10 @@ static bool macro_trace( struct macro_params *params, SceCtrlData *pad )
 	} while( ( params->temp.cmd = macromgrNext( params->temp.cmd ) ) );
 	
 	/* コマンドを次に進める */
-	if( params->temp.cmd && action != MACROMGR_DELAY ) params->temp.cmd = macromgrNext( params->temp.cmd );
+	if( params->temp.cmd && action != MACROMGR_DELAY ){
+		params->temp.cmd = macromgrNext( params->temp.cmd );
+		sceRtcGetCurrentTick( &(params->temp.common.rtc) );
+	}
 	
 	/* 全コマンド実行終了 */
 	return params->temp.cmd ? true : false;
