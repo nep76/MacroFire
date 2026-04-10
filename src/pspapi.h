@@ -33,20 +33,6 @@ void sceDisplayEnable( void );
 int  sceDmacMemcpy( void *dest, const void *src, SceSize size );
 //int  sceDmacTryMemcpy( void *dest, const void *src, SceSize size );
 
-
-/*-----------------------------------------------
-	scePowerVolatileMemLock    (sync)
-	scePowerVolatileMemTryLock (poll)
-	scePowerVolatileMemUnlock
-	
-	4MBのカーネルメモリのロック/アンロック。
-	しかし、このメモリパーティションを使うことはゲームクラッシュの大きな要因になる模様。
-	プラグインでは使わない方がいいかもしれない。
------------------------------------------------*/
-//int scePowerVolatileMemLock( int unk, void **ptr, int *size ); 
-int scePowerVolatileMemTryLock( int unk, void **ptr, int *size );
-int scePowerVolatileMemUnlock( int unk );
-
 /*-----------------------------------------------
 	sceSysregAudioIoEnable
 	sceSysregAudioIoDisable

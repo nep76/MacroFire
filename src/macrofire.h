@@ -26,7 +26,7 @@
 	定数
 ==========================================================*/
 #define MF_TITLE        MF_STR_TITLE
-#define MF_VERSION      "3.0.13"
+#define MF_VERSION      "3.1.0"
 #define MF_AUTHOR       "ClassG (http://classg.sytes.net)"
 
 #define MF_INI_PATH_DEFAULT    "ms0:/seplugins/"
@@ -67,7 +67,7 @@
 	1: デバッグメッセージを標準出力へ
 	   ファイルへ出力する場合は明示的にmfDebugPrintf()を使用するが、
 	   DEBUG=0にしても自動で削除されないため一時的な使用に限る。
-	2: デバッグメッセージをms0:/mfdebug.txtへ
+	2: デバッグメッセージをms0:/mfdebug.txtへ (よく止まる)
 -----------------------------------------------*/
 #if DEBUG >= 1
 #define DEBUG_ENABLED
@@ -158,31 +158,25 @@ SceUID mfNotificationThreadId( void );
 void mfNotificationPrintTerm( void );
 bool mfNotificationPrintf( const char *format, ... );
 bool mfHookIncomplete( void );
-HeapUID mfHeapCreate( unsigned int count, size_t size );
 const PadutilAnalogStick *mfGetAnalogStickContext( void );
 
-#define mfHeapAlloc   heapAlloc
-#define mfHeapCalloc  heapCalloc
-#define mfHeapFree    heapFree
-#define mfHeapDestroy heapDestroy
-
-#ifndef MFEXCLUDE_DIALOG
+#ifndef MFDIALOG_H
 #include "mfdialog.h"
 #endif
 
-#ifndef MFEXCLUDE_MENU
+#ifndef MFMENU_H
 #include "mfmenu.h"
 #endif
 
-#ifndef MFEXCLUDE_CTRL
+#ifndef MFCTRL_H
 #include "mfctrl.h"
 #endif
 
-#ifndef MFEXCLUDE_ANALOGSTICK
+#ifndef MFANALOGSTICK_H
 #include "mfanalogstick.h"
 #endif
 
-#ifndef MFEXCLUDE_RAPIDFIRE
+#ifndef MFRAPIDFIRE_H
 #include "mfrapidfire.h"
 #endif
 

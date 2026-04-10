@@ -21,12 +21,14 @@
 /* detect buttons */
 #define CDIALOG_STR_DETECTBUTTONS_DESC            "Please choose one."
 #define CDIALOG_STR_DETECTBUTTONS_START           "Starting to detect"
+#define CDIALOG_STR_DETECTBUTTONS_CHOOSE          "Choose from list"
 #define CDIALOG_STR_DETECTBUTTONS_CLEAR           "Clear current"
 #define CDIALOG_STR_DETECTBUTTONS_CANCEL          "Cancel"
 #define CDIALOG_STR_DETECTBUTTONS_ACCEPT          "Accept"
 #define CDIALOG_STR_DETECTBUTTONS_CURRENT_BUTTONS "Current buttons:"
 #define CDIALOG_STR_DETECTBUTTONS_DETECT_DESC     "Please press the button combination.\n\nWhen you want to exit the dialog,\npress the already pressed button."
 #define CDIALOG_STR_DETECTBUTTONS_NOW_DETECTING   "Now detecting..."
+#define CDIALOG_STR_DETECTBUTTONS_CHOOSE_EXIT     "Exit"
 
 /* get filename */
 #define CDIALOG_STR_GETFILENAME_SAVE_IN                 "Save in"

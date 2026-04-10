@@ -7,7 +7,7 @@
 #include <string.h>
 #include "memory/memory.h"
 #include "util/makepath.h"
-#include "cgerrs.h"
+#include "cgerrno.h"
 
 struct dirh_cwd {
 	char  *path;

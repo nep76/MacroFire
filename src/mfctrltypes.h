@@ -14,21 +14,18 @@
 	コントロールメッセージ
 =========================================================*/
 typedef enum {
-	MF_CM_INIT = 0,
-	MF_CM_LABEL,
-	MF_CM_INFO,
-	MF_CM_PROC,
-	MF_CM_TERM,
-	MF_CM_DIALOG_START,
-	MF_CM_DIALOG_UPDATE,
-	MF_CM_DIALOG_FINISH,
-	MF_CM_EXTRA,
-	MF_CM_SIGNAL,
+	MF_CM_INIT     = 0x00000001,
+	MF_CM_LABEL    = 0x00000002,
+	MF_CM_INFO     = 0x00000004,
+	MF_CM_PROC     = 0x00000008,
+	MF_CM_TERM     = 0x00000010,
+	MF_CM_WAIT     = 0x00000020, /* コントロールに対して処理を待つよう指示する。ダイアログと拡張関数の実行時に送られる。*/
+	MF_CM_CONTINUE = 0x00000040  /* コントロールに対して処理を再開するよう指示する。MF_CM_WAITが終了したときに1度だけ送られる。*/
 } MfCtrlMessage;
 
 /*=========================================================
 	コントロールプロシージャ
 =========================================================*/
-typedef bool ( *MfControl )( MfCtrlMessage message, const char *label, void *var, void *arg, void *ex );
+typedef bool ( *MfControl )( MfMessage message, const char *label, void *var, void *arg, void *ex );
 
 #endif

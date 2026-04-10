@@ -8,9 +8,7 @@
 #ifndef MFANALOGSTICK_H
 #define MFANALOGSTICK_H
 
-#define MFEXCLUDE_ANALOGSTICK
 #include "macrofire.h"
-#undef MFEXCLUDE_ANALOGSTICK
 
 /*=========================================================
 	ä÷êî

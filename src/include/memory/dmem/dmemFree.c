@@ -34,10 +34,7 @@ int dmemFree( DmemUID uid, void *ptr )
 			avail_heap->next = (*heap)->next;
 		}
 		
-		/*
-			最後に使用したヒープが削除対象ヒープを指していたら、どこでもいいので生きているヒープを指す。
-			空き容量を調べないのは、次回のdmemAlloc()時に計算するため。
-		*/
+		/* 最後に使用したヒープが削除対象ヒープを指していたら、どこでもいいので生きているヒープを指す。 */
 		if( root->lastUse == *heap ) root->lastUse = avail_heap;
 		
 		heapDestroy( (*heap)->uid );

@@ -23,41 +23,42 @@ struct rapidfire_mode {
 /*=========================================================
 	ローカル関数
 =========================================================*/
-static void rapidfire_apply( struct rapidfire_mode *mode, struct rapidfire_delay *delay );
-static void rapidfire_menu_save( MfMenuMessage message );
-static void rapidfire_menu_load( MfMenuMessage message );
-static bool rapidfire_save( const char *path, struct rapidfire_mode *mode, struct rapidfire_delay *delay );
-static bool rapidfire_load( const char *path, struct rapidfire_mode *mode, struct rapidfire_delay *delay );
-
 static const char *rapidfire_get_mode_name_by_idn( unsigned short idn );
 static unsigned short rapidfire_get_mode_idn_by_name( const char *name );
+static void rapidfire_apply( struct rapidfire_mode *mode, struct rapidfire_delay *delay );
+
+static bool rapidfire_control_save( MfMessage message, const char *label, void *var, void *pref, void *ex );
+static bool rapidfire_control_load( MfMessage message, const char *label, void *var, void *pref, void *ex );
+
+static int  rapidfire_ini_handler( MfCtrlDefIniAction action, const char *path );
+static int  rapidfire_save( const char *path, struct rapidfire_mode *mode, struct rapidfire_delay *delay );
+static int  rapidfire_load( const char *path, struct rapidfire_mode *mode, struct rapidfire_delay *delay );
 
 /*=========================================================
 	ローカル変数
 =========================================================*/
 static MfRapidfireUID st_rfuid;
+static MfRapidfireParams st_rfparams;
+
 static struct rapidfire_mode  *st_mode;
 static struct rapidfire_delay st_delay;
 
-static HeapUID     st_heap;
+static HeapUID st_heap;
 
 /*=========================================================
 	関数
 =========================================================*/
 void *rapidfireProc( MfMessage message )
 {
-	if( message != MF_MS_INIT && ! st_rfuid ) return NULL;
-	
 	switch( message ){
 		case MF_MS_INIT:
-			st_rfuid = mfRapidfireNew();
+			st_rfuid = mfRapidfireBind( &st_rfparams );
 			break;
 		case MF_MS_INI_LOAD:
 			return rapidfireIniLoad;
 		case MF_MS_INI_CREATE:
 			return rapidfireIniCreate;
 		case MF_MS_TERM:
-			mfRapidfireDestroy( st_rfuid );
 			break;
 		case MF_MS_HOOK:
 			return rapidfireMain;
@@ -73,8 +74,8 @@ void rapidfireIniLoad( IniUID ini, char *buf, size_t len )
 {
 	const char *section = mfGetIniSection();
 	
-	/* 設定用メモリ確保 */
-	st_mode  = memoryAlloc( sizeof( struct rapidfire_mode ) * MF_RAPIDFIRE_NUMBER_OF_AVAIL_BUTTONS );
+	/* 設定用一時メモリ確保 */
+	st_mode  = mfMemoryTempAlloc( sizeof( struct rapidfire_mode ) * MF_RAPIDFIRE_NUMBER_OF_AVAIL_BUTTONS );
 	if( st_mode ){
 		unsigned short i, save;
 		
@@ -87,7 +88,7 @@ void rapidfireIniLoad( IniUID ini, char *buf, size_t len )
 			rapidfire_load( buf, st_mode, &st_delay );
 			rapidfire_apply( st_mode, &st_delay );
 		}
-		memoryFree( st_mode );
+		mfMemoryFree( st_mode );
 	}
 }
 
@@ -108,14 +109,16 @@ void rapidfireMenu( MfMessage message )
 	
 	if( mfIsRunningApp( MF_APP_WEBBROWSER ) ){
 		if( message == MF_MM_PROC ){
-			pbPrint( pbOffsetChar( 3 ), pbOffsetLine(  4 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, MF_STR_LIMIT_WEBBROWSER );
-			mfMenuWait( MF_ERROR_DELAY );
+			if( ! mfDialogMessage( MF_STR_ERROR, MF_STR_LIMIT_WEBBROWSER, 0, false ) ){
+				pbPrint( pbOffsetChar( 3 ), pbOffsetLine(  4 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, MF_STR_LIMIT_WEBBROWSER );
+				mfMenuWait( MF_ERROR_DELAY );
+			}
 			mfMenuProc( NULL );
 		}
 		return;
 	}
 	
-	switch( message ){
+	switch( mfMenuMaskMainMessage( message ) ){
 		case MF_MM_INIT:
 			dbgprint( "Creating rapidfire menu" );
 			menu = mfMenuCreateTables(
@@ -124,19 +127,19 @@ void rapidfireMenu( MfMessage message )
 				2, 1,
 				2, 1
 			);
-			st_heap = mfHeapCreate( 4,
+			st_heap = mfMemoryTempHeapCreate( 4,
 				sizeof( struct rapidfire_mode ) * 12 +
 				sizeof( char ** ) * 6                +
 				sizeof( MfCtrlDefGetNumberPref )     +
-				MF_PATH_MAX
+				sizeof( MfCtrlDefIniPref )
 			);
 			if( ! menu || ! st_heap ){
 				if( menu ) mfMenuDestroyTables( menu );
-				if( st_heap ) mfHeapDestroy( st_heap );
+				if( st_heap ) mfMemoryHeapDestroy( st_heap );
 				return;
 			}
 			
-			st_mode  = mfHeapAlloc( st_heap, sizeof( struct rapidfire_mode ) * MF_RAPIDFIRE_NUMBER_OF_AVAIL_BUTTONS );
+			st_mode  = mfMemoryHeapAlloc( st_heap, sizeof( struct rapidfire_mode ) * MF_RAPIDFIRE_NUMBER_OF_AVAIL_BUTTONS );
 			
 			{
 				unsigned short i, save;
@@ -144,11 +147,17 @@ void rapidfireMenu( MfMessage message )
 				unsigned int pdelay, rdelay;
 				bool autorun;
 				
-				MfCtrlDefGetNumberPref *delaypref = mfHeapCalloc( st_heap, sizeof( MfCtrlDefGetNumberPref ) );
-				const char **options = mfHeapAlloc( st_heap, sizeof( char ** ) * 6 );
+				MfCtrlDefGetNumberPref *delaypref = mfMemoryHeapCalloc( st_heap, sizeof( MfCtrlDefGetNumberPref ) );
+				MfCtrlDefIniPref       *inipref   = mfMemoryHeapCalloc( st_heap, sizeof( MfCtrlDefIniPref ) );
+				const char **options = mfMemoryHeapAlloc( st_heap, sizeof( char ** ) * 6 );
 				
 				delaypref->unit = "ms";
 				delaypref->max   = 999;
+				
+				inipref->title        = "";
+				inipref->initDir      = "ms0:";
+				inipref->initFilename = "";
+				inipref->pathMax      = MF_PATH_MAX;
 				
 				options[0] = rapidfire_get_mode_name_by_idn( RAPIDFIRE_NORMAL );
 				options[1] = rapidfire_get_mode_name_by_idn( RAPIDFIRE_RAPID );
@@ -159,7 +168,7 @@ void rapidfireMenu( MfMessage message )
 				
 				mfMenuSetTablePosition( menu, 1, pbOffsetChar( 5 ), pbOffsetLine( 6 ) );
 				mfMenuSetTableLabel( menu, 1, MF_STR_RAPIDFIRE_MODE_LABEL );
-				mfMenuSetColumnWidth( menu, 1, 1, 20 );
+				mfMenuSetColumnWidth( menu, 1, 1, pbOffsetChar( 21 ) );
 				
 				/* MacroFireコアから設定値を読み出す */
 				for( i = 0, save = 0; mfRapidfireReadEntry( st_rfuid, &(st_mode[i].button), &mode, &pdelay, &rdelay, &autorun, &save ); i++ ){
@@ -195,15 +204,15 @@ void rapidfireMenu( MfMessage message )
 				
 				mfMenuSetTablePosition( menu, 3, pbOffsetChar( 5 ), pbOffsetLine( 19 ) );
 				mfMenuSetTableLabel( menu, 3, MF_STR_RAPIDFIRE_FILE_LABEL );
-				mfMenuSetTableEntry( menu, 3, 1, 1, MF_STR_LOAD, mfCtrlDefExtra, rapidfire_menu_load, NULL );
-				mfMenuSetTableEntry( menu, 3, 2, 1, MF_STR_SAVE, mfCtrlDefExtra, rapidfire_menu_save, NULL );
+				mfMenuSetTableEntry( menu, 3, 1, 1, MF_STR_LOAD, rapidfire_control_load, rapidfire_ini_handler, inipref );
+				mfMenuSetTableEntry( menu, 3, 2, 1, MF_STR_SAVE, rapidfire_control_save, rapidfire_ini_handler, inipref );
 			}
 			mfMenuInitTables( menu, 3 );
 			break;
 		case MF_MM_TERM:
 			rapidfire_apply( st_mode, &st_delay );
 			mfMenuDestroyTables( menu );
-			mfHeapDestroy( st_heap );
+			mfMemoryHeapDestroy( st_heap );
 			return;
 		default:
 			pbPrint( pbOffsetChar( 3 ), pbOffsetLine(  4 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, MF_STR_RAPIDFIRE_DESC );
@@ -280,69 +289,36 @@ static void rapidfire_apply( struct rapidfire_mode *mode, struct rapidfire_delay
 	if( buttons_autohold  ) mfRapidfireSetHold( st_rfuid, buttons_autohold, true );
 }
 
-static void rapidfire_menu_save( MfMenuMessage message )
+static bool rapidfire_control_save( MfMessage message, const char *label, void *var, void *pref, void *ex )
 {
-	static char *path;
-	
-	if( message == MF_MM_INIT ){
-		path = mfHeapAlloc( st_heap, MF_PATH_MAX );
-		
-		if( ! mfDialogGetfilenameInit( MF_STR_RAPIDFIRE_DIAGGETFN_SAVE, "ms0:", "rapidfire.ini", path, 255, CDIALOG_GETFILENAME_SAVE | CDIALOG_GETFILENAME_OVERWRITEPROMPT  ) ){
-			mfHeapFree( st_heap, path );
-			path = NULL;
-			mfMenuExitExtra();
-		}
-	} else if( message == MF_MM_PROC ){
-		if( mfDialogCurrentType() ){
-			if( ! mfDialogGetfilenameDraw() ){
-				if( ! mfDialogGetfilenameResult() ){
-					mfHeapFree( st_heap, path );
-					path = NULL;
-				}
-			}
-		} else if( path ){
-			mfMenuSetInfoText( MF_MENU_INFOTEXT_SET_MIDDLE_LINE, MF_STR_SAVING, path );
-			rapidfire_save( path, st_mode, &st_delay );
-			mfHeapFree( st_heap, path );
-			path = NULL;
-		} else if( ! path ){
-			mfMenuExitExtra();
-		}
+	if( ( message & MF_CM_PROC ) && mfMenuIsPressed( mfMenuAcceptButton() ) ){
+		((MfCtrlDefIniPref *)pref)->title        = "Save rapidfire preference";
+		((MfCtrlDefIniPref *)pref)->initFilename = "rapidfire.ini";
 	}
+	return mfCtrlDefIniSave( message, label, var, pref, ex );
 }
 
-static void rapidfire_menu_load( MfMenuMessage message )
+static bool rapidfire_control_load( MfMessage message, const char *label, void *var, void *pref, void *ex )
 {
-	static char *path;
-	
-	if( message == MF_MM_INIT ){
-		path = mfHeapAlloc( st_heap, MF_PATH_MAX );
-		
-		if( ! mfDialogGetfilenameInit( MF_STR_RAPIDFIRE_DIAGGETFN_LOAD, "ms0:", "", path, 255, CDIALOG_GETFILENAME_OPEN | CDIALOG_GETFILENAME_FILEMUSTEXIST ) ){
-			mfHeapFree( st_heap, path );
-			path = NULL;
-			mfMenuExitExtra();
-		}
-	} else if( message == MF_MM_PROC ){
-		if( mfDialogCurrentType() ){
-			if( ! mfDialogGetfilenameDraw() ){
-				if( ! mfDialogGetfilenameResult() ){
-					mfHeapFree( st_heap, path );
-					path = NULL;
-				}
-			}
-		} else if( path ){
-			mfMenuSetInfoText( MF_MENU_INFOTEXT_SET_MIDDLE_LINE, MF_STR_LOADING, path );
-			rapidfire_load( path, st_mode, &st_delay );
-			mfHeapFree( st_heap, path );
-			path = NULL;
-		} else if( ! path ){
-			mfMenuExitExtra();
-		}
+	if( ( message & MF_CM_PROC ) && mfMenuIsPressed( mfMenuAcceptButton() ) ){
+		((MfCtrlDefIniPref *)pref)->title        = "Load rapidfire preference";
+		((MfCtrlDefIniPref *)pref)->initFilename = "";
 	}
+	return mfCtrlDefIniLoad( message, label, var, pref, ex );
 }
 
-static bool rapidfire_save( const char *path, struct rapidfire_mode *mode, struct rapidfire_delay *delay )
+static int rapidfire_ini_handler( MfCtrlDefIniAction action, const char *path )
+{
+	switch( action ){
+		case MF_CTRL_INI_LOAD:
+			return rapidfire_load( path, st_mode, &st_delay );
+		case MF_CTRL_INI_SAVE:
+			return rapidfire_save( path, st_mode, &st_delay );
+	}
+	return 0;
+}
+
+static int rapidfire_save( const char *path, struct rapidfire_mode *mode, struct rapidfire_delay *delay )
 {
 	IniUID ini = inimgrNew();
 	if( ini ){
@@ -362,25 +338,18 @@ static bool rapidfire_save( const char *path, struct rapidfire_mode *mode, struc
 			inimgrDestroy( ini );
 			
 			if( ret != 0 ){
-				mfMenuSetInfoText( MF_MENU_INFOTEXT_ERROR | MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "inimgr %s: %X", MF_STR_ERROR, ret );
-				mfMenuWait( MF_ERROR_DELAY );
+				return ret;
 			} else{
-				return true;
+				return MF_CTRL_INI_ERROR_OK;
 			}
 		} else{
-			mfMenuSetInfoText( MF_MENU_INFOTEXT_ERROR | MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "%s: %s.", MF_STR_ERROR, MF_STR_ERROR_NOT_ENOUGH_MEMORY );
-			mfMenuWait( MF_ERROR_DELAY );
+			inimgrDestroy( ini );
 		}
-		inimgrDestroy( ini );
-	} else{
-		mfMenuSetInfoText( MF_MENU_INFOTEXT_ERROR | MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "inimgr %s: %s.", MF_STR_ERROR, MF_STR_ERROR_NOT_ENOUGH_MEMORY );
-		mfMenuWait( MF_ERROR_DELAY );
 	}
-	
-	return false;
+	return MF_CTRL_INI_ERROR_NOT_ENOUGH_MEMORY;
 }
 
-static bool rapidfire_load( const char *path, struct rapidfire_mode *mode, struct rapidfire_delay *delay )
+static int rapidfire_load( const char *path, struct rapidfire_mode *mode, struct rapidfire_delay *delay )
 {
 	IniUID ini = inimgrNew();
 	if( ini ){
@@ -389,13 +358,12 @@ static bool rapidfire_load( const char *path, struct rapidfire_mode *mode, struc
 		ret = inimgrLoad( ini, path, RAPIDFIRE_INI_SIGNATURE, RAPIDFIRE_INI_VERSION, 0, 0 );
 		if( ret != 0 ){
 			if( ret == INIMGR_ERROR_INVALID_SIGNATURE ){
-				mfMenuSetInfoText( MF_MENU_INFOTEXT_ERROR | MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "%s: %s.", MF_STR_ERROR, MF_STR_ERROR_INVALID_CONF );
+				return MF_CTRL_INI_ERROR_INVALID_CONF;
 			} else if( ret == INIMGR_ERROR_INVALID_VERSION ){
-				mfMenuSetInfoText( MF_MENU_INFOTEXT_ERROR | MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "%s: %s.", MF_STR_ERROR, MF_STR_ERROR_UNSUPPORTED_VERSION );
+				return MF_CTRL_INI_ERROR_UNSUPPORTED_VERSION;
 			} else {
-				mfMenuSetInfoText( MF_MENU_INFOTEXT_ERROR | MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "inimgr %s: %X", MF_STR_ERROR, ret );
+				return ret;
 			}
-			mfMenuWait( MF_ERROR_DELAY );
 		} else if( mfConvertButtonReady() ){
 			char button_name[16];
 			char mode_name[16];
@@ -414,16 +382,10 @@ static bool rapidfire_load( const char *path, struct rapidfire_mode *mode, struc
 			if( inimgrGetInt( ini, RAPIDFIRE_INI_SECTION_DELAY, RAPIDFIRE_INI_ENTRY_RD, &delayms ) ) delay->releaseDelay = delayms;
 			
 			inimgrDestroy( ini );
-			return true;
+			return MF_CTRL_INI_ERROR_OK;;
 		} else{
-			mfMenuSetInfoText( MF_MENU_INFOTEXT_ERROR | MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "%s: %s.", MF_STR_ERROR, MF_STR_ERROR_NOT_ENOUGH_MEMORY );
-			mfMenuWait( MF_ERROR_DELAY );
+			inimgrDestroy( ini );
 		}
-		inimgrDestroy( ini );
-	} else{
-		mfMenuSetInfoText( MF_MENU_INFOTEXT_ERROR | MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "inimgr %s: %s.", MF_STR_ERROR, MF_STR_ERROR_NOT_ENOUGH_MEMORY );
-		mfMenuWait( MF_ERROR_DELAY );
 	}
-	
-	return false;
+	return MF_CTRL_INI_ERROR_NOT_ENOUGH_MEMORY;
 }

@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include "memory/memory.h"
 #include "util/strutil.h"
-#include "cgerrs.h"
+#include "cgerrno.h"
 
 #define FIOMGR_CACHE_SIZE 1024
 

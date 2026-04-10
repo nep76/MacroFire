@@ -7,6 +7,31 @@
 =========================================================*/
 #include "mfctrl.h"
 
+/*-----------------------------------------------
+	ローカル定数
+-----------------------------------------------*/
+#define MF_CTRL_DEF_INI_SIG_ACCEPT MF_SM_1
+#define MF_CTRL_DEF_INI_SIG_FINISH MF_SM_2
+
+/*-----------------------------------------------
+	ローカル型宣言
+-----------------------------------------------*/
+struct mf_ctrl_ini_params {
+	MfCtrlDefIniProc proc;
+	MfCtrlDefIniPref *pref;
+	MfCtrlDefIniAction action;
+	char *path;
+};
+
+/*-----------------------------------------------
+	ローカル関数
+-----------------------------------------------*/
+static void mf_ctrl_ini_handler( MfMessage message, void *arg );
+static void mf_ctrl_ini_error( int error );
+
+/*-----------------------------------------------
+	関数
+-----------------------------------------------*/
 void mfCtrlSetLabel( void *arg, char *format, ... )
 {
 	va_list ap;
@@ -18,7 +43,7 @@ void mfCtrlSetLabel( void *arg, char *format, ... )
 
 bool mfCtrlDefBool( MfMessage message, const char *label, void *var, void *unused, void *ex )
 {
-	switch( message ){
+	switch( mfMenuMaskMainMessage( message ) ){
 		case MF_CM_INIT:
 		case MF_CM_TERM:
 			break;
@@ -37,7 +62,7 @@ bool mfCtrlDefBool( MfMessage message, const char *label, void *var, void *unuse
 
 bool mfCtrlDefOptions( MfMessage message, const char *label, void *var, void *items, void *ex )
 {
-	switch( message ){
+	switch( mfMenuMaskMainMessage( message ) ){
 		case MF_CM_INIT:
 		case MF_CM_TERM:
 			 break;
@@ -69,7 +94,7 @@ bool mfCtrlDefOptions( MfMessage message, const char *label, void *var, void *it
 
 bool mfCtrlDefCallback( MfMessage message, const char *label, void *func, void *arg, void *ex )
 {
-	switch( message ){
+	switch( mfMenuMaskMainMessage( message ) ){
 		case MF_CM_INIT:
 		case MF_CM_TERM:
 		case MF_CM_LABEL:
@@ -88,7 +113,7 @@ bool mfCtrlDefCallback( MfMessage message, const char *label, void *func, void *
 
 bool mfCtrlDefExtra( MfMessage message, const char *label, void *func, void *arg, void *ex )
 {
-	switch( message ){
+	switch( mfMenuMaskMainMessage( message ) ){
 		case MF_CM_INIT:
 		case MF_CM_TERM:
 		case MF_CM_LABEL:
@@ -98,7 +123,7 @@ bool mfCtrlDefExtra( MfMessage message, const char *label, void *func, void *arg
 			break;
 		case MF_CM_PROC:
 			if( mfMenuIsPressed( mfMenuAcceptButton() ) ){
-				mfMenuSetExtra( (MfMenuProc)func );
+				mfMenuSetExtra( (MfMenuExtraProc)func, arg );
 			}
 			break;
 	}
@@ -107,7 +132,7 @@ bool mfCtrlDefExtra( MfMessage message, const char *label, void *func, void *arg
 
 bool mfCtrlDefGetButtons( MfMessage message, const char *label, void *var, void *pref, void *ex )
 {
-	switch( message ){
+	switch( mfMenuMaskMainMessage( message ) ){
 		case MF_CM_INIT:
 		case MF_CM_TERM:
 		case MF_CM_LABEL:
@@ -117,7 +142,7 @@ bool mfCtrlDefGetButtons( MfMessage message, const char *label, void *var, void 
 			break;
 		case MF_CM_PROC:
 			if( mfMenuIsPressed( mfMenuAcceptButton() ) ){
-				mfDialogDetectbuttonsInit( label, ((MfCtrlDefGetButtonsPref *)pref)->availButtons, (PadutilButtons *)var );
+				mfDialogDetectbuttons( label, ((MfCtrlDefGetButtonsPref *)pref)->availButtons, (PadutilButtons *)var );
 			}
 			break;
 	}
@@ -128,7 +153,7 @@ bool mfCtrlDefGetNumber( MfMessage message, const char *label, void *var, void *
 {
 	unsigned int value = mfCtrlVarGetNum( var, ((MfCtrlDefGetNumberPref *)pref)->max );
 	
-	switch( message ){
+	switch( mfMenuMaskMainMessage( message ) ){
 		case MF_CM_INIT:
 		case MF_CM_TERM:
 			break;
@@ -156,7 +181,7 @@ bool mfCtrlDefGetNumber( MfMessage message, const char *label, void *var, void *
 					value++;
 				}
 			} else if( mfMenuIsPressed( PSP_CTRL_TRIANGLE ) ){
-				mfDialogNumeditInit( label, ((MfCtrlDefGetNumberPref *)pref)->unit, var, ((MfCtrlDefGetNumberPref *)pref)->max );
+				mfDialogNumedit( label, ((MfCtrlDefGetNumberPref *)pref)->unit, var, ((MfCtrlDefGetNumberPref *)pref)->max );
 			}
 			break;
 	}
@@ -187,31 +212,133 @@ void mfCtrlVarSetNum( void *num, unsigned int max, unsigned int value )
 		*((uint32_t *)num) = value;
 	}
 }
-/*
-bool mfCtrlDefGetFilename( MfMessage message, const char *label, void *var, void *pref, void *ex )
+
+bool mfCtrlDefIniLoad( MfMessage message, const char *label, void *loader, void *pref, void *ex )
 {
-	switch( message ){
+	switch( mfMenuMaskMainMessage( message ) ){
 		case MF_CM_INIT:
 		case MF_CM_TERM:
 		case MF_CM_LABEL:
 			break;
 		case MF_CM_INFO:
-			mfCtrlSetInfo( ex, MF_CTRL_INFO_LOWER_LINE, "\x85 = Select file" );
+			mfMenuSetInfoText( *((unsigned int *)ex) | MF_MENU_INFOTEXT_COMMON_CTRL | MF_MENU_INFOTEXT_SET_LOWER_LINE, "(%s)%s", mfMenuAcceptSymbol(), MF_STR_CTRL_CHOOSEFILE );
 			break;
 		case MF_CM_PROC:
 			if( mfMenuIsPressed( mfMenuAcceptButton() ) ){
-				mfDialogGetfilenameInit(
-					label,
-					((MfCtrlDefGetFilenamePref *)pref)->initDir,
-					((MfCtrlDefGetFilenamePref *)pref)->initFilename,
-					var,
-					((MfCtrlDefGetFilenamePref *)pref)->pathMax,
-					((MfCtrlDefGetFilenamePref *)pref)->options
-				);
+				struct mf_ctrl_ini_params *params = mfMemoryTempAlloc( sizeof( struct mf_ctrl_ini_params ) );
+				if( params ){
+					params->proc   = loader;
+					params->pref   = pref;
+					params->action = MF_CTRL_INI_LOAD;
+					params->path   = mfMemoryTempAlloc( params->pref->pathMax );
+					if( params->path ){
+						params->path[0] = '\0';
+						mfMenuSetExtra( (MfMenuExtraProc)mf_ctrl_ini_handler, params );
+					} else{
+						mfMemoryFree( params );
+						mf_ctrl_ini_error( MF_CTRL_INI_ERROR_NOT_ENOUGH_MEMORY );
+						return false;
+					}
+				} else{
+					mf_ctrl_ini_error( MF_CTRL_INI_ERROR_NOT_ENOUGH_MEMORY );
+					return false;
+				}
 			}
 			break;
 	}
-	
 	return true;
 }
-*/
+
+bool mfCtrlDefIniSave( MfMessage message, const char *label, void *saver, void *pref, void *ex )
+{
+	switch( mfMenuMaskMainMessage( message ) ){
+		case MF_CM_INIT:
+		case MF_CM_TERM:
+		case MF_CM_LABEL:
+			break;
+		case MF_CM_INFO:
+			mfMenuSetInfoText( *((unsigned int *)ex) | MF_MENU_INFOTEXT_COMMON_CTRL | MF_MENU_INFOTEXT_SET_LOWER_LINE, "(%s)%s", mfMenuAcceptSymbol(), MF_STR_CTRL_SAVEFILE );
+			break;
+		case MF_CM_PROC:
+			if( mfMenuIsPressed( mfMenuAcceptButton() ) ){
+				struct mf_ctrl_ini_params *params = mfMemoryTempAlloc( sizeof( struct mf_ctrl_ini_params ) );
+				if( params ){
+					params->proc   = saver;
+					params->pref   = pref;
+					params->action = MF_CTRL_INI_SAVE;
+					params->path   = mfMemoryTempAlloc( params->pref->pathMax );
+					if( params->path ){
+						params->path[0] = '\0';
+						mfMenuSetExtra( (MfMenuExtraProc)mf_ctrl_ini_handler, params );
+					} else{
+						mfMemoryFree( params );
+						mf_ctrl_ini_error( MF_CTRL_INI_ERROR_NOT_ENOUGH_MEMORY );
+						return false;
+					}
+				} else{
+					mf_ctrl_ini_error( MF_CTRL_INI_ERROR_NOT_ENOUGH_MEMORY );
+					return false;
+				}
+			}
+			break;
+	}
+	return true;
+}
+
+static void mf_ctrl_ini_handler( MfMessage message, void *arg )
+{
+	struct mf_ctrl_ini_params *params = arg;
+	
+	if( message & MF_MM_INIT ){
+		unsigned int options;
+		
+		if( params->action == MF_CTRL_INI_SAVE ){
+			options = CDIALOG_GETFILENAME_SAVE | CDIALOG_GETFILENAME_OVERWRITEPROMPT;
+		} else{
+			options = CDIALOG_GETFILENAME_OPEN | CDIALOG_GETFILENAME_FILEMUSTEXIST;
+		}
+		
+		if( ! mfDialogGetfilename( params->pref->title, params->pref->initDir, params->pref->initFilename, params->path, params->pref->pathMax, options ) ){
+			mfMenuSendSignal( MF_CTRL_DEF_INI_SIG_FINISH );
+		}
+	} else if( message & MF_MM_PROC ){
+		 if( message & MF_CTRL_DEF_INI_SIG_ACCEPT ){
+			int ret = ( params->proc )( params->action, params->path );
+			if( ret != MF_CTRL_INI_ERROR_OK ) mf_ctrl_ini_error( ret );
+			mfMenuSendSignal( MF_CTRL_DEF_INI_SIG_FINISH );
+		} else if( message & MF_CTRL_DEF_INI_SIG_FINISH ){
+			mfMemoryFree( params->path );
+			mfMemoryFree( params );
+			mfMenuExitExtra();
+		} else if( message & MF_DM_FINISH ){
+			if( ! mfDialogLastResult() ){
+				mfMenuSendSignal( MF_CTRL_DEF_INI_SIG_FINISH );
+			} else{
+				mfMenuSetInfoText( MF_MENU_INFOTEXT_SET_MIDDLE_LINE, params->action == MF_CTRL_INI_SAVE ? MF_STR_SAVING : MF_STR_LOADING, params->path );
+				mfMenuSendSignal( MF_CTRL_DEF_INI_SIG_ACCEPT );
+			}
+		}
+	}
+}
+
+static void mf_ctrl_ini_error( int error )
+{
+	switch( error ){
+		case MF_CTRL_INI_ERROR_OK: break;
+		case MF_CTRL_INI_ERROR_INVALID_CONF:
+			mfDialogMessage( MF_STR_ERROR, MF_STR_ERROR_INVALID_CONF, 0, false );
+			break;
+		case MF_CTRL_INI_ERROR_UNSUPPORTED_VERSION:
+			mfDialogMessage( MF_STR_ERROR, MF_STR_ERROR_UNSUPPORTED_VERSION, 0, false );
+			break;
+		case MF_CTRL_INI_ERROR_NOT_ENOUGH_MEMORY:
+			if( ! mfDialogMessage( MF_STR_ERROR, MF_STR_ERROR_INICTRL MF_STR_ERROR_NOT_ENOUGH_MEMORY, CG_ERROR_NOT_ENOUGH_MEMORY, false ) ){
+				/* メモリ不足でメッセージダイアログ表示も出来ない場合は直接表示 */
+				mfMenuSetInfoText( MF_MENU_INFOTEXT_ERROR | MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "%s: %s", MF_STR_ERROR, MF_STR_ERROR_NOT_ENOUGH_MEMORY );
+				mfMenuWait( MF_ERROR_DELAY );
+			}
+			break;
+		default:
+			mfDialogMessage( MF_STR_ERROR, MF_STR_ERROR_INICTRL, error, false );
+	}
+}

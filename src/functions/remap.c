@@ -23,13 +23,16 @@ static bool remap_add( struct remap_params *params );
 static bool remap_delete( struct remap_params *params );
 static bool remap_clear( struct remap_params *params );
 
-static void remap_menu_load( MfMenuMessage message );
-static void remap_menu_save( MfMenuMessage message );
-static void remap_menu_clear( MfMenuMessage message );
-static int  remap_loader( InimgrCallbackMode mode, InimgrCallbackParams *cbp, char *buf, size_t buflen, void *arg );
-static int  remap_saver( InimgrCallbackMode mode, InimgrCallbackParams *cbp, char *buf, size_t buflen, void *arg );
-static bool remap_save( struct remap_params *params, const char *path );
-static bool remap_load( struct remap_params *params, const char *path );
+static bool remap_control_load( MfMessage message, const char *label, void *var, void *pref, void *ex );
+static bool remap_control_save( MfMessage message, const char *label, void *var, void *pref, void *ex );
+static void remap_menu_clear( MfMessage message );
+
+static int remap_ini_handle( MfCtrlDefIniAction action, const char *path );
+static int remap_save( struct remap_params *params, const char *path );
+static int remap_load( struct remap_params *params, const char *path );
+
+static int remap_inicb_load( InimgrCallbackMode mode, InimgrCallbackParams *cbp, char *buf, size_t buflen, void *arg );
+static int remap_inicb_save( InimgrCallbackMode mode, InimgrCallbackParams *cbp, char *buf, size_t buflen, void *arg );
 
 /*=========================================================
 	ローカル変数
@@ -84,9 +87,10 @@ void remapMain( MfHookAction action, SceCtrlData *pad, MfHprmKey *hk )
 void remapMenu( MfMenuMessage message )
 {
 	static MfMenuTable *menu;
+	static MfCtrlDefIniPref *inipref;
 	static char column;
 	
-	switch( message ){
+	switch( mfMenuMaskMainMessage( message ) ){
 		case MF_MM_INIT:
 			dbgprint( "Creating remap menu" );
 			menu = mfMenuCreateTables(
@@ -95,13 +99,25 @@ void remapMenu( MfMenuMessage message )
 			);
 			if( ! menu ) return;
 			
+			inipref = mfMemoryTempAlloc( sizeof( MfCtrlDefIniPref ) );
+			if( ! inipref ){
+				mfMenuDestroyTables( menu );
+				return;
+			}
+			
+			inipref->title        = NULL;
+			inipref->initDir      = "ms0:";
+			inipref->initFilename = NULL;
+			inipref->pathMax      = MF_PATH_MAX;
+			
 			mfMenuSetTablePosition( menu, 1, pbOffsetChar( 57 ), pbOffsetLine( 7 ) );
-			mfMenuSetTableEntry( menu, 1, 1, 1, MF_STR_LOAD, mfCtrlDefExtra, remap_menu_load, NULL );
-			mfMenuSetTableEntry( menu, 1, 2, 1, MF_STR_SAVE, mfCtrlDefExtra, remap_menu_save, NULL );
+			mfMenuSetTableEntry( menu, 1, 1, 1, MF_STR_LOAD, remap_control_load, remap_ini_handle, inipref );
+			mfMenuSetTableEntry( menu, 1, 2, 1, MF_STR_SAVE, remap_control_save, remap_ini_handle, inipref );
 			mfMenuSetTableEntry( menu, 1, 4, 1, MF_STR_REMAP_CLEAR, mfCtrlDefExtra, remap_menu_clear, NULL );
 			mfMenuInitTable( menu );
 			break;
 		case MF_MM_TERM:
+			mfMemoryFree( inipref );
 			mfMenuDestroyTables( menu );
 			return;
 		default:
@@ -138,15 +154,11 @@ void remapMenu( MfMenuMessage message )
 					if( ! entry->realButtons ) continue;
 					
 					real_buttons[0]  = '\0';
-					//remap_buttons[0] = '\0';
 					
 					mfMenuButtonsSymbolList( entry->realButtons,  real_buttons,  sizeof( real_buttons ) );
-					//mfMenuButtonsSymbolList( entry->remapButtons, remap_buttons, sizeof( remap_buttons ) );
 					if( pos == line ){
-						//pbPrintf( pbOffsetChar( 3 ), pbOffsetLine( 7 + linepos ), MF_COLOR_TEXT_FC, MF_COLOR_TEXT_BG, "%s: %s", real_buttons, remap_buttons );
 						pbPrint( pbOffsetChar( 3 ), pbOffsetLine( 7 + linepos ), MF_COLOR_TEXT_FC, MF_COLOR_TEXT_BG, real_buttons );
 					} else{
-						//pbPrintf( pbOffsetChar( 3 ), pbOffsetLine( 7 + linepos ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, "%s: %s", real_buttons, remap_buttons );
 						pbPrint( pbOffsetChar( 3 ), pbOffsetLine( 7 + linepos ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, real_buttons );
 					}
 				}
@@ -164,14 +176,12 @@ void remapMenu( MfMenuMessage message )
 				
 				mfMenuDrawTable( menu, MF_MENU_DISPLAY_ONLY );
 				
-				if( mfDialogCurrentType() == MFDIALOG_DETECTBUTTONS ){
-					if( ! mfDialogDetectbuttonsDraw() ){
-						if( ! mfDialogDetectbuttonsResult() && ! st_params.selected->remapButtons ){
-							remap_delete( &st_params );
-						}
+				if( message & MF_DM_FINISH ){
+					if( ! mfDialogLastResult() && ! st_params.selected->realButtons ){
+						remap_delete( &st_params );
 						mfMenuResetKeyRepeat();
 					}
-				} else{
+				} else if( ! mfMenuMaskDialogMessage( message ) ){
 					if( ! st_params.remapList ){
 						mfMenuSetInfoText( MF_MENU_INFOTEXT_COMMON_CTRL | MF_MENU_INFOTEXT_MOVABLEPAGE_CTRL | MF_MENU_INFOTEXT_SET_LOWER_LINE, "(L/R)%s, (%s)%s", MF_STR_REMAP_CTRL_SWITCH_COLUMN, PB_SYM_PSP_TRIANGLE, MF_STR_REMAP_CTRL_ADD );
 					} else{
@@ -180,15 +190,13 @@ void remapMenu( MfMenuMessage message )
 					if( buttons ){
 						if( buttons & mfMenuCancelButton() ){
 							mfMenuProc( NULL );
-						} else if( buttons & PSP_CTRL_TRIANGLE ){
-							if( remap_add( &st_params ) ){
-								mfDialogDetectbuttonsInit( MF_STR_REMAP_DIAGBUTTON_REAL, MF_HOTKEY_BUTTONS, &(st_params.selected->realButtons) );
-							}
+						} else if( ( buttons & PSP_CTRL_TRIANGLE ) && remap_add( &st_params ) ){
+							mfDialogDetectbuttons( MF_STR_REMAP_DIAGBUTTON_REAL, MF_HOTKEY_BUTTONS, &(st_params.selected->realButtons) );
 						} else if( buttons & ( PSP_CTRL_LTRIGGER | PSP_CTRL_RTRIGGER ) ){
 							column = REMAP_COLUMN_MENU;
 						} else if( st_params.selected ){
 							if( buttons & mfMenuAcceptButton() ){
-								mfDialogDetectbuttonsInit( MF_STR_REMAP_DIAGBUTTON_REMAP, MF_TARGET_BUTTONS, &(st_params.selected->remapButtons) );
+								mfDialogDetectbuttons( MF_STR_REMAP_DIAGBUTTON_REMAP, MF_TARGET_BUTTONS, &(st_params.selected->remapButtons) );
 							} else if( buttons & PSP_CTRL_SQUARE ){
 								remap_delete( &st_params );
 							} else if( buttons & PSP_CTRL_UP ){
@@ -215,9 +223,7 @@ void remapMenu( MfMenuMessage message )
 				pbLineRectRel( pbOffsetChar(  2 ), pbOffsetLine( 6 ), pbOffsetChar( 53 ), pbOffsetLine( REMAP_LINES_PER_PAGE + 2 ), MF_COLOR_TEXT_FG );
 				pbLineRectRel( pbOffsetChar( 56 ), pbOffsetLine( 6 ), pbOffsetChar( 23 ), pbOffsetLine( REMAP_LINES_PER_PAGE + 2 ), MF_COLOR_TEXT_FC );
 				
-				if( message != MF_MM_EXTRA ){
-					mfMenuSetInfoText( MF_MENU_INFOTEXT_COMMON_CTRL | MF_MENU_INFOTEXT_SET_LOWER_LINE, "(L/R)%s", MF_STR_REMAP_CTRL_SWITCH_COLUMN );
-					
+				if( message & MF_MM_PROC ){
 					if( buttons & ( PSP_CTRL_LTRIGGER | PSP_CTRL_RTRIGGER ) ){
 						column = REMAP_COLUMN_LIST;
 					}
@@ -298,7 +304,7 @@ static bool remap_clear( struct remap_params *params )
 	return true;
 }
 
-static bool remap_save( struct remap_params *params, const char *path )
+static int remap_save( struct remap_params *params, const char *path )
 {
 	IniUID ini = inimgrNew();
 	
@@ -306,61 +312,49 @@ static bool remap_save( struct remap_params *params, const char *path )
 		int ret;
 		
 		inimgrAddSection( ini, REMAP_SECTION_DATA );
-		inimgrSetCallback( ini, REMAP_SECTION_DATA, remap_saver, (void *)params );
+		inimgrSetCallback( ini, REMAP_SECTION_DATA, remap_inicb_save, (void *)params );
 		ret = inimgrSave( ini, path, REMAP_INI_SIGNATURE, REMAP_INI_VERSION, 0, 0 );
+		inimgrDestroy( ini );
 		
 		if( ret != 0 ){
-			mfMenuSetInfoText( MF_MENU_INFOTEXT_ERROR | MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "inimgr %s: %X", MF_STR_ERROR, ret );
-			mfMenuWait( MF_ERROR_DELAY );
+			return ret;
 		} else{
-			inimgrDestroy( ini );
-			return true;
+			return MF_CTRL_INI_ERROR_OK;
 		}
-		inimgrDestroy( ini );
-	} else{
-		mfMenuSetInfoText( MF_MENU_INFOTEXT_ERROR | MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "inimgr %s: %s.", MF_STR_ERROR, MF_STR_ERROR_NOT_ENOUGH_MEMORY );
-		mfMenuWait( MF_ERROR_DELAY );
 	}
-	return false;
+	return MF_CTRL_INI_ERROR_NOT_ENOUGH_MEMORY;
 }
 
-static bool remap_load( struct remap_params *params, const char *path )
+static int remap_load( struct remap_params *params, const char *path )
 {
 	IniUID ini = inimgrNew();
 	
 	if( ini ){
 		int ret;
 		
-		remap_clear( params );
-		
-		inimgrSetCallback( ini, REMAP_SECTION_DATA, remap_loader, (void *)params );
+		inimgrSetCallback( ini, REMAP_SECTION_DATA, remap_inicb_load, (void *)params );
 		ret = inimgrLoad( ini, path, REMAP_INI_SIGNATURE, REMAP_INI_VERSION, 0, 0 );
+		inimgrDestroy( ini );
 		
 		if( ret != 0 ){
 			if( ret == INIMGR_ERROR_INVALID_SIGNATURE ){
-				mfMenuSetInfoText( MF_MENU_INFOTEXT_ERROR | MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "%s: %s.", MF_STR_ERROR, MF_STR_ERROR_INVALID_CONF );
+				return MF_CTRL_INI_ERROR_INVALID_CONF;
 			} else if( ret == INIMGR_ERROR_INVALID_VERSION ){
-				mfMenuSetInfoText( MF_MENU_INFOTEXT_ERROR | MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "%s: %s.", MF_STR_ERROR, MF_STR_ERROR_UNSUPPORTED_VERSION );
+				return MF_CTRL_INI_ERROR_UNSUPPORTED_VERSION;
 			} else {
-				mfMenuSetInfoText( MF_MENU_INFOTEXT_ERROR | MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "inimgr %s: %X", MF_STR_ERROR, ret );
+				return ret;
 			}
-			mfMenuWait( MF_ERROR_DELAY );
 		} else{
-			inimgrDestroy( ini );
-			return true;
+			return MF_CTRL_INI_ERROR_OK;
 		}
-		inimgrDestroy( ini );
-	} else{
-		mfMenuSetInfoText( MF_MENU_INFOTEXT_ERROR | MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "inimgr %s: %s.", MF_STR_ERROR, MF_STR_ERROR_NOT_ENOUGH_MEMORY );
-		mfMenuWait( MF_ERROR_DELAY );
 	}
-	return false;
+	return MF_CTRL_INI_ERROR_NOT_ENOUGH_MEMORY;
 }
 
 /*-----------------------------------------------
 	セーブロードコールバック
 -----------------------------------------------*/
-static int remap_loader( InimgrCallbackMode mode, InimgrCallbackParams *cbp, char *buf, size_t buflen, void *arg )
+static int remap_inicb_load( InimgrCallbackMode mode, InimgrCallbackParams *cbp, char *buf, size_t buflen, void *arg )
 {
 	struct remap_params *params = (struct remap_params *)arg;
 	char *name, *value;
@@ -369,12 +363,12 @@ static int remap_loader( InimgrCallbackMode mode, InimgrCallbackParams *cbp, cha
 	dbgprint( "Remap loader called." );
 	
 	if( ! mfConvertButtonReady() ){
-		return CG_ERROR_NOT_ENOUGH_MEMORY;
+		return MF_CTRL_INI_ERROR_NOT_ENOUGH_MEMORY;
 	}
 	
 	if( ! remap_add( params ) ){
 		mfConvertButtonFinish();
-		return CG_ERROR_NOT_ENOUGH_MEMORY;
+		return MF_CTRL_INI_ERROR_NOT_ENOUGH_MEMORY;
 	}
 	
 	while( inimgrCbReadln( cbp, buf, buflen ) ){
@@ -396,10 +390,10 @@ static int remap_loader( InimgrCallbackMode mode, InimgrCallbackParams *cbp, cha
 	if( ! update ) remap_delete( params );
 	mfConvertButtonFinish();
 	
-	return 0;
+	return MF_CTRL_INI_ERROR_OK;
 }
 
-static int remap_saver( InimgrCallbackMode mode, InimgrCallbackParams *cbp, char *buf, size_t buflen, void *arg )
+static int remap_inicb_save( InimgrCallbackMode mode, InimgrCallbackParams *cbp, char *buf, size_t buflen, void *arg )
 {
 	struct remap_params *params = (struct remap_params *)arg;
 	char section[INIMGR_SECTION_BUFFER];
@@ -409,7 +403,7 @@ static int remap_saver( InimgrCallbackMode mode, InimgrCallbackParams *cbp, char
 	
 	inimgrDeleteSection( inimgrCbGetIniHandle( cbp ), REMAP_SECTION_DATA );
 	
-	if( ! mfConvertButtonReady() ) return CG_ERROR_NOT_ENOUGH_MEMORY;
+	if( ! mfConvertButtonReady() ) return MF_CTRL_INI_ERROR_NOT_ENOUGH_MEMORY;
 	
 	for( seq = 1, remap = params->remapList; remap; remap = remap->next, seq++ ){
 		if( ! remap->realButtons ) continue;
@@ -434,89 +428,53 @@ static int remap_saver( InimgrCallbackMode mode, InimgrCallbackParams *cbp, char
 	
 	mfConvertButtonFinish();
 	
-	return 0;
+	return MF_CTRL_INI_ERROR_OK;
 }
 
 /*-----------------------------------------------
 	メニューコントロール
 -----------------------------------------------*/
-static void remap_menu_save( MfMenuMessage message )
+static bool remap_control_load( MfMessage message, const char *label, void *var, void *pref, void *ex )
 {
-	static char *path;
-	
-	if( message == MF_MM_INIT ){
-		path = memoryExalloc( "RemapSave", MEMORY_USER, 0, MF_PATH_MAX, PSP_SMEM_High, NULL );
-		
-		if( ! mfDialogGetfilenameInit( MF_STR_REMAP_DIAGGETFN_SAVE, "ms0:", "remap.ini", path, 255, CDIALOG_GETFILENAME_SAVE | CDIALOG_GETFILENAME_OVERWRITEPROMPT  ) ){
-			memoryFree( path );
-			path = NULL;
-			mfMenuExitExtra();
-		}
-	} else if( message == MF_MM_PROC ){
-		if( mfDialogCurrentType() ){
-			if( ! mfDialogGetfilenameDraw() ){
-				if( ! mfDialogGetfilenameResult() ){
-					memoryFree( path );
-					path = NULL;
-				} else{
-					mfMenuSetInfoText( MF_MENU_INFOTEXT_SET_MIDDLE_LINE, MF_STR_SAVING, path );
-				}
-			}
-		} else if( path ){
-			remap_save( &st_params, path );
-			memoryFree( path );
-			path = NULL;
-		} else if( ! path ){
-			mfMenuExitExtra();
-		}
+	if( ( message & MF_CM_PROC ) && mfMenuIsPressed( mfMenuAcceptButton() ) ){
+		((MfCtrlDefIniPref *)pref)->title        = "Load remap list";
+		((MfCtrlDefIniPref *)pref)->initFilename = "";
 	}
+	return mfCtrlDefIniLoad( message, label, var, pref, ex );
 }
 
-static void remap_menu_load( MfMenuMessage message )
+static bool remap_control_save( MfMessage message, const char *label, void *var, void *pref, void *ex )
 {
-	static char *path;
-	
-	if( message == MF_MM_INIT ){
-		path = memoryExalloc( "RemapLoad", MEMORY_USER, 0, MF_PATH_MAX, PSP_SMEM_High, NULL );
-		
-		if( ! mfDialogGetfilenameInit( MF_STR_REMAP_DIAGGETFN_LOAD, "ms0:", "", path, 255, CDIALOG_GETFILENAME_OPEN | CDIALOG_GETFILENAME_FILEMUSTEXIST ) ){
-			memoryFree( path );
-			path = NULL;
-			mfMenuExitExtra();
-		}
-	} else if( message == MF_MM_PROC ){
-		if( mfDialogCurrentType() ){
-			if( ! mfDialogGetfilenameDraw() ){
-				if( ! mfDialogGetfilenameResult() ){
-					memoryFree( path );
-					path = NULL;
-				} else{
-					mfMenuSetInfoText( MF_MENU_INFOTEXT_SET_MIDDLE_LINE, MF_STR_LOADING, path );
-				}
-			}
-		} else if( path ){
-			if( ! remap_load( &st_params, path ) ){
-				remap_clear( &st_params );
-			}
-			memoryFree( path );
-			path = NULL;
-		} else if( ! path ){
-			mfMenuExitExtra();
-		}
+	if( ( message & MF_CM_PROC ) && mfMenuIsPressed( mfMenuAcceptButton() ) ){
+		((MfCtrlDefIniPref *)pref)->title        = "Save remap list";
+		((MfCtrlDefIniPref *)pref)->initFilename = "remap.ini";
 	}
+	return mfCtrlDefIniSave( message, label, var, pref, ex );
 }
 
-static void remap_menu_clear( MfMenuMessage message )
+static int remap_ini_handle( MfCtrlDefIniAction action, const char *path )
 {
-	if( message == MF_MM_INIT ){
-		if( ! mfDialogMessageInit( MF_STR_REMAP_CLEAR_WARN_TITLE, MF_STR_REMAP_CLEAR_WARN_MSG, true ) ) return;
-	} else if( message == MF_MM_PROC ){
-		if( ! mfDialogMessageDraw() ){
-			if( mfDialogMessageResult() ){
-				remap_clear( &st_params );
-			}
-			mfMenuExitExtra();
-		}
+	int ret;
+	
+	switch( action ){
+		case MF_CTRL_INI_LOAD:
+			remap_clear( &st_params );
+			ret = remap_load( &st_params, path );
+			if( ret != MF_CTRL_INI_ERROR_OK ) remap_clear( &st_params );
+			return ret;
+		case MF_CTRL_INI_SAVE:
+			return remap_save( &st_params, path );
+	}
+	return 0;
+}
+
+static void remap_menu_clear( MfMessage message )
+{
+	if( message & MF_MM_INIT ){
+		if( ! mfDialogMessage( MF_STR_REMAP_CLEAR_WARN_TITLE, MF_STR_REMAP_CLEAR_WARN_MSG, 0, true ) ) return;
+	} else if( message & MF_DM_FINISH ){
+		if( mfDialogLastResult() ) remap_clear( &st_params );
+		mfMenuExitExtra();
 	}
 }
 

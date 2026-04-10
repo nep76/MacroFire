@@ -20,7 +20,7 @@
 =========================================================*/
 bool macroeditorInit( MacromgrUID uid );
 void macroeditorTerm( void );
-bool macroeditorMain( void );
+bool macroeditorMain( MfMessage message );
 
 
 #endif

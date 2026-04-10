@@ -14,21 +14,6 @@
 /*=========================================================
 	ローカル型宣言
 =========================================================*/
-struct mf_rapidfire_pref {
-	unsigned int    button;       /* 対象ボタン */
-	MfRapidfireMode mode;         /* モード */
-	unsigned int    pressDelay;   /* 連射時のディレイ */
-	unsigned int    releaseDelay; /* 連射時のディレイ */
-	unsigned int    nextDelay;    /* 次のボタンアクションまでの待ち時間 */
-	bool            autorun;      /* ボタンが押下されていなくとも自動実行するかどうか */
-	unsigned int    bitFlags;     /* モードに応じて必要なフラグがセットされる */
-};
-
-struct mf_rapidfire_params {
-	uint64_t lastTick;
-	struct mf_rapidfire_pref *pref;
-};
-
 struct mf_rapidfire_progress {
 	unsigned int button;
 	unsigned int mode;
@@ -70,12 +55,22 @@ static struct mf_rapidfire_progress st_progress[] = {
 =========================================================*/
 MfRapidfireUID mfRapidfireNew( void )
 {
+	MfRapidfireParams *params = (MfRapidfireParams *)mfMemoryAlloc( sizeof( MfRapidfireParams ) );
+	return mfRapidfireBind( params );
+}
+
+void mfRapidfireDestroy( MfRapidfireUID uid )
+{
+	memoryFree( (void *)uid );
+}
+
+MfRapidfireUID mfRapidfireBind( MfRapidfireParams *params )
+{
 	unsigned short i;
-	struct mf_rapidfire_params *params = (struct mf_rapidfire_params *)memoryAlloc( sizeof( struct mf_rapidfire_params ) + sizeof( struct mf_rapidfire_pref ) * MF_RAPIDFIRE_NUMBER_OF_AVAIL_BUTTONS );
+	
 	if( ! params ) return 0;
 	
 	params->lastTick = 0;
-	params->pref     = (struct mf_rapidfire_pref *)( (uintptr_t)params + sizeof( struct mf_rapidfire_params ) );
 	
 	for( i = 0; i < MF_RAPIDFIRE_NUMBER_OF_AVAIL_BUTTONS; i++ ){
 		params->pref[i].button       = st_progress[i].button;
@@ -90,15 +85,10 @@ MfRapidfireUID mfRapidfireNew( void )
 	return (MfRapidfireUID)params;
 }
 
-void mfRapidfireDestroy( MfRapidfireUID uid )
-{
-	memoryFree( (void *)uid );
-}
-
 void mfRapidfireSetRapid( MfRapidfireUID uid, unsigned int buttons, unsigned int pdelay, unsigned int rdelay, bool autorun )
 {
 	unsigned short i;
-	struct mf_rapidfire_pref *pref = ((struct mf_rapidfire_params *)uid)->pref;
+	MfRapidfireData *pref = ((MfRapidfireParams *)uid)->pref;
 	
 	for( i = 0; i < MF_RAPIDFIRE_NUMBER_OF_AVAIL_BUTTONS; i++ ){
 		if( buttons & pref[i].button ){
@@ -114,7 +104,7 @@ void mfRapidfireSetRapid( MfRapidfireUID uid, unsigned int buttons, unsigned int
 void mfRapidfireSetHold( MfRapidfireUID uid, unsigned int buttons, bool autorun )
 {
 	unsigned short i;
-	struct mf_rapidfire_pref *pref = ((struct mf_rapidfire_params *)uid)->pref;
+	MfRapidfireData *pref = ((MfRapidfireParams *)uid)->pref;
 	
 	for( i = 0; i < MF_RAPIDFIRE_NUMBER_OF_AVAIL_BUTTONS; i++ ){
 		if( buttons & pref[i].button ){
@@ -130,7 +120,7 @@ void mfRapidfireSetHold( MfRapidfireUID uid, unsigned int buttons, bool autorun 
 void mfRapidfireClear( MfRapidfireUID uid, unsigned int buttons )
 {
 	unsigned short i;
-	struct mf_rapidfire_pref *pref = ((struct mf_rapidfire_params *)uid)->pref;
+	MfRapidfireData *pref = ((MfRapidfireParams *)uid)->pref;
 	
 	for( i = 0; i < MF_RAPIDFIRE_NUMBER_OF_AVAIL_BUTTONS; i++ ){
 		if( buttons & pref[i].button ){
@@ -146,7 +136,7 @@ void mfRapidfireClear( MfRapidfireUID uid, unsigned int buttons )
 bool mfRapidfireGetEntry( MfRapidfireUID uid, enum PspCtrlButtons button, MfRapidfireMode *mode, unsigned int *pdelay, unsigned int *rdelay, bool *autorun )
 {
 	unsigned short i;
-	struct mf_rapidfire_pref *pref = ((struct mf_rapidfire_params *)uid)->pref;
+	MfRapidfireData *pref = ((MfRapidfireParams *)uid)->pref;
 	
 	/* ボタンコードから配列の要素番号を取得 */
 	switch( button ){
@@ -175,7 +165,7 @@ bool mfRapidfireGetEntry( MfRapidfireUID uid, enum PspCtrlButtons button, MfRapi
 
 bool mfRapidfireReadEntry( MfRapidfireUID uid, unsigned int *button, MfRapidfireMode *mode, unsigned int *pdelay, unsigned int *rdelay, bool *autorun, unsigned short *save )
 {
-	struct mf_rapidfire_pref *pref = ((struct mf_rapidfire_params *)uid)->pref;
+	MfRapidfireData *pref = ((MfRapidfireParams *)uid)->pref;
 	
 	if( ! save || *save >= MF_RAPIDFIRE_NUMBER_OF_AVAIL_BUTTONS ) return false;
 	
@@ -195,7 +185,7 @@ void mfRapidfireExec( MfRapidfireUID uid, MfHookAction action, SceCtrlData *pad 
 	unsigned short i;
 	uint64_t cur_tick;
 	unsigned int delay;
-	struct mf_rapidfire_params *params = (struct mf_rapidfire_params *)uid;
+	MfRapidfireParams *params = (MfRapidfireParams *)uid;
 	
 	sceRtcGetCurrentTick( &cur_tick );
 	delay = ( cur_tick - params->lastTick ) / 1000;

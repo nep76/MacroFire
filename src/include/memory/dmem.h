@@ -15,11 +15,17 @@
 #ifndef DMEM_H
 #define DMEM_H
 
+#ifdef HEAP_KERNEL
+#include "memory/heap_kernel.h"
+#else
 #include "memory/heap.h"
+#endif
 
 /*=========================================================
 	É}ÉNÉç
 =========================================================*/
+#define DMEM_LOW  HEAP_LOW
+#define DMEM_HIGH HEAP_HIGH
 
 #ifdef __cplusplus
 extern "C" {

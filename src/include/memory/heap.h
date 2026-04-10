@@ -5,9 +5,6 @@
 	ヒープとして使用するメモリ領域を作成する。
 	大きさの分かっているものを複数確保する場合に有利。
 	
-	ヒープをマネジメントするAPIが存在するが、カーネルモードでないと動かないのと、
-	sceKernelDeleteHeap()時に原因不明のフリーズを起こすことがあるため、自前で。
-	
 	とはいえ、まともな実装にしようとすると結構大変そうなので、とりあえずそれっぽく。
 	今のところ速度面は無視。
 
@@ -18,11 +15,14 @@
 #include <pspkernel.h>
 #include <pspsysmem_kernel.h>
 #include "memory/memory.h"
-#include "cgerrs.h"
+#include "cgerrno.h"
 
 /*=========================================================
 	マクロ
 =========================================================*/
+#define HEAP_LOW  1
+#define HEAP_HIGH 2
+
 #define HEAP_HEADER_SIZE sizeof( struct heap_allocated_memblock_header )
 
 #ifdef __cplusplus
@@ -44,7 +44,7 @@ struct heap_allocated_memblock_header {
 =========================================================*/
 
 /*-----------------------------------------------
-	heapCreateEx
+	heapExCreate
 	
 	ヒープとして使用するメモリ領域を確保する。
 	ヘッダを必要とするため、確保されるサイズは指定したサイズよりヘッダサイズ(HEAP_HEADER_SIZE)だけ大きくなる。
@@ -61,7 +61,7 @@ struct heap_allocated_memblock_header {
 	@return: HeapUID
 		ヒープを使うためのUID。
 -----------------------------------------------*/
-HeapUID heapExCreate( const char *name, MemoryPartition partition, unsigned int align, SceSize size, int type, void *addr );
+HeapUID heapExCreate( const char *name, MemoryPartition partition, SceSize size, int type );
 
 /*-----------------------------------------------
 	heapCreate
@@ -137,34 +137,6 @@ void *heapCalloc( HeapUID uid, SceSize size );
 	heapDestroy()が実行されると、そのヒープから確保しているメモリブロックは全て解放される。
 -----------------------------------------------*/
 int heapFree( HeapUID uid, void *heap );
-
-/*-----------------------------------------------
-	heapUsableSize
-	
-	heapCreate()/heapCreateEx()で確保したヒープ領域が、
-	実際にどれだけのサイズを使用可能かを取得する。
-	
-	@param: HeapUID uid
-		heapCreate/heapCreateExの返り値。
-	
-	@return: SceSize
-		使用可能なバイト数。
------------------------------------------------*/
-SceSize heapUsableSize( HeapUID uid );
-
-/*-----------------------------------------------
-	heapMaxFreeSize
-	
-	heapCreate()/heapCreateEx()で確保したヒープ領域で、
-	もっとも大きな空き容量を返す。
-	
-	@param: HeapUID uid
-		heapCreate/heapCreateExの返り値。
-	
-	@return: SceSize
-		もっとも大きな空き容量。
------------------------------------------------*/
-SceSize heapMaxFreeSize( HeapUID uid );
 
 /*-----------------------------------------------
 	heapTotalFreeSize

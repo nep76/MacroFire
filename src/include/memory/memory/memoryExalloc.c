@@ -16,8 +16,6 @@ void *memoryExalloc( const char *name, MemoryPartition partition, unsigned int a
 	header.blockId = sceKernelAllocPartitionMemory( partition, name, type, sizeof( struct memory_header ) + real_size + align, addr );
 	if( header.blockId < 0 ) return NULL;
 	
-	header.size = real_size; 
-	
 	memblock = (void *)( (uintptr_t)(sceKernelGetBlockHeadAddr( header.blockId )) + sizeof( struct memory_header ) );
 	if( align ){
 		if( ! MEMORY_POWER_OF_TWO( align ) ){
@@ -27,12 +25,11 @@ void *memoryExalloc( const char *name, MemoryPartition partition, unsigned int a
 		memblock = (void *)MEMORY_ALIGN_ADDR( align, memblock );
 	}
 	
-	memcpy( (void *)( (uintptr_t)memblock - sizeof( struct memory_header ) ), (void *)&header, sizeof( struct memory_header ) );
+	header.size      = real_size;
+	header.part_type = MEMORY_SET_PARTITION_BLOCKTYPE( partition, type );
+	header.align     = align;
 	
-#ifdef MEMORY_DEBUG
-	printf( "MemoryAlloc %s: BlockID: %x, HeadAddr: %p, Size: %u\n", name, header.blockId, memblock, header.size );
-	st_alloc_count++;
-#endif
+	memcpy( (void *)( (uintptr_t)memblock - sizeof( struct memory_header ) ), (void *)&header, sizeof( struct memory_header ) );
 	
 	return memblock;
 }
@@ -40,23 +37,9 @@ void *memoryExalloc( const char *name, MemoryPartition partition, unsigned int a
 int memoryFree( void *memblock )
 {
 	struct memory_header *header;
-#ifdef MEMORY_DEBUG
-	int debug_ret;
-#endif
-	
+
 	if( ! memblock ) return 0;
 	header = (struct memory_header *)( (uintptr_t)memblock - sizeof( struct memory_header ) );
-	
-#ifdef MEMORY_DEBUG
-	debug_ret = sceKernelFreePartitionMemory( header->blockId );
-	if( debug_ret < 0 ){
-		printf( "MemoryFree Error (%x): BlockID: %x, HeapAddr: %p\n", debug_ret, header->blockId, memblock );
-	} else{
-		st_alloc_count--;
-		printf( "MemoryFree: BlockID: %x, HeapAddr: %p\n", header->blockId, memblock );
-	}
-	return debug_ret;
-#else
+
 	return sceKernelFreePartitionMemory( header->blockId );
-#endif
 }

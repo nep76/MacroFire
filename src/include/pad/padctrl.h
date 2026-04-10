@@ -15,7 +15,7 @@
 #include <stdint.h>
 #include "memory/memory.h"
 #include "pad/padutil.h"
-#include "cgerrs.h"
+#include "cgerrno.h"
 
 /*=========================================================
 	É}ÉNÉç

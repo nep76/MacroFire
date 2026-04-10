@@ -49,23 +49,25 @@ void *mfAnalogStickProc( MfMessage message )
 
 void mfAnalogStickIniLoad( IniUID ini, char *buf, size_t len )
 {
+	const char *section = mfGetIniSection();
 	int deadzone, sensitivity, originx, originy;
+	
 	st_enable_movement = true;
 	
-	inimgrGetBool( ini, "AnalogStick", "Movement", &st_enable_movement );
-	if( inimgrGetInt(  ini, "AnalogStick", "Deadzone",    &deadzone )    ) st_analogstick.deadzone    = deadzone;
-	if( inimgrGetInt(  ini, "AnalogStick", "Sensitivity", &sensitivity ) ) st_analogstick.sensitivity = (float)sensitivity / 100.0f;
-	if( inimgrGetInt(  ini, "AnalogStick", "OriginX",     &originx )     ) st_analogstick.originX     = originx;
-	if( inimgrGetInt(  ini, "AnalogStick", "OriginY",     &originy )     ) st_analogstick.originY     = originy;
+	inimgrGetBool( ini, section, "AnalogStickMovement", &st_enable_movement );
+	if( inimgrGetInt(  ini, section, "AnalogStickDeadzone",    &deadzone )    ) st_analogstick.deadzone    = deadzone;
+	if( inimgrGetInt(  ini, section, "AnalogStickSensitivity", &sensitivity ) ) st_analogstick.sensitivity = (float)sensitivity / 100.0f;
+	if( inimgrGetInt(  ini, section, "AnalogStickOriginX",     &originx )     ) st_analogstick.originX     = originx;
+	if( inimgrGetInt(  ini, section, "AnalogStickOriginY",     &originy )     ) st_analogstick.originY     = originy;
 }
 
 void mfAnalogStickIniSave( IniUID ini, char *buf, size_t len )
 {
-	inimgrSetBool( ini, "AnalogStick", "Movement",    true );
-	inimgrSetInt(  ini, "AnalogStick", "Deadzone",    40 );
-	inimgrSetInt(  ini, "AnalogStick", "Sensitivity", 100 );
-	inimgrSetInt(  ini, "AnalogStick", "OriginX",     PADUTIL_CENTER_X );
-	inimgrSetInt(  ini, "AnalogStick", "OriginY",     PADUTIL_CENTER_Y );
+	inimgrSetBool( ini, MF_INI_SECTION_DEFAULT, "AnalogStickMovement",    true );
+	inimgrSetInt(  ini, MF_INI_SECTION_DEFAULT, "AnalogStickDeadzone",    40 );
+	inimgrSetInt(  ini, MF_INI_SECTION_DEFAULT, "AnalogStickSensitivity", 100 );
+	inimgrSetInt(  ini, MF_INI_SECTION_DEFAULT, "AnalogStickOriginX",     PADUTIL_CENTER_X );
+	inimgrSetInt(  ini, MF_INI_SECTION_DEFAULT, "AnalogStickOriginY",     PADUTIL_CENTER_Y );
 }
 
 void mfAnalogStickAdjust( MfHookAction action, SceCtrlData *pad )
@@ -94,17 +96,17 @@ void mfAnalogStickMenu( MfMenuMessage message )
 				1,
 				7, 1
 			);
-			pheap = mfHeapCreate( 3, sizeof( MfCtrlDefGetNumberPref ) * 3 );
+			pheap = mfMemoryTempHeapCreate( 3, sizeof( MfCtrlDefGetNumberPref ) * 3 );
 			if( ! menu || ! pheap ){
 				if( menu ) mfMenuDestroyTables( menu );
-				if( pheap ) mfHeapDestroy( pheap );
+				if( pheap ) mfMemoryHeapDestroy( pheap );
 				return;
 			}
 			
 			{
-				MfCtrlDefGetNumberPref *pref_deadzone    = mfHeapCalloc( pheap, sizeof( MfCtrlDefGetNumberPref ) );
-				MfCtrlDefGetNumberPref *pref_sensitivity = mfHeapCalloc( pheap, sizeof( MfCtrlDefGetNumberPref ) );
-				MfCtrlDefGetNumberPref *pref_origin      = mfHeapCalloc( pheap, sizeof( MfCtrlDefGetNumberPref ) );
+				MfCtrlDefGetNumberPref *pref_deadzone    = mfMemoryHeapCalloc( pheap, sizeof( MfCtrlDefGetNumberPref ) );
+				MfCtrlDefGetNumberPref *pref_sensitivity = mfMemoryHeapCalloc( pheap, sizeof( MfCtrlDefGetNumberPref ) );
+				MfCtrlDefGetNumberPref *pref_origin      = mfMemoryHeapCalloc( pheap, sizeof( MfCtrlDefGetNumberPref ) );
 				
 				pref_deadzone->unit  = "(0-182)";
 				pref_deadzone->max   = 182;
@@ -130,7 +132,7 @@ void mfAnalogStickMenu( MfMenuMessage message )
 			break;
 		case MF_MM_TERM:
 			mfMenuDestroyTables( menu );
-			mfHeapDestroy( pheap );
+			mfMemoryHeapDestroy( pheap );
 			return;
 		default:
 			st_analogstick.sensitivity = sensitivity / 100.0f;

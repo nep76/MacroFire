@@ -71,7 +71,7 @@ void *memoryCalloc( SceSize nelem, SceSize size );
 	例外として、メモリブロックサイズ(256バイト)以下の増減で、なおかつ、変更後のサイズが、
 	メモリブロック境界をまたがない場合はアドレスは変更されない。
 -----------------------------------------------*/
-void *memoryRealloc( void *src_memblock, SceSize new_size );
+void *memoryRealloc( const char *name, void *src_memblock, SceSize new_size );
 
 /*-----------------------------------------------
 	memoryReallocf
@@ -80,7 +80,7 @@ void *memoryRealloc( void *src_memblock, SceSize new_size );
 	これは、要求されたサイズへリサイズ出来なかった場合も、
 	元の領域を自動的に解放する点を除いて、memoryRealloc()と同じ。
 -----------------------------------------------*/
-void *memoryReallocf( void *src_memblock, SceSize new_size );
+void *memoryReallocf( const char *name, void *src_memblock, SceSize new_size );
 
 /*-----------------------------------------------
 	memoryAlign
@@ -137,10 +137,6 @@ void *memoryExalloc( const char *name, MemoryPartition partition, unsigned int a
 	確保されたメモリを解放する。
 -----------------------------------------------*/
 int memoryFree( void *memblock );
-
-#ifdef MEMORY_DEBUG
-unsigned int memoryGetAllocCount( void );
-#endif
 
 #ifdef __cplusplus
 }

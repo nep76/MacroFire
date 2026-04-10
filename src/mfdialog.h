@@ -8,54 +8,35 @@
 #ifndef MFDIALOG_H
 #define MFDIALOG_H
 
-#define MFEXCLUDE_MENU
-#define MFEXCLUDE_DIALOG
 #include "macrofire.h"
-#undef MFEXCLUDE_MENU
-#undef MFEXCLUDE_DIALOG
-
 #include "cdialog.h"
-#include "util/strutil.h"
 
 /*=========================================================
 	å^êÈåæ
 =========================================================*/
 typedef enum {
-	MFDIALOG_NONE = 0,
-	MFDIALOG_MESSAGE,
-	MFDIALOG_SOSK,
-	MFDIALOG_NUMEDIT,
-	MFDIALOG_GETFILENAME,
-	MFDIALOG_DETECTBUTTONS
+	MF_DIALOG_NONE = 0,
+	MF_DIALOG_MESSAGE,
+	MF_DIALOG_SOSK,
+	MF_DIALOG_NUMEDIT,
+	MF_DIALOG_GETFILENAME,
+	MF_DIALOG_DETECTBUTTONS
 } MfDialogType;
-
-#include "mfmenu.h"
 
 /*=========================================================
 	ä÷êî
 =========================================================*/
-inline void mfDialogInit( PadutilRemap *remap );
 inline MfDialogType mfDialogCurrentType( void );
-inline void mfDialogFinish( void );
+inline bool mfDialogLastResult( void );
 
-bool mfDialogMessageInit( const char *title, const char *message, bool yesno );
-bool mfDialogMessageDraw( void );
-bool mfDialogMessageResult( void );
+bool mfDialogMessage( const char *title, const char *message, unsigned int error, bool yesno );
 
-bool mfDialogSoskInit( const char *title, char *text, size_t length, unsigned int availkb );
-bool mfDialogSoskDraw( void );
-bool mfDialogSoskResult( void );
+bool mfDialogSosk( const char *title, char *text, size_t length, unsigned int availkb );
 
-bool mfDialogNumeditInit( const char *title, const char *unit, void *num, uint32_t max );
-bool mfDialogNumeditDraw( void );
-bool mfDialogNumeditResult( void );
+bool mfDialogNumedit( const char *title, const char *unit, void *num, uint32_t max );
 
-bool mfDialogGetfilenameInit( const char *title, const char *initdir, const char *initname, char *path, size_t pathmax, unsigned int options );
-bool mfDialogGetfilenameDraw( void );
-bool mfDialogGetfilenameResult( void );
+bool mfDialogGetfilename( const char *title, const char *initdir, const char *initname, char *path, size_t pathmax, unsigned int options );
 
-bool mfDialogDetectbuttonsInit( const char *title, PadutilButtons availbtns, PadutilButtons *buttons );
-bool mfDialogDetectbuttonsDraw( void );
-bool mfDialogDetectbuttonsResult( void );
+bool mfDialogDetectbuttons( const char *title, PadutilButtons availbtns, PadutilButtons *buttons );
 
 #endif

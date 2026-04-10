@@ -2,8 +2,8 @@
 	Class G error codes
 */
 
-#ifndef CGERRS_H
-#define CGERRS_H
+#ifndef CGERRNO_H
+#define CGERRNO_H
 
 #define CG_ERROR_OK                      0
 #define CG_ERROR_UNKNOWN                 0xE0000000

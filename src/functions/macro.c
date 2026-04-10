@@ -8,16 +8,21 @@
 #include "macro.h"
 
 /*=========================================================
+	定数/マクロ
+=========================================================*/
+#define MACRO_SIG_SLOT_PREV MF_SM_1
+#define MACRO_SIG_SLOT_NEXT MF_SM_2
+
+#define MACRO_HOTKEY_IS_PRESSED( pad, hk, hotkey ) \
+	mfIsPressed( padutilSetPad( pad->Buttons | padutilGetAnalogStickDirection( pad->Lx, pad->Ly, 0 ) ) | padutilSetHprm( hk ), hotkey )
+
+#define MACRO_CHECK_HOTKEY( pad, hk, avail ) \
+	mfIsAnyPressed( padutilSetPad( pad->Buttons | padutilGetAnalogStickDirection( pad->Lx, pad->Ly, 0 ) ) | padutilSetHprm( hk ), avail )
+
+/*=========================================================
 	ローカル型宣言
 =========================================================*/
-enum macro_error {
-	MACRO_ERROR_NONE           = 0,
-	MACRO_ERROR_BUSY           = 0x00000001,
-	MACRO_ERROR_UNAVAIL        = 0x00000002,
-	MACRO_ERROR_DISABLE_ENGINE = 0x00000004
-};
-
-enum macro_mode {
+enum macro_action_type {
 	MACRO_NTD = 0,
 	MACRO_TRACE,
 	MACRO_RECORD,
@@ -33,65 +38,96 @@ struct macro_common_tempdata {
 struct macro_trace_tempdata {
 	MfRapidfireUID rfUid;
 	int            loopRest;
+	uint64_t       rtc;
 };
 
-struct macro_params {
-	enum macro_mode mode;
-	MacromgrUID  macro;
+struct macro_tempdata{
+	struct macro_common_tempdata common;
+	struct macro_trace_tempdata trace;
+	MacromgrCommand *cmd;
+};
+	
+struct macro_data {
+	MacromgrUID macro;
 	char name[MACRO_NAME_LENGTH];
 	PadutilButtons hotkey;
 	unsigned int loopNum;
 	bool analogStickEnable;
-	struct {
-		struct macro_common_tempdata common;
-		struct macro_trace_tempdata trace;
-		bool hotkeyAccepted;
-		MacromgrCommand *cmd;
-	} temp;
+
+	struct macro_data *next, *prev;
+};
+
+struct macro_params_main {
+	struct macro_data *rootData;
+	bool              hotkeyAccept;
+};
+
+struct macro_params_menu {
+	struct macro_data *selectedData;
+	unsigned int selectedIndex;
+};
+
+struct macro_params_action {
+	DmemUID           memoryUid;
+	struct macro_data *actionData;
+	enum macro_action_type actionType;
+	struct macro_tempdata *temp;
+};
+
+struct macro_params {
+	struct macro_params_main   main;
+	struct macro_params_menu   menu;
+	struct macro_params_action work;
+	bool macroeditor;
 };
 
 /*=========================================================
 	ローカル関数
 =========================================================*/
-static void macro_select( unsigned short slot );
 
-static bool macro_slot_control( MfMessage message, const char *label, void *var, void *pref, void *ex );
-static bool macro_hotkey_control( MfMessage message, const char *label, void *var, void *pref, void *ex );
-static bool macro_loop_control( MfMessage message, const char *label, void *var, void *pref, void *ex );
-static bool macro_analogstick_control( MfMessage message, const char *label, void *var, void *pref, void *ex );
+static void macro_slot_forward( struct macro_params_menu *menu );
+static void macro_slot_back( struct macro_params_menu *menu );
+static bool macro_control_slot( MfMessage message, const char *label, void *var, void *pref, void *ex );
+static bool macro_control_hotkey( MfMessage message, const char *label, void *var, void *pref, void *ex );
+static bool macro_control_loop( MfMessage message, const char *label, void *var, void *pref, void *ex );
+static bool macro_control_analogstick( MfMessage message, const char *label, void *var, void *pref, void *ex );
+static bool macro_control_load( MfMessage message, const char *label, void *var, void *pref, void *ex );
+static bool macro_control_save( MfMessage message, const char *label, void *var, void *pref, void *ex );
 
-static void macro_menu_record_start( MfMenuMessage message );
-static void macro_menu_append_start( MfMenuMessage message );
-static void macro_menu_record_stop( MfMenuMessage message );
-static void macro_menu_run( MfMenuMessage message );
-static void macro_menu_stop( MfMenuMessage message );
-static void macro_menu_edit( MfMenuMessage message );
-static void macro_menu_clear( MfMenuMessage message );
-static void macro_menu_save( MfMenuMessage message );
-static void macro_menu_load( MfMenuMessage message );
+static void macro_menu_update( struct macro_params *params );
+static void macro_menu_add( MfMessage message );
+static void macro_menu_remove( MfMessage message );
+static void macro_menu_record_start( MfMessage message );
+static void macro_menu_append_start( MfMessage message );
+static void macro_menu_record_stop( MfMessage message );
+static void macro_menu_run( MfMessage message );
+static void macro_menu_stop( MfMessage message );
+static void macro_menu_edit( MfMessage message );
+static void macro_menu_clear( MfMessage message );
 
-static void macro_clear( struct macro_params *slot );
-static bool macro_save( struct macro_params *slot, const char *path );
-static bool macro_load( struct macro_params *slot, const char *path );
+static bool macro_add( struct macro_params *params );
+static bool macro_remove( struct macro_params *params );
 
-static void macro_run( struct macro_params *params );
-static bool macro_loop( struct macro_params *params );
+static void macro_clear( struct macro_data *macro );
+static int macro_ini_handler( MfCtrlDefIniAction action, const char *path );
+static int macro_save( struct macro_data *macro, const char *path );
+static int macro_load( struct macro_data *macro, const char *path );
+
+static void macro_record_prepare( struct macro_params_action *work, struct macro_data *macro, MacromgrCommand *start );
+static void macro_record_stop( struct macro_params_action *work );
+static void macro_record( struct macro_params_action *work, SceCtrlData *pad );
+static void macro_trace_prepare( struct macro_params_action *work, struct macro_data *macro, MacromgrCommand *start );
+static void macro_trace_stop( struct macro_params_action *work );
+static bool macro_trace( struct macro_params_action *work, SceCtrlData *pad );
+
 static unsigned int macro_calc_delayms( MacromgrData base );
-static void macro_record_prepare( struct macro_params *params, MacromgrCommand *start );
-static void macro_record_stop( struct macro_params *params );
-static void macro_record( struct macro_params *params, SceCtrlData *pad );
-static void macro_trace_prepare( struct macro_params *params, MacromgrCommand *start );
-static void macro_trace_loop( struct macro_params *params, MacromgrCommand *start );
-static void macro_trace_stop( struct macro_params *params );
-static bool macro_trace( struct macro_params *params, SceCtrlData *pad );
 
 static void macro_mfengine_warning( void );
 
 /*=========================================================
 	ローカル変数
 =========================================================*/
-static unsigned short st_current_slot = 0;
-static struct macro_params st_slot[MACRO_MAX_SLOT];
+static struct macro_params   st_params;
 
 static MfMenuTable *st_menu;
 static HeapUID     st_heap;
@@ -103,6 +139,8 @@ void *macroProc( MfMessage message )
 {
 	switch( message ){
 		case MF_MS_INIT:
+			/* この値だけは設定する */
+			st_params.main.hotkeyAccept = true;
 			break;
 		case MF_MS_INI_LOAD:
 			return macroIniLoad;
@@ -111,12 +149,7 @@ void *macroProc( MfMessage message )
 		case MF_MS_TERM:
 			break;
 		case MF_MS_TOGGLE:
-			{
-				int i;
-				for( i = 0; i < MACRO_MAX_SLOT; i++ ){
-					if( st_slot[i].mode == MACRO_TRACE ) macro_trace_stop( &(st_slot[i]) );
-				}
-			}
+			if( st_params.work.actionType == MACRO_TRACE ) macro_trace_stop( &(st_params.work) );
 			break;
 		case MF_MS_HOOK:
 			return macroMain;
@@ -125,283 +158,297 @@ void *macroProc( MfMessage message )
 		default:
 			break;
 	}
-	
 	return NULL;
 }
 
 void macroIniLoad( IniUID ini, char *buf, size_t len )
 {
-	unsigned short entry_i;
+	unsigned int entry_i = 0;
 	char entryname[32];
 	const char *section = mfGetIniSection();
 	
-	for( entry_i = 0; entry_i < MACRO_MAX_SLOT; entry_i++ ){
+	while( ++entry_i ){
 		/* エントリ名を作成 */
-		snprintf( entryname, sizeof( entryname ), "Macro%d", entry_i + 1 );
+		snprintf( entryname, sizeof( entryname ), "Macro%d", entry_i );
 		
 		if( inimgrGetString( ini, section, entryname, buf, len ) > 0 ){
-			macro_load( &(st_slot[entry_i]), buf );
+			if( macro_add( &st_params ) ){
+				if( macro_load( st_params.menu.selectedData, buf ) != MF_CTRL_INI_ERROR_OK ) macro_remove( &st_params );
+			}
+		} else{
+			break;
 		}
 	}
+	
+	/* 先頭に戻す */
+	
 }
 
 void macroIniCreate( IniUID ini, char *buf, size_t len )
 {
-	unsigned int i;
-	
-	for( i = 1; i <= MACRO_MAX_SLOT; i++ ){
-		snprintf( buf, len, "Macro%d", i );
-		inimgrSetString( ini, MF_INI_SECTION_DEFAULT, buf, "" );
-	}
+	inimgrSetString( ini, MF_INI_SECTION_DEFAULT, "Macro1", "" );
 }
 
 void macroMain( MfHookAction action, SceCtrlData *pad, MfHprmKey *hk )
 {
-	unsigned short i;
-	
-	enum {
-		MACRO_READY = 0,
-		MACRO_RECORD_WORK,
-		MACRO_TRACE_START,
-		MACRO_TRACE_WORK,
-		MACRO_TRACE_STOP,
-	} mode = MACRO_READY;
-	unsigned short  target_slot = 0;
-	
-	if( mfIsRunningApp( MF_APP_WEBBROWSER ) ) return;
+	if( ! st_params.main.rootData || ! mfIsEnabled() || mfIsRunningApp( MF_APP_WEBBROWSER ) ) return;
 	
 	if( action == MF_KEEP ){
-		for( i = 0; i < MACRO_MAX_SLOT; i++ ){
-			if( st_slot[i].mode == MACRO_TRACE ){
-				pad->Buttons |= st_slot[i].temp.common.lastButtons;
-				break;
-			}
-		}
+		if( st_params.work.actionType == MACRO_TRACE ) pad->Buttons |= st_params.work.temp->common.lastButtons;
 		return;
 	}
 	
-	for( i = 0; i < MACRO_MAX_SLOT; i++ ){
-		bool hotkey_detected = false;
-		
-		if( ! st_slot[i].macro ) continue;
-		
-		if( st_slot[i].hotkey && mfIsEnabled() ){
-			bool trigger = ( ( padutilSetPad( pad->Buttons | padutilGetAnalogStickDirection( pad->Lx, pad->Ly, 0 ) ) | padutilSetHprm( *hk ) ) & st_slot[i].hotkey ) == st_slot[i].hotkey ? true : false;
-			
-			if( ! trigger && ! st_slot[i].temp.hotkeyAccepted ){
-				st_slot[i].temp.hotkeyAccepted = true;
-			} else if( trigger && st_slot[i].temp.hotkeyAccepted ){
-				hotkey_detected = true;
-				st_slot[i].temp.hotkeyAccepted = false;
-			}
-		}
-		
-		if( mode != MACRO_RECORD_WORK && st_slot[i].mode == MACRO_RECORD ){
-			mode = MACRO_RECORD_WORK;
-			target_slot = i;
+	switch( st_params.work.actionType ){
+		case MACRO_RECORD:
+			macro_record( &(st_params.work), pad );
 			break;
-		} else if( mode == MACRO_READY ){
-			if( hotkey_detected ){
-				if( st_slot[i].mode == MACRO_NTD ){
-					mode = MACRO_TRACE_START;
-					target_slot = i;
-				} else{
-					mode = MACRO_TRACE_STOP;
-					target_slot = i;
-				}
-			} else if( st_slot[i].mode == MACRO_TRACE ){
-				mode = MACRO_TRACE_WORK;
-				target_slot = i;
-			}
-		} else if( mode == MACRO_TRACE_START && st_slot[i].mode == MACRO_TRACE && hotkey_detected ){
-			mode = MACRO_TRACE_STOP;
-			target_slot = i;
-		}
-	}
-	
-	switch( mode ){
-		case MACRO_RECORD_WORK:
-			macro_record( &(st_slot[target_slot]), pad );
-			break;
-		case MACRO_TRACE_START:
-			macro_run( &(st_slot[target_slot]) );
-			macro_trace( &(st_slot[target_slot]), pad );
-			break;
-		case MACRO_TRACE_WORK:
-			if( ! macro_trace( &(st_slot[target_slot]), pad ) ){
-				if( macro_loop( &(st_slot[target_slot]) ) ){
-					macro_trace( &(st_slot[target_slot]), pad );
-				} else{
-					macro_trace_stop(  &(st_slot[target_slot]) );
+		case MACRO_TRACE:
+			if( st_params.work.actionData->hotkey ){
+				bool trigger = MACRO_HOTKEY_IS_PRESSED( pad, *hk, st_params.work.actionData->hotkey );
+				
+				if( ! trigger && ! st_params.main.hotkeyAccept ){
+					st_params.main.hotkeyAccept = true;
+				} else if( trigger && st_params.main.hotkeyAccept ){
+					st_params.main.hotkeyAccept = false;
+					macro_trace_stop( &(st_params.work) );
+					if( mfNotificationThreadId() ) mfNotificationPrintf( MF_STR_MACRO_OVMSG_HALT );
+					break;
 				}
 			}
-			break;
-		case MACRO_TRACE_STOP:
-			macro_trace_stop(  &(st_slot[target_slot]) );
+			if( ! macro_trace( &(st_params.work), pad ) ){
+				macro_trace_stop( &(st_params.work ) );
+				if( mfNotificationThreadId() ) mfNotificationPrintf( MF_STR_MACRO_OVMSG_FINISH );
+			}
 			break;
 		default:
-			break;
+			if( st_params.main.hotkeyAccept ){
+				if( ! MACRO_CHECK_HOTKEY( pad, *hk, MF_HOTKEY_BUTTONS ) ) break;
+				for( st_params.work.actionData = st_params.main.rootData, st_params.menu.selectedIndex = 0; st_params.work.actionData; st_params.work.actionData = st_params.work.actionData->next, st_params.menu.selectedIndex++ ){
+					if( st_params.work.actionData->hotkey && MACRO_HOTKEY_IS_PRESSED( pad, *hk, st_params.work.actionData->hotkey ) ){
+						/* 実行したマクロをメニューで選択状態にするために実行したマクロのポインタをセット */
+						st_params.menu.selectedData = st_params.work.actionData;
+						st_params.main.hotkeyAccept = false;
+						
+						if( mfNotificationThreadId() ) mfNotificationPrintf( MF_STR_MACRO_OVMSG_START, st_params.menu.selectedIndex + 1, st_params.work.actionData->name );
+						
+						macro_trace_prepare( &(st_params.work), st_params.work.actionData, macromgrSeek( st_params.work.actionData->macro, 0, MACROMGR_SEEK_SET, NULL ) );
+						macro_trace( &(st_params.work), pad );
+						break;
+					}
+				}
+			} else if( ! MACRO_HOTKEY_IS_PRESSED( pad, *hk, st_params.work.actionData->hotkey ) ){
+				st_params.main.hotkeyAccept = true;
+			}
 	}
 }
 
-void macroMenu( MfMenuMessage message )
+void macroMenu( MfMessage message )
 {
 	if( mfIsRunningApp( MF_APP_WEBBROWSER ) ){
 		if( message == MF_MM_PROC ){
-			pbPrint( pbOffsetChar( 3 ), pbOffsetLine(  4 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, MF_STR_LIMIT_WEBBROWSER );
-			mfMenuWait( MF_ERROR_DELAY );
+			if( ! mfDialogMessage( MF_STR_ERROR, MF_STR_LIMIT_WEBBROWSER, 0, false ) ){
+				pbPrint( pbOffsetChar( 3 ), pbOffsetLine(  4 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, MF_STR_LIMIT_WEBBROWSER );
+				mfMenuWait( MF_ERROR_DELAY );
+			}
 			mfMenuProc( NULL );
 		}
 		return;
 	}
 	
-	switch( message ){
+	switch( mfMenuMaskMainMessage( message ) ){
 		case MF_MM_INIT:
+			/* 選択されているデータがあればインデックス番号を調べる */
+			st_params.menu.selectedIndex = 0;
+			if( st_params.menu.selectedData ){
+				struct macro_data *macro;
+				unsigned int index;
+				for( macro = st_params.main.rootData, index = 0; macro; macro = macro->next, index++ ){
+					if( macro == st_params.menu.selectedData ){
+						st_params.menu.selectedIndex = index;
+						break;
+					}
+				}
+			}
+			
 			dbgprint( "Creating macro menu" );
 			st_menu = mfMenuCreateTables(
-				5,
+				6,
+				1, 2, /* memory */
 				1, 1, /* slot */
 				2, 1, /* preference */
-				4, 1, /* control */
-				4, 1, /* recording */
+				2, 2, /* control */
+				3, 2, /* recording */
 				2, 1  /* save/load */
 			);
-			st_heap = mfHeapCreate( 5,
-				sizeof( MfCtrlDefGetButtonsPref )     +
-				sizeof( MfCtrlDefGetNumberPref  ) * 2 +
-				MF_PATH_MAX                           +
-				MACRO_NAME_LENGTH + 4
+			st_heap = mfMemoryTempHeapCreate( 4,
+				sizeof( MfCtrlDefGetButtonsPref ) +
+				sizeof( MfCtrlDefGetNumberPref  ) +
+				sizeof( MfCtrlDefIniPref )        +
+				MACRO_NAME_LENGTH + 4 //セーブ時のデフォルトファイル名用
 			);
 			if( ! st_menu || ! st_heap ){
 				if( st_menu ) mfMenuDestroyTables( st_menu );
-				if( st_heap ) mfHeapDestroy( st_heap );
+				if( st_heap ) mfMemoryHeapDestroy( st_heap );
 				return;
 			}
 			
 			{
-				MfCtrlDefGetNumberPref  *pref_slot   = mfHeapCalloc( st_heap, sizeof( MfCtrlDefGetNumberPref ) );
-				MfCtrlDefGetButtonsPref *pref_hotkey = mfHeapCalloc( st_heap, sizeof( MfCtrlDefGetButtonsPref ) );
-				MfCtrlDefGetNumberPref  *pref_loop   = mfHeapCalloc( st_heap, sizeof( MfCtrlDefGetNumberPref ) );
+				MfCtrlDefGetButtonsPref *pref_hotkey = mfMemoryHeapCalloc( st_heap, sizeof( MfCtrlDefGetButtonsPref ) );
+				MfCtrlDefGetNumberPref  *pref_loop   = mfMemoryHeapCalloc( st_heap, sizeof( MfCtrlDefGetNumberPref ) );
+				MfCtrlDefIniPref        *pref_ini    = mfMemoryHeapCalloc( st_heap, sizeof( MfCtrlDefIniPref ) );
 				
-				pref_slot->max            = MACRO_MAX_SLOT -1;
 				pref_hotkey->availButtons = MF_HOTKEY_BUTTONS;
 				pref_loop->max            = 99999;
+				pref_ini->title           = NULL;
+				pref_ini->initDir         = "ms0:";
+				pref_ini->initFilename    = NULL;
+				pref_ini->pathMax         = MF_PATH_MAX;
 				
 				mfMenuSetTablePosition( st_menu, 1, pbOffsetChar( 5 ), pbOffsetLine( 6 ) );
-				mfMenuSetTableEntry( st_menu, 1, 1, 1, MF_STR_MACRO_SLOT, macro_slot_control, &st_current_slot, pref_slot );
+				mfMenuSetColumnWidth( st_menu, 1, 1, pbMeasureString( MF_STR_MACRO_SLOT_ADD ) + pbOffsetChar( 2 ) );
+				mfMenuSetTableEntry( st_menu, 1, 1, 1, MF_STR_MACRO_SLOT_ADD, mfCtrlDefExtra, macro_menu_add, NULL );
+				mfMenuSetTableEntry( st_menu, 1, 1, 2, MF_STR_MACRO_SLOT_REMOVE, mfCtrlDefExtra, macro_menu_remove, NULL );
 				
-				mfMenuSetTablePosition( st_menu, 2, pbOffsetChar( 5 ), pbOffsetLine( 8 ) );
-				mfMenuSetTableLabel( st_menu, 2, MF_STR_MACRO_PREF_LABEL );
-				mfMenuSetTableEntry( st_menu, 2, 1, 1, MF_STR_MACRO_PREF_RUN_STOP, macro_hotkey_control, &st_current_slot, pref_hotkey );
-				mfMenuSetTableEntry( st_menu, 2, 2, 1, MF_STR_MACRO_PREF_LOOP_NUM, macro_loop_control, &st_current_slot, pref_loop );
+				mfMenuSetTablePosition( st_menu, 2, pbOffsetChar( 5 ), pbOffsetLine( 9 ) );
+				mfMenuSetTableEntry( st_menu, 2, 1, 1, MF_STR_MACRO_SLOT, macro_control_slot, NULL, NULL );
 				
-				mfMenuSetTablePosition( st_menu, 3, pbOffsetChar( 5 ), pbOffsetLine( 12 ) );
-				mfMenuSetTableLabel( st_menu, 3, MF_STR_MACRO_CONTROL_LABEL );
-				mfMenuSetTableEntry( st_menu, 3, 1, 1, MF_STR_MACRO_CONTROL_RUN,   mfCtrlDefCallback, macro_menu_run, NULL );
-				mfMenuSetTableEntry( st_menu, 3, 2, 1, MF_STR_MACRO_CONTROL_STOP,  mfCtrlDefCallback, macro_menu_stop, NULL );
-				mfMenuSetTableEntry( st_menu, 3, 3, 1, MF_STR_MACRO_CONTROL_EDIT,  mfCtrlDefCallback, macro_menu_edit, NULL );
-				mfMenuSetTableEntry( st_menu, 3, 4, 1, MF_STR_MACRO_CONTROL_CLEAR, mfCtrlDefExtra, macro_menu_clear, NULL );
+				mfMenuSetTablePosition( st_menu, 3, pbOffsetChar( 5 ), pbOffsetLine( 11 ) );
+				mfMenuSetTableLabel( st_menu, 3, MF_STR_MACRO_PREF_LABEL );
+				mfMenuSetTableEntry( st_menu, 3, 1, 1, MF_STR_MACRO_PREF_RUN_STOP, macro_control_hotkey, NULL, pref_hotkey );
+				mfMenuSetTableEntry( st_menu, 3, 2, 1, MF_STR_MACRO_PREF_LOOP_NUM, macro_control_loop, NULL, pref_loop );
 				
-				mfMenuSetTablePosition( st_menu, 4, pbOffsetChar( 5 ), pbOffsetLine( 18 ) );
-				mfMenuSetTableLabel( st_menu, 4, MF_STR_MACRO_RECORD_LABEL );
-				mfMenuSetTableEntry( st_menu, 4, 1, 1, MF_STR_MACRO_RECORD_START,  mfCtrlDefCallback, macro_menu_record_start, NULL );
-				mfMenuSetTableEntry( st_menu, 4, 2, 1, MF_STR_MACRO_RECORD_APPEND, mfCtrlDefCallback, macro_menu_append_start, NULL );
-				mfMenuSetTableEntry( st_menu, 4, 3, 1, MF_STR_MACRO_RECORD_STOP,   mfCtrlDefCallback, macro_menu_record_stop, NULL );
-				mfMenuSetTableEntry( st_menu, 4, 4, 1, MF_STR_MACRO_RECORD_ANALOG ,macro_analogstick_control, &st_current_slot, NULL );
+				mfMenuSetTablePosition( st_menu, 4, pbOffsetChar( 5 ), pbOffsetLine( 15 ) );
+				{
+					unsigned int r1 = pbMeasureString( MF_STR_MACRO_CONTROL_RUN ), r2 = pbMeasureString( MF_STR_MACRO_CONTROL_STOP );
+					mfMenuSetColumnWidth( st_menu, 4, 1, ( r1 > r2 ? r1 : r2)  + pbOffsetChar( 2 ) );
+				}
+				mfMenuSetTableLabel( st_menu, 4, MF_STR_MACRO_CONTROL_LABEL );
+				mfMenuSetTableEntry( st_menu, 4, 1, 1, MF_STR_MACRO_CONTROL_RUN,   mfCtrlDefCallback, macro_menu_run, NULL );
+				mfMenuSetTableEntry( st_menu, 4, 2, 1, MF_STR_MACRO_CONTROL_STOP,  mfCtrlDefCallback, macro_menu_stop, NULL );
+				mfMenuSetTableEntry( st_menu, 4, 1, 2, MF_STR_MACRO_CONTROL_EDIT,  mfCtrlDefCallback, macro_menu_edit, NULL );
+				mfMenuSetTableEntry( st_menu, 4, 2, 2, MF_STR_MACRO_CONTROL_CLEAR, mfCtrlDefExtra, macro_menu_clear, NULL );
 				
-				mfMenuSetTablePosition( st_menu, 5, pbOffsetChar( 5 ), pbOffsetLine( 24 ) );
-				mfMenuSetTableLabel( st_menu, 5, MF_STR_MACRO_FILE_LABEL );
-				mfMenuSetTableEntry( st_menu, 5, 1, 1, MF_STR_LOAD, mfCtrlDefExtra, macro_menu_load, NULL );
-				mfMenuSetTableEntry( st_menu, 5, 2, 1, MF_STR_SAVE, mfCtrlDefExtra, macro_menu_save, NULL );
+				mfMenuSetTablePosition( st_menu, 5, pbOffsetChar( 5 ), pbOffsetLine( 19 ) );
+				mfMenuSetColumnWidth( st_menu, 5, 1, pbMeasureString( MF_STR_MACRO_RECORD_START ) + pbOffsetChar( 2 ) );
+				mfMenuSetTableLabel( st_menu, 5, MF_STR_MACRO_RECORD_LABEL );
+				mfMenuSetTableEntry( st_menu, 5, 1, 1, MF_STR_MACRO_RECORD_START,  mfCtrlDefCallback, macro_menu_record_start, NULL );
+				mfMenuSetTableEntry( st_menu, 5, 2, 1, MF_STR_MACRO_RECORD_STOP,   mfCtrlDefCallback, macro_menu_record_stop, NULL );
+				mfMenuSetTableEntry( st_menu, 5, 3, 1, MF_STR_MACRO_RECORD_ANALOG ,macro_control_analogstick, NULL, NULL );
+				mfMenuSetTableEntry( st_menu, 5, 1, 2, MF_STR_MACRO_RECORD_APPEND, mfCtrlDefCallback, macro_menu_append_start, NULL );
+				
+				mfMenuSetTablePosition( st_menu, 6, pbOffsetChar( 5 ), pbOffsetLine( 24 ) );
+				mfMenuSetTableLabel( st_menu, 6, MF_STR_MACRO_FILE_LABEL );
+				mfMenuSetTableEntry( st_menu, 6, 1, 1, MF_STR_LOAD, macro_control_load, macro_ini_handler, pref_ini );
+				mfMenuSetTableEntry( st_menu, 6, 2, 1, MF_STR_SAVE, macro_control_save, macro_ini_handler, pref_ini );
 			}
 			mfMenuInitTables( st_menu, 5 );
-			macro_select( st_current_slot );
+			macro_menu_update( &st_params );
 			break;
 		case MF_MM_TERM:
 			mfMenuDestroyTables( st_menu );
-			mfHeapDestroy( st_heap );
+			mfMemoryHeapDestroy( st_heap );
 			return;
 		default:
 			pbPrint( pbOffsetChar( 3 ), pbOffsetLine(  4 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, MF_STR_MACRO_DESC );
-			if( ! mfMenuDrawTables( st_menu, 5, MF_MENU_NO_OPTIONS ) ) mfMenuProc( NULL );
+			if( ! mfMenuDrawTables( st_menu, 6, MF_MENU_NO_OPTIONS ) ) mfMenuProc( NULL );
 	}
 }
 
 /*-----------------------------------------------
-	マクロスロット用メニューコントロール
+	メニューコントロール
 -----------------------------------------------*/
-static void macro_select( unsigned short slot )
+static void macro_menu_update( struct macro_params *params )
 {
-	unsigned short i;
-	bool busy = false;
+	mfMenuInactiveTableEntry( st_menu, 1, 1, 2 );
+	mfMenuInactiveTableEntry( st_menu, 2, 1, 1 );
+	mfMenuInactiveTable( st_menu, 3 );
+	mfMenuInactiveTable( st_menu, 4 );
+	mfMenuInactiveTable( st_menu, 5 );
+	mfMenuInactiveTable( st_menu, 6 );
 	
-	for( i = 0; i < MACRO_MAX_SLOT; i++ ){
-		if( st_slot[i].mode != MACRO_NTD ){
-			busy = true;
-			break;
-		}
-	}
-	
-	mfMenuInactiveTableEntry( st_menu, 3, 1, 1 );
-	mfMenuInactiveTableEntry( st_menu, 3, 2, 1 );
-	mfMenuInactiveTableEntry( st_menu, 3, 4, 1 );
-	
-	mfMenuInactiveTableEntry( st_menu, 4, 1, 1 );
-	mfMenuInactiveTableEntry( st_menu, 4, 2, 1 );
-	mfMenuInactiveTableEntry( st_menu, 4, 3, 1 );
-	
-	mfMenuInactiveTableEntry( st_menu, 5, 1, 1 );
-	mfMenuInactiveTableEntry( st_menu, 5, 2, 1 );
-	
-	if( st_slot[slot].mode == MACRO_RECORD ){
-		mfMenuActiveTableEntry( st_menu, 4, 3, 1 );
-		mfMenuInactiveTableEntry( st_menu, 3, 3, 1 );
-	} else if( st_slot[slot].mode == MACRO_TRACE ){
-		mfMenuInactiveTableEntry( st_menu, 2, 2, 1 );
-		mfMenuActiveTableEntry( st_menu, 3, 2, 1 );
-		mfMenuInactiveTableEntry( st_menu, 3, 3, 1 );
-	} else if( ! busy ){
-		if( st_slot[slot].macro ){
-			mfMenuActiveTableEntry( st_menu, 3, 1, 1 );
-			mfMenuActiveTableEntry( st_menu, 4, 2, 1 );
-			mfMenuActiveTableEntry( st_menu, 3, 4, 1 );
-			mfMenuActiveTableEntry( st_menu, 5, 2, 1 );
-		}
-		mfMenuActiveTableEntry( st_menu, 2, 2, 1 );
-		mfMenuActiveTableEntry( st_menu, 4, 1, 1 );
-		mfMenuActiveTableEntry( st_menu, 3, 3, 1 );
-		mfMenuActiveTableEntry( st_menu, 5, 1, 1 );
-	} else{
-		if( st_slot[slot].macro ){
-			mfMenuActiveTableEntry( st_menu, 3, 4, 1 );
+	if( params->menu.selectedData ){
+		mfMenuActiveTableEntry( st_menu, 1, 1, 2 );
+		mfMenuActiveTableEntry( st_menu, 2, 1, 1 );
+		mfMenuActiveTableEntry( st_menu, 3, 1, 1 );
+		mfMenuActiveTableEntry( st_menu, 5, 3, 1 );
+		if( params->work.actionType == MACRO_NTD ){
+			mfMenuActiveTableEntry( st_menu, 3, 2, 1 );
+			mfMenuActiveTableEntry( st_menu, 4, 1, 2 );
+			mfMenuActiveTableEntry( st_menu, 5, 1, 1 );
+			mfMenuActiveTableEntry( st_menu, 6, 1, 1 );
+			if( params->menu.selectedData->macro ){
+				mfMenuActiveTableEntry( st_menu, 4, 1, 1 );
+				mfMenuActiveTableEntry( st_menu, 4, 2, 2 );
+				mfMenuActiveTableEntry( st_menu, 5, 1, 2 );
+				mfMenuActiveTableEntry( st_menu, 6, 2, 1 );
+			}
+		} else if( params->work.actionType == MACRO_RECORD ){
+			mfMenuActiveTableEntry( st_menu, 3, 2, 1 );
+			if( params->menu.selectedData == params->work.actionData ){
+				mfMenuInactiveTableEntry( st_menu, 1, 1, 2 );
+				mfMenuActiveTableEntry( st_menu, 5, 2, 1 );
+			} else{
+				mfMenuActiveTableEntry( st_menu, 3, 2, 1 );
+				mfMenuActiveTableEntry( st_menu, 4, 1, 2 );
+				mfMenuActiveTableEntry( st_menu, 6, 1, 1 );
+				if( params->menu.selectedData->macro ){
+					mfMenuActiveTableEntry( st_menu, 4, 2, 2 );
+					mfMenuActiveTableEntry( st_menu, 6, 2, 1 );
+				}
+			}
+		} else if( params->work.actionType == MACRO_TRACE ){
+			if( params->menu.selectedData == params->work.actionData ){
+				mfMenuInactiveTableEntry( st_menu, 1, 1, 2 );
+				mfMenuActiveTableEntry( st_menu, 4, 2, 1 );
+			} else{
+				mfMenuActiveTableEntry( st_menu, 3, 2, 1 );
+				mfMenuActiveTableEntry( st_menu, 4, 1, 2 );
+				mfMenuActiveTableEntry( st_menu, 6, 1, 1 );
+				if( params->menu.selectedData->macro ){
+					mfMenuActiveTableEntry( st_menu, 4, 2, 2 );
+					mfMenuActiveTableEntry( st_menu, 6, 2, 1 );
+				}
+			}
 		}
 	}
 }
 
-static bool macro_slot_control( MfMessage message, const char *label, void *var, void *pref, void *ex )
+static void macro_slot_forward( struct macro_params_menu *menu )
 {
-	unsigned short slot_num_prev = *((unsigned short *)var);
-	struct macro_params *params  = &(st_slot[*((unsigned short *)var)]);
+	menu->selectedIndex++;
+	menu->selectedData = menu->selectedData->next;
+}
+
+static void macro_slot_back( struct macro_params_menu *menu )
+{
+	menu->selectedIndex--;
+	menu->selectedData = menu->selectedData->prev;
+}
+
+static bool macro_control_slot( MfMessage message, const char *label, void *nothing, void *null, void *ex )
+{
+	if( ! st_params.menu.selectedData ) return true;
 	
-	switch( message ){
+	switch( mfMenuMaskMainMessage( message ) ){
 		case MF_CM_LABEL:
 			{
-				char *state;
-				switch( params->mode ){
-					case MACRO_RECORD:
-						state = MF_STR_MACRO_STAT_RECORDING;
-						break;
-					case MACRO_TRACE:
-						state = MF_STR_MACRO_STAT_RUNNING;
-						break;
-					default:
-						if( params->macro ){
-							state = MF_STR_MACRO_STAT_AVAILABLE;
-						} else{
-							state = MF_STR_MACRO_STAT_EMPTY;
+				char *state = NULL;
+				if( st_params.work.actionType != MACRO_NTD ){
+					if( st_params.menu.selectedData == st_params.work.actionData ){
+						if( st_params.work.actionType == MACRO_RECORD ){
+							state = MF_STR_MACRO_STAT_RECORDING;
+						} else if( st_params.work.actionType == MACRO_TRACE ){
+							state = MF_STR_MACRO_STAT_RUNNING;
 						}
+					} else{
+						state = "Waiting";
+					}
+				} else if( st_params.menu.selectedData->macro ){
+					state = MF_STR_MACRO_STAT_AVAILABLE;
+				} else{
+					state = MF_STR_MACRO_STAT_UNASSIGNED;
 				}
-				mfCtrlSetLabel( ex, "%s: %d [%s] %s", label, *((unsigned short *)var) + 1, params->name, state );
+				mfCtrlSetLabel( ex, "%s: %d [%s] (%s)", label, st_params.menu.selectedIndex + 1, st_params.menu.selectedData->name, state );
 			}
 			break;
 		case MF_CM_INFO:
@@ -409,243 +456,218 @@ static bool macro_slot_control( MfMessage message, const char *label, void *var,
 			break;
 		case MF_CM_PROC:
 			if( mfMenuIsPressed( PSP_CTRL_TRIANGLE ) ){
-				mfDialogSoskInit( MF_STR_MACRO_DIAGSOSK_NAME, params->name, MACRO_NAME_LENGTH, CDIALOG_SOSK_INPUTTYPE_ASCII );
-			} else{
-				mfCtrlDefGetNumber( message, label, var, pref, ex );
+				mfDialogSosk( MF_STR_MACRO_DIAGSOSK_NAME, st_params.menu.selectedData->name, MACRO_NAME_LENGTH, CDIALOG_SOSK_INPUTTYPE_ASCII );
+			} else if( mfMenuIsPressed( PSP_CTRL_SQUARE ) && st_params.menu.selectedData->prev ){
+				macro_slot_back( &(st_params.menu) );
+				macro_menu_update( &st_params );
+			} else if( mfMenuIsPressed( mfMenuAcceptButton() ) && st_params.menu.selectedData->next ){
+				macro_slot_forward( &(st_params.menu) );
+				macro_menu_update( &st_params );
 			}
 			break;
-		default:
-			mfCtrlDefGetNumber( message, label, var, pref, ex );
-			break;
 	}
-	
-	if( slot_num_prev != *((unsigned short *)var) ) macro_select( *((unsigned short *)var) );
 	
 	return true;
 }
 
-static bool macro_hotkey_control( MfMessage message, const char *label, void *var, void *pref, void *ex )
+static bool macro_control_hotkey( MfMessage message, const char *label, void *null, void *pref, void *ex )
 {
-	return mfCtrlDefGetButtons( message, label, &(st_slot[*((unsigned short *)var)].hotkey), pref, ex );
+	if( ! st_params.menu.selectedData ) return true;
+	
+	return mfCtrlDefGetButtons( message, label, &(st_params.menu.selectedData->hotkey), pref, ex );
 }
 
-static bool macro_loop_control( MfMessage message, const char *label, void *var, void *pref, void *ex )
+static bool macro_control_loop( MfMessage message, const char *label, void *null, void *pref, void *ex )
 {
-	if( message == MF_CM_LABEL && st_slot[*((unsigned short *)var)].loopNum == 0 ){
+	if( ! st_params.menu.selectedData ) return true;
+	
+	if( ( message & MF_CM_LABEL ) && st_params.menu.selectedData->loopNum == 0 ){
 		mfCtrlSetLabel( ex, "%s: 0 (%s)", label, MF_STR_MACRO_LOOP_INFINITY );
 		return true;
 	} else{
-		return mfCtrlDefGetNumber( message, label, &(st_slot[*((unsigned short *)var)].loopNum), pref, ex );
+		return mfCtrlDefGetNumber( message, label, &(st_params.menu.selectedData->loopNum), pref, ex );
 	}
 }
 
-static bool macro_analogstick_control( MfMessage message, const char *label, void *var, void *pref, void *ex )
+static bool macro_control_analogstick( MfMessage message, const char *label, void *null, void *pref, void *ex )
 {
-	return mfCtrlDefBool( message, label, &(st_slot[*((unsigned short *)var)].analogStickEnable), pref, ex );
+	if( ! st_params.menu.selectedData ) return true;
+
+	return mfCtrlDefBool( message, label, &(st_params.menu.selectedData->analogStickEnable), pref, ex );
+}
+
+static bool macro_control_load( MfMessage message, const char *label, void *var, void *pref, void *ex )
+{
+	if( ( message & MF_CM_PROC ) && mfMenuIsPressed( mfMenuAcceptButton() ) ){
+		((MfCtrlDefIniPref *)pref)->title        = MF_STR_MACRO_DIAGGETFN_LOAD;
+		((MfCtrlDefIniPref *)pref)->initFilename = "";
+	} else if( message & MF_CM_CONTINUE ){
+		macro_menu_update( &st_params );
+	}
+	return mfCtrlDefIniLoad( message, label, var, pref, ex );
+}
+
+static bool macro_control_save( MfMessage message, const char *label, void *var, void *pref, void *ex )
+{
+	if( ( message & MF_CM_PROC ) && mfMenuIsPressed( mfMenuAcceptButton() ) ){
+		((MfCtrlDefIniPref *)pref)->title = MF_STR_MACRO_DIAGGETFN_SAVE;
+		((MfCtrlDefIniPref *)pref)->initFilename = mfMemoryHeapAlloc( st_heap, MACRO_NAME_LENGTH + 4 );
+		
+		if( (st_params.menu.selectedData->name)[0] != '\0' ){
+			snprintf( ((MfCtrlDefIniPref *)pref)->initFilename, MACRO_NAME_LENGTH + 4, "%s.ini", st_params.menu.selectedData->name );
+		} else{
+			snprintf( ((MfCtrlDefIniPref *)pref)->initFilename, MACRO_NAME_LENGTH + 4, "macro%d.ini", st_params.menu.selectedIndex + 1 );
+		}
+	} else if( message & MF_CM_CONTINUE ){
+		mfMemoryHeapFree( st_heap, ((MfCtrlDefIniPref *)pref)->initFilename );
+	}
+	return mfCtrlDefIniSave( message, label, var, pref, ex );
 }
 
 /*-----------------------------------------------
 	メニュー項目
 -----------------------------------------------*/
-static void macro_menu_record_start( MfMenuMessage message )
+static void macro_menu_add( MfMessage message )
 {
-	if( message == MF_MM_PROC ){
+	if( message & MF_MM_PROC ){
+		if( message & MF_DM_FINISH ){
+			macro_menu_update( &st_params );
+			mfMenuExitExtra();
+		} else if( ! mfMenuMaskDialogMessage( message ) ){
+			if( macro_add( &st_params ) ){
+				mfDialogMessage( MF_STR_MACRO_MSG_SLOT_ADD_TITLE, MF_STR_MACRO_MSG_SLOT_ADD, 0, false );
+			}
+		}
+	}
+}
+
+static void macro_menu_remove( MfMessage message )
+{
+	if( message & MF_MM_PROC ){
+		if( message & MF_DM_FINISH ){
+			macro_menu_update( &st_params );
+			mfMenuExitExtra();
+		} else if( ! mfMenuMaskDialogMessage( message ) ){
+			if( macro_remove( &st_params ) ){
+				mfDialogMessage( MF_STR_MACRO_MSG_SLOT_REMOVE_TITLE, MF_STR_MACRO_MSG_SLOT_REMOVE, 0, false );
+			}
+		}
+	}
+}
+
+static void macro_menu_record_start( MfMessage message )
+{
+	if( message & MF_MM_PROC ){
 		if( ! mfIsEnabled() ){
 			macro_mfengine_warning();
 		} else{
-			struct macro_params *params = &(st_slot[st_current_slot]);
 			MacromgrCommand *cmd;
 			
-			if( ! params->macro ){
-				params->macro = macromgrNew();
+			if( ! st_params.menu.selectedData->macro ){
+				st_params.menu.selectedData->macro = macromgrNew();
 			} else{
-				macromgrClear( params->macro );
+				macromgrClear( st_params.menu.selectedData->macro );
 			}
 			
-			cmd = macromgrCreateRoot( params->macro );
-			macro_record_prepare( params, cmd );
+			cmd = macromgrCreateRoot( st_params.menu.selectedData->macro );
+			macro_record_prepare( &(st_params.work), st_params.menu.selectedData, cmd );
 			
 			mfMenuQuit();
 		}
 	}
 }
 
-static void macro_menu_append_start( MfMenuMessage message )
+static void macro_menu_append_start( MfMessage message )
 {
-	if( message == MF_MM_PROC ){
+	if( message & MF_MM_PROC ){
 		if( ! mfIsEnabled() ){
 			macro_mfengine_warning();
 		} else{
-			struct macro_params *params = &(st_slot[st_current_slot]);
-			MacromgrCommand *cmd = macromgrSeek( params->macro, 0, MACROMGR_SEEK_END, NULL );
+			MacromgrCommand *cmd = macromgrSeek( st_params.menu.selectedData->macro, 0, MACROMGR_SEEK_END, NULL );
 			
-			cmd = macromgrInsertAfter( params->macro, cmd );
-			macro_record_prepare( params, cmd );
+			cmd = macromgrInsertAfter( st_params.menu.selectedData->macro, cmd );
+			macro_record_prepare( &(st_params.work), st_params.menu.selectedData, cmd );
 			
 			mfMenuQuit();
 		}
 	}
 }
 
-static void macro_menu_record_stop( MfMenuMessage message )
+static void macro_menu_record_stop( MfMessage message )
 {
-	if( message == MF_MM_PROC ){
-		struct macro_params *params = &(st_slot[st_current_slot]);
-		
+	if( message & MF_MM_PROC ){
 		pbPrint( pbOffsetChar( 3 ), pbOffsetLine( 4 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, MF_STR_MACRO_STOP_RECORD );
 		
-		macro_record_stop( params );
-		macro_select( st_current_slot );
+		macro_record_stop( &(st_params.work) );
+		macro_menu_update( &st_params );
 		
 		mfMenuWait( MF_MESSAGE_DELAY );
 		mfMenuProc( NULL );
 	}
 }
 
-static void macro_menu_run( MfMenuMessage message )
+static void macro_menu_run( MfMessage message )
 {
-	if( message == MF_MM_PROC ){
+	if( message & MF_MM_PROC ){
 		if( ! mfIsEnabled() ){
 			macro_mfengine_warning();
 		} else{
-			macro_run( &(st_slot[st_current_slot]) );
+			macro_trace_prepare( &(st_params.work), st_params.menu.selectedData, macromgrSeek( st_params.menu.selectedData->macro, 0, MACROMGR_SEEK_SET, NULL ) );
 			mfMenuQuit();
 		}
 	}
 }
 
-static void macro_menu_stop( MfMenuMessage message )
+static void macro_menu_stop( MfMessage message )
 {
-	if( message == MF_MM_PROC ){
-		struct macro_params *params = &(st_slot[st_current_slot]);
-		
+	if( message & MF_MM_PROC ){
 		pbPrint( pbOffsetChar( 3 ), pbOffsetLine( 4 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, MF_STR_MACRO_STOP_RUN );
 		
-		macro_trace_stop( params );
-		macro_select( st_current_slot );
+		macro_trace_stop( &(st_params.work) );
+		macro_menu_update( &st_params );
 		
 		mfMenuWait( MF_MESSAGE_DELAY );
 		mfMenuProc( NULL );
 	}
 }
 
-static void macro_menu_edit( MfMenuMessage message )
+static void macro_menu_edit( MfMessage message )
 {
-	static bool macroeditor_stat;
-	
-	if( message == MF_MM_INIT ){
-		if( ! st_slot[st_current_slot].macro ){
+	if( message & MF_MM_INIT ){
+		if( ! st_params.menu.selectedData->macro ){
 			dbgprint( "Creating minimize macro" );
-			st_slot[st_current_slot].macro = macromgrNew();
-			macromgrCreateRoot( st_slot[st_current_slot].macro );
+			st_params.menu.selectedData->macro = macromgrNew();
+			macromgrCreateRoot( st_params.menu.selectedData->macro );
 		}
 		dbgprint( "Init macroeditor" );
-		macroeditor_stat = macroeditorInit( st_slot[st_current_slot].macro );
-	} else if( message == MF_MM_PROC ){
-		if( macroeditor_stat ){
-			if( ! macroeditorMain() ) mfMenuProc( NULL );
-		} else{
+		st_params.macroeditor = macroeditorInit( st_params.menu.selectedData->macro );
+		
+		if( ! st_params.macroeditor ){
 			mfMenuSetInfoText( MF_MENU_INFOTEXT_ERROR | MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "%s: %s", MF_STR_ERROR, MF_STR_ERROR_NOT_ENOUGH_MEMORY );
 			mfMenuWait( MF_ERROR_DELAY );
 			mfMenuProc( NULL );
 		}
-	} else if( message == MF_MM_TERM ){
+	} else if( message & MF_MM_TERM ){
 		dbgprint( "Term macroeditor" );
 		macroeditorTerm();
-		macro_select( st_current_slot );
-	}
-}
-
-static void macro_menu_clear( MfMenuMessage message )
-{
-	if( message == MF_MM_INIT ){
-		if( ! mfDialogMessageInit( MF_STR_MACRO_CLEAR_WARN_TITLE, MF_STR_MACRO_CLEAR_WARN_MSG, true ) ) return;
-	} else if( message == MF_MM_PROC ){
-		if( ! mfDialogMessageDraw() ){
-			if( mfDialogMessageResult() ){
-				macro_clear( &(st_slot[st_current_slot]) );
-				macro_select( st_current_slot );
-			}
-			mfMenuExitExtra();
+		macro_menu_update( &st_params );
+	} else{
+		if( st_params.macroeditor ){
+			if( ! macroeditorMain( message ) ) mfMenuProc( NULL );
 		}
 	}
 }
 
-static void macro_menu_save( MfMenuMessage message )
+static void macro_menu_clear( MfMessage message )
 {
-	static char *path;
-	static char *name;
-	
-	if( message == MF_MM_INIT ){
-		path = mfHeapAlloc( st_heap, MF_PATH_MAX );
-		name = mfHeapAlloc( st_heap, MACRO_NAME_LENGTH + 4 );
-		
-		if( (st_slot[st_current_slot].name)[0] != '\0' ){
-			snprintf( name, MACRO_NAME_LENGTH + 4, "%s.ini", st_slot[st_current_slot].name );
-		} else{
-			snprintf( name, MACRO_NAME_LENGTH + 4, "macro%d.ini", st_current_slot + 1 );
-		}
-		
-		if( ! mfDialogGetfilenameInit( MF_STR_MACRO_DIAGGETFN_SAVE, "ms0:", name, path, 255, CDIALOG_GETFILENAME_SAVE | CDIALOG_GETFILENAME_OVERWRITEPROMPT  ) ){
-			mfHeapFree( st_heap, path );
-			path = NULL;
-			mfMenuExitExtra();
-		}
-	} else if( message == MF_MM_PROC ){
-		if( mfDialogCurrentType() ){
-			if( ! mfDialogGetfilenameDraw() ){
-				if( ! mfDialogGetfilenameResult() ){
-					mfHeapFree( st_heap, path );
-					mfHeapFree( st_heap, name );
-					path = NULL;
-					name = NULL;
-				} else{
-					mfMenuSetInfoText( MF_MENU_INFOTEXT_SET_MIDDLE_LINE, MF_STR_SAVING, path );
-				}
+	if( message & MF_MM_INIT ){
+		if( ! mfDialogMessage( MF_STR_MACRO_CLEAR_WARN_TITLE, MF_STR_MACRO_CLEAR_WARN_MSG, 0, true ) ) return;
+	} else if( message & MF_MM_PROC ){
+		if( message & MF_DM_FINISH ){
+			if( mfDialogLastResult() ){
+				macro_clear( st_params.menu.selectedData );
+				macro_menu_update( &st_params );
 			}
-		} else if( path ){
-			macro_save( &(st_slot[st_current_slot]), path );
-			mfHeapFree( st_heap, path );
-			mfHeapFree( st_heap, name );
-			path = NULL;
-			name = NULL;
-		} else if( ! path ){
-			mfMenuExitExtra();
-		}
-	}
-}
-
-static void macro_menu_load( MfMenuMessage message )
-{
-	static char *path;
-	
-	if( message == MF_MM_INIT ){
-		path = mfHeapAlloc( st_heap, MF_PATH_MAX );
-		
-		if( ! mfDialogGetfilenameInit( MF_STR_MACRO_DIAGGETFN_LOAD, "ms0:", "", path, 255, CDIALOG_GETFILENAME_OPEN | CDIALOG_GETFILENAME_FILEMUSTEXIST ) ){
-			mfHeapFree( st_heap, path );
-			path = NULL;
-			mfMenuExitExtra();
-		}
-	} else if( message == MF_MM_PROC ){
-		if( mfDialogCurrentType() ){
-			if( ! mfDialogGetfilenameDraw() ){
-				if( ! mfDialogGetfilenameResult() ){
-					mfHeapFree( st_heap, path );
-					path = NULL;
-				} else{
-					mfMenuSetInfoText( MF_MENU_INFOTEXT_SET_MIDDLE_LINE, MF_STR_LOADING, path );
-				}
-			}
-		} else if( path ){
-			macro_clear( &(st_slot[st_current_slot]) );
-			if( ! macro_load( &(st_slot[st_current_slot]), path ) ){
-				macro_clear( &(st_slot[st_current_slot]) );
-			}
-			mfHeapFree( st_heap, path );
-			path = NULL;
-		} else if( ! path ){
-			macro_select( st_current_slot );
 			mfMenuExitExtra();
 		}
 	}
@@ -654,15 +676,116 @@ static void macro_menu_load( MfMenuMessage message )
 /*-----------------------------------------------
 	マクロの操作
 -----------------------------------------------*/
-static void macro_clear( struct macro_params *slot )
+static void macro_reset( struct macro_data *macro )
 {
-	if( slot->macro ){
-		macromgrDestroy( slot->macro );
-		memset( slot, 0, sizeof( struct macro_params ) );
+	macro->macro             = 0;
+	macro->name[0]           = '\0';
+	macro->hotkey            = 0;
+	macro->loopNum           = 0;
+	macro->analogStickEnable = false;
+}
+
+static bool macro_add( struct macro_params *params )
+{
+	struct macro_data *new_macro;
+	
+	if( ! params->work.memoryUid ){
+		params->work.memoryUid = dmemNew( 768, PSP_SMEM_Low );
+		if( ! params->work.memoryUid ) return false;
+		
+		params->work.temp = dmemAlloc( params->work.memoryUid, sizeof( struct macro_tempdata ) );
+		if( ! params->work.temp ){
+			dmemDestroy( params->work.memoryUid );
+			return false;
+		}
+	}
+	
+	new_macro = dmemAlloc( params->work.memoryUid, sizeof( struct macro_data ) );
+	if( ! new_macro ) return false;
+	
+	/* 必要なメンバを初期化 */
+	macro_reset( new_macro );
+	
+	if( ! params->main.rootData ){
+		params->menu.selectedIndex = 0;
+		params->main.rootData = new_macro;
+		new_macro->next = NULL;
+		new_macro->prev = NULL;
+	} else{
+		struct macro_data *last_macro;
+		
+		/* 末尾を探す */
+		for( last_macro = params->main.rootData, params->menu.selectedIndex = 1; last_macro->next; last_macro = last_macro->next, params->menu.selectedIndex++ );
+		new_macro->prev  = last_macro;
+		new_macro->next  = NULL;
+		last_macro->next = new_macro;
+	}
+	
+	params->menu.selectedData = new_macro;
+	
+	return true;
+}
+
+static bool macro_remove( struct macro_params *params )
+{
+	struct macro_data *macro = params->menu.selectedData;
+	
+	if( macro->next ) macro->next->prev = macro->prev;
+	if( macro->prev ) macro->prev->next = macro->next;
+	
+	if( macro == params->main.rootData ){
+		if( macro->next ){
+			params->menu.selectedData = macro->next;
+			params->main.rootData = params->menu.selectedData;
+			macro_clear( macro );
+			dmemFree( params->work.memoryUid, macro );
+		} else{
+			dmemDestroy( params->work.memoryUid );
+			params->work.memoryUid = 0;
+			params->work.temp = NULL;
+			params->main.rootData = NULL;
+			params->menu.selectedData = NULL;
+			params->menu.selectedIndex = 0;
+		}
+	} else{
+		if( macro->next ){
+			params->menu.selectedData = macro->next;
+		} else if( macro->prev ){
+			params->menu.selectedIndex--;
+			params->menu.selectedData = macro->prev;
+		}
+		macro_clear( macro );
+		dmemFree( params->work.memoryUid, macro );
+	}
+	
+	return true;
+}
+
+static void macro_clear( struct macro_data *macro )
+{
+	if( macro->macro ){
+		macromgrDestroy( macro->macro );
+		memset( macro, 0, sizeof( struct macro_data ) );
 	}
 }
 
-static bool macro_save( struct macro_params *slot, const char *path )
+static int macro_ini_handler( MfCtrlDefIniAction action, const char *path )
+{
+	int ret;
+	
+	switch( action ){
+		case MF_CTRL_INI_LOAD:
+			macro_clear( st_params.menu.selectedData );
+			ret = macro_load( st_params.menu.selectedData, path );
+			if( ret != MF_CTRL_INI_ERROR_OK ) macro_clear( st_params.menu.selectedData );
+			return ret;
+		case MF_CTRL_INI_SAVE:
+			return macro_save( st_params.menu.selectedData, path );
+	}
+	return 0;
+}
+
+static int macro_save( struct macro_data *macro, const char *path )
 {
 	IniUID ini = inimgrNew();
 	if( ini ){
@@ -670,119 +793,84 @@ static bool macro_save( struct macro_params *slot, const char *path )
 		char hotkey[MACRO_HOTKEY_LENGTH];
 		
 		if( mfConvertButtonReady() ){
-			mfConvertButtonC2N( slot->hotkey, hotkey, sizeof( hotkey ) );
+			mfConvertButtonC2N( macro->hotkey, hotkey, sizeof( hotkey ) );
 			mfConvertButtonFinish();
+			
+			inimgrAddSection( ini, MACRO_SECTION_INFO );
+			inimgrSetString( ini, MACRO_SECTION_INFO, MACRO_ENTRY_NAME, macro->name );
+			inimgrSetString( ini, MACRO_SECTION_INFO, MACRO_ENTRY_HOTKEY, hotkey );
+			inimgrSetInt( ini, MACRO_SECTION_INFO, MACRO_ENTRY_REPEAT, macro->loopNum );
+			inimgrAddSection( ini, MACRO_SECTION_DATA );
+			inimgrSetCallback( ini, MACRO_SECTION_DATA, macromgrSaver, &(macro->macro) );
+			ret = inimgrSave( ini, path, MACRO_INI_SIGNATURE, MACROMGR_MACRO_VERSION, 0, 0 );
+			inimgrDestroy( ini );
+			
+			if( ret != 0 ){
+				return ret;
+			} else{
+				return MF_CTRL_INI_ERROR_OK;
+			}
 		} else{
-			mfMenuSetInfoText( MF_MENU_INFOTEXT_ERROR | MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "Cannot save Hotkey: Not enough memory." );
-			mfMenuWait( MF_ERROR_DELAY );
+			inimgrDestroy( ini );
 		}
-		
-		inimgrAddSection( ini, MACRO_SECTION_INFO );
-		inimgrSetString( ini, MACRO_SECTION_INFO, MACRO_ENTRY_NAME, slot->name );
-		inimgrSetString( ini, MACRO_SECTION_INFO, MACRO_ENTRY_HOTKEY, hotkey );
-		inimgrSetInt( ini, MACRO_SECTION_INFO, MACRO_ENTRY_REPEAT, slot->loopNum );
-		inimgrAddSection( ini, MACRO_SECTION_DATA );
-		inimgrSetCallback( ini, MACRO_SECTION_DATA, macromgrSaver, &(slot->macro) );
-		ret = inimgrSave( ini, path, MACRO_INI_SIGNATURE, MACROMGR_MACRO_VERSION, 0, 0 );
-		inimgrDestroy( ini );
-		
-		if( ret != 0 ){
-			mfMenuSetInfoText( MF_MENU_INFOTEXT_ERROR | MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "inimgr %s: %X", MF_STR_ERROR, ret );
-			mfMenuWait( MF_ERROR_DELAY );
-		} else{
-			return true;
-		}
-	} else{
-		mfMenuSetInfoText( MF_MENU_INFOTEXT_ERROR | MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "inimgr %s: %s", MF_STR_ERROR, MF_STR_ERROR_NOT_ENOUGH_MEMORY );
-		mfMenuWait( MF_ERROR_DELAY );
 	}
-	return false;
+	return MF_CTRL_INI_ERROR_NOT_ENOUGH_MEMORY;
 }
 
-static bool macro_load( struct macro_params *slot, const char *path )
+static int macro_load( struct macro_data *macro, const char *path )
 {
 	IniUID ini = inimgrNew();
 	if( ini ){
 		int ret;
 		
-		if( ! slot->macro ){
-			slot->macro = macromgrNew();
-			if( ! slot->macro ){
-				mfMenuSetInfoText( MF_MENU_INFOTEXT_ERROR | MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "macromgr %s: %s", MF_STR_ERROR, MF_STR_ERROR_NOT_ENOUGH_MEMORY );
-				mfMenuWait( MF_ERROR_DELAY );
-				return false;
+		if( ! macro->macro ){
+			macro->macro = macromgrNew();
+			if( ! macro->macro ){
+				inimgrDestroy( ini );
+				return MF_CTRL_INI_ERROR_NOT_ENOUGH_MEMORY;
 			}
-			inimgrSetCallback( ini, MACRO_SECTION_DATA, macromgrLoader, &(slot->macro) );
+			inimgrSetCallback( ini, MACRO_SECTION_DATA, macromgrLoader, &(macro->macro) );
 		} else{
-			inimgrSetCallback( ini, MACRO_SECTION_DATA, macromgrAppendLoader, &(slot->macro) );
+			inimgrSetCallback( ini, MACRO_SECTION_DATA, macromgrAppendLoader, &(macro->macro) );
 		}
 		
 		ret = inimgrLoad( ini, path, MACRO_INI_SIGNATURE, MACROMGR_MACRO_VERSION, 0, 0 );
 		
 		if( ret != 0 ){
-			macro_clear( slot );
+			macro_clear( macro );
 			if( ret == INIMGR_ERROR_INVALID_SIGNATURE ){
-				mfMenuSetInfoText( MF_MENU_INFOTEXT_ERROR | MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "%s: %s.", MF_STR_ERROR, MF_STR_ERROR_INVALID_CONF );
+				ret = MF_CTRL_INI_ERROR_INVALID_CONF;
 			} else if( ret == INIMGR_ERROR_INVALID_VERSION ){
-				mfMenuSetInfoText( MF_MENU_INFOTEXT_ERROR | MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "%s: %s.", MF_STR_ERROR, MF_STR_ERROR_UNSUPPORTED_VERSION );
-			} else {
-				mfMenuSetInfoText( MF_MENU_INFOTEXT_ERROR | MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "inimgr %s: %X", MF_STR_ERROR, ret );
+				ret = MF_CTRL_INI_ERROR_UNSUPPORTED_VERSION;
 			}
-			mfMenuWait( MF_ERROR_DELAY );
+			inimgrDestroy( ini );
+			return ret;
 		} else{
 			char hotkey[MACRO_HOTKEY_LENGTH];
 			
-			inimgrGetString( ini, MACRO_SECTION_INFO, MACRO_ENTRY_NAME, slot->name, MACRO_NAME_LENGTH );
+			inimgrGetString( ini, MACRO_SECTION_INFO, MACRO_ENTRY_NAME, macro->name, MACRO_NAME_LENGTH );
 			inimgrGetString( ini, MACRO_SECTION_INFO, MACRO_ENTRY_HOTKEY, hotkey, sizeof( hotkey ) );
-			inimgrGetInt( ini, MACRO_SECTION_INFO, MACRO_ENTRY_REPEAT, (int *)&(slot->loopNum) );
+			inimgrGetInt( ini, MACRO_SECTION_INFO, MACRO_ENTRY_REPEAT, (int *)&(macro->loopNum) );
 			inimgrDestroy( ini );
 			
-			if( macromgrSeek( slot->macro, 0, MACROMGR_SEEK_SET, NULL ) == NULL ){
-				macromgrDestroy( slot->macro );
-				slot->macro = 0;
+			if( macromgrSeek( macro->macro, 0, MACROMGR_SEEK_SET, NULL ) == NULL ){
+				macromgrDestroy( macro->macro );
+				macro->macro = 0;
 			}
 			
 			if( mfConvertButtonReady() ){
-				slot->hotkey = mfConvertButtonN2C( hotkey );
+				macro->hotkey = mfConvertButtonN2C( hotkey );
 				mfConvertButtonFinish();
-			} else{
-				mfMenuSetInfoText( MF_MENU_INFOTEXT_ERROR | MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "Cannot load Hotkey: Not enough memory." );
-				mfMenuWait( MF_ERROR_DELAY );
+				return MF_CTRL_INI_ERROR_OK;
 			}
-			return true;
 		}
-		inimgrDestroy( ini );
-	} else{
-		mfMenuSetInfoText( MF_MENU_INFOTEXT_ERROR | MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "inimgr %s: %s", MF_STR_ERROR, MF_STR_ERROR_NOT_ENOUGH_MEMORY );
-		mfMenuWait( MF_ERROR_DELAY );
 	}
-	return false;
+	return MF_CTRL_INI_ERROR_NOT_ENOUGH_MEMORY;
 }
 
 /*-----------------------------------------------
 	マクロの記録と実行
 -----------------------------------------------*/
-static void macro_run( struct macro_params *params )
-{
-	MacromgrCommand *cmd = macromgrSeek( params->macro, 0, MACROMGR_SEEK_SET, NULL );
-	
-	params->temp.trace.loopRest = params->loopNum;
-	macro_trace_prepare( params, cmd );
-}
-
-static bool macro_loop( struct macro_params *params )
-{
-	MacromgrCommand *cmd = macromgrSeek( params->macro, 0, MACROMGR_SEEK_SET, NULL );
-	
-	if( ! params->temp.trace.loopRest || ( params->temp.trace.loopRest > 1 ) ){
-		if( params->temp.trace.loopRest ) params->temp.trace.loopRest--;
-		macro_trace_loop( params, cmd );
-		return true;
-	} else{
-		return false;
-	}
-}
-
 static unsigned int macro_calc_delayms( MacromgrData base )
 {
 	MacromgrData rtc, waitms;
@@ -792,27 +880,28 @@ static unsigned int macro_calc_delayms( MacromgrData base )
 	return waitms > MACROMGR_MAX_DELAY ? MACROMGR_MAX_DELAY : waitms;
 }
 
-static void macro_record_prepare( struct macro_params *params, MacromgrCommand *start )
+static void macro_record_prepare( struct macro_params_action *work, struct macro_data *macro, MacromgrCommand *start )
 {
-	params->temp.common.lastButtons = 0;
-	params->temp.common.analogX     = MACROMGR_ANALOG_CENTER;
-	params->temp.common.analogY     = MACROMGR_ANALOG_CENTER;
-	sceRtcGetCurrentTick( &(params->temp.common.rtc) );
+	work->actionData = macro;
+	work->actionType = MACRO_RECORD;
 	
-	params->mode     = MACRO_RECORD;
-	params->temp.cmd = start;
+	work->temp->common.lastButtons = 0;
+	work->temp->common.analogX     = MACROMGR_ANALOG_CENTER;
+	work->temp->common.analogY     = MACROMGR_ANALOG_CENTER;
+	work->temp->cmd                = start;
+	sceRtcGetCurrentTick( &(work->temp->common.rtc) );
 }
 
-static void macro_record_stop( struct macro_params *params )
+static void macro_record_stop( struct macro_params_action *work )
 {
-	if( params->mode != MACRO_RECORD ) return;
+	if( work->actionType != MACRO_RECORD ) return;
 	
-	params->mode            = MACRO_NTD;
-	params->temp.cmd        = NULL;
-	params->temp.common.rtc = 0;
+	work->actionType       = MACRO_NTD;
+	work->temp->cmd        = NULL;
+	work->temp->common.rtc = 0;
 }
 
-static void macro_record( struct macro_params *params, SceCtrlData *pad )
+static void macro_record( struct macro_params_action *work, SceCtrlData *pad )
 {
 	/* 記録開始前にmacro_record_prepare()を呼んで準備すること */
 	
@@ -820,203 +909,202 @@ static void macro_record( struct macro_params *params, SceCtrlData *pad )
 	bool         analog_move     = false;
 	
 	
-	if( params->analogStickEnable && ( params->temp.common.analogX != pad->Lx || params->temp.common.analogY != pad->Ly ) ){
+	if( work->actionData->analogStickEnable && ( work->temp->common.analogX != pad->Lx || work->temp->common.analogY != pad->Ly ) ){
 		analog_move = true;
 	}
 	
-	if( current_buttons == params->temp.common.lastButtons && ! analog_move ){
+	if( current_buttons == work->temp->common.lastButtons && ! analog_move ){
 		/* ボタンもアナログスティックも前回と同じならばディレイをセットして終了 */
-		if( params->temp.cmd->prev ) macromgrSetDelay( params->temp.cmd, macro_calc_delayms( params->temp.common.rtc ) );
+		if( work->temp->cmd->prev ) macromgrSetDelay( work->temp->cmd, macro_calc_delayms( work->temp->common.rtc ) );
 	} else{
 		/* ボタンかアナログスティックに動きがあった場合 */
 		MacromgrAction action;
 		MacromgrData data;
 		MacromgrData sub;
 		
-		unsigned int press_buttons   = ( params->temp.common.lastButtons ^ current_buttons ) & current_buttons;
-		unsigned int release_buttons = ( params->temp.common.lastButtons ^ current_buttons ) & params->temp.common.lastButtons;
+		unsigned int press_buttons   = ( work->temp->common.lastButtons ^ current_buttons ) & current_buttons;
+		unsigned int release_buttons = ( work->temp->common.lastButtons ^ current_buttons ) & work->temp->common.lastButtons;
 		
-		macromgrGetCommand( params->temp.cmd, &action, &data, &sub );
+		macromgrGetCommand( work->temp->cmd, &action, &data, &sub );
 		
 		if( action == MACROMGR_DELAY ){
 			if( data > 0 ){
 				/* 現在のコマンドがディレイで時間が0より大きい場合は、ディレイを更新して次のコマンド作成 */
-				macromgrSetDelay( params->temp.cmd, macro_calc_delayms( params->temp.common.rtc ) );
-				params->temp.cmd = macromgrInsertAfter( params->macro, params->temp.cmd );
+				macromgrSetDelay( work->temp->cmd, macro_calc_delayms( work->temp->common.rtc ) );
+				work->temp->cmd = macromgrInsertAfter( work->actionData->macro, work->temp->cmd );
 			}
 		} else{
 			/* 現在のコマンドがディレイじゃない場合は次のコマンド作成 */
-			params->temp.cmd = macromgrInsertAfter( params->macro, params->temp.cmd );
+			work->temp->cmd = macromgrInsertAfter( work->actionData->macro, work->temp->cmd );
 		}
 		
 		/* コマンドの追加に失敗していれば記録終了 */
-		if( ! params->temp.cmd ) goto ABORT;
+		if( ! work->temp->cmd ) goto ABORT;
 		
 		/* ボタンが異なっていればボタン変更コマンドをセット */
 		if( press_buttons && release_buttons ){
-			macromgrSetButtonsChange( params->temp.cmd, current_buttons );
-			params->temp.cmd = macromgrInsertAfter( params->macro, params->temp.cmd );
+			macromgrSetButtonsChange( work->temp->cmd, current_buttons );
+			work->temp->cmd = macromgrInsertAfter( work->actionData->macro, work->temp->cmd );
 		} else if( press_buttons ){
-			macromgrSetButtonsPress( params->temp.cmd, press_buttons );
-			params->temp.cmd = macromgrInsertAfter( params->macro, params->temp.cmd );
+			macromgrSetButtonsPress( work->temp->cmd, press_buttons );
+			work->temp->cmd = macromgrInsertAfter( work->actionData->macro, work->temp->cmd );
 		} else if( release_buttons ){
-			macromgrSetButtonsRelease( params->temp.cmd, release_buttons );
-			params->temp.cmd = macromgrInsertAfter( params->macro, params->temp.cmd );
+			macromgrSetButtonsRelease( work->temp->cmd, release_buttons );
+			work->temp->cmd = macromgrInsertAfter( work->actionData->macro, work->temp->cmd );
 		}
 		
 		/* コマンドの追加に失敗していれば記録終了 */
-		if( ! params->temp.cmd ) goto ABORT;
+		if( ! work->temp->cmd ) goto ABORT;
 		
 		/* アナログスティックが動いていれば移動コマンドをセット */
 		if( analog_move ){
-			macromgrSetAnalogMove( params->temp.cmd, pad->Lx, pad->Ly );
-			params->temp.cmd = macromgrInsertAfter( params->macro, params->temp.cmd );
+			macromgrSetAnalogMove( work->temp->cmd, pad->Lx, pad->Ly );
+			work->temp->cmd = macromgrInsertAfter( work->actionData->macro, work->temp->cmd );
 			
 			/* コマンドの追加に失敗していれば記録終了 */
-			if( ! params->temp.cmd ) goto ABORT;
+			if( ! work->temp->cmd ) goto ABORT;
 		}
 		
 		/* 一時データを更新する */
-		params->temp.common.lastButtons = current_buttons;
-		params->temp.common.analogX     = pad->Lx;
-		params->temp.common.analogY     = pad->Ly;
-		sceRtcGetCurrentTick( &(params->temp.common.rtc) );
+		work->temp->common.lastButtons = current_buttons;
+		work->temp->common.analogX     = pad->Lx;
+		work->temp->common.analogY     = pad->Ly;
+		sceRtcGetCurrentTick( &(work->temp->common.rtc) );
 	}
 	
 	return;
 	
 	ABORT:
-		macro_record_stop( params );
+		macro_record_stop( work );
 		return;
 }
 
-static void macro_trace_prepare( struct macro_params *params, MacromgrCommand *start )
+static void macro_trace_prepare( struct macro_params_action *work, struct macro_data *macro, MacromgrCommand *start )
 {
-	if( params->mode == MACRO_TRACE ) macro_trace_stop( params );
+	work->actionData = macro;
+	work->actionType = MACRO_TRACE;
 	
-	params->temp.common.lastButtons = 0;
-	params->temp.common.analogX     = MACROMGR_ANALOG_CENTER;
-	params->temp.common.analogY     = MACROMGR_ANALOG_CENTER;
+	work->temp->common.lastButtons = 0;
+	work->temp->common.analogX     = MACROMGR_ANALOG_CENTER;
+	work->temp->common.analogY     = MACROMGR_ANALOG_CENTER;
 	
-	params->temp.trace.rfUid    = mfRapidfireNew();
-	if( ! params->temp.trace.rfUid ) return;
+	work->temp->trace.loopRest = work->actionData->loopNum;
+	work->temp->trace.rfUid    = mfRapidfireNew();
 	
-	params->mode     = MACRO_TRACE;
-	params->temp.cmd = start;
-	sceRtcGetCurrentTick( &(params->temp.common.rtc) );
+	sceRtcGetCurrentTick( &(work->temp->common.rtc) );
+	work->temp->cmd = start;
 }
 
-static void macro_trace_loop( struct macro_params *params, MacromgrCommand *start )
+static void macro_trace_stop( struct macro_params_action *work )
 {
-	params->temp.common.lastButtons = 0;
-	params->temp.common.analogX     = MACROMGR_ANALOG_CENTER;
-	params->temp.common.analogY     = MACROMGR_ANALOG_CENTER;
-	params->temp.cmd                = start;
+	if( work->actionType != MACRO_TRACE ) return;
+	
+	if( work->temp->trace.rfUid ){
+		mfRapidfireDestroy( work->temp->trace.rfUid );
+		work->temp->trace.rfUid = 0;
+	}
+	
+	work->actionType       = MACRO_NTD;
+	work->temp->cmd        = NULL;
+	work->temp->common.rtc = 0;
+	work->temp->trace.rtc  = 0;
 }
 
-
-static void macro_trace_stop( struct macro_params *params )
-{
-	if( params->mode != MACRO_TRACE ) return;
-	
-	mfRapidfireDestroy( params->temp.trace.rfUid );
-	params->temp.trace.rfUid = 0;
-	
-	params->mode            = MACRO_NTD;
-	params->temp.cmd        = NULL;
-	params->temp.common.rtc = 0;
-}
-
-static bool macro_trace( struct macro_params *params, SceCtrlData *pad )
+static bool macro_trace( struct macro_params_action *work, SceCtrlData *pad )
 {
 	/* 記録開始前にmacro_trace_prepare()を呼んで準備すること */
+	
 	MacromgrAction action;
 	MacromgrData   data;
 	MacromgrData   sub;
 	
 	do {
-		macromgrGetCommand( params->temp.cmd, &action, &data, &sub );
+		macromgrGetCommand( work->temp->cmd, &action, &data, &sub );
 		if( ! data ) continue;
 		
 		switch( action ){
-			case MACROMGR_DELAY: {
-					uint64_t current_tick;
-					sceRtcGetCurrentTick( &current_tick );
-					
-					if( ( ( current_tick - params->temp.common.rtc ) / 1000 ) >= data ){
-						sceRtcGetCurrentTick( &(params->temp.common.rtc) );
-						continue;
-					}
+			case MACROMGR_DELAY:
+				if( ! work->temp->trace.rtc ) sceRtcTickAddMicroseconds( &(work->temp->trace.rtc), &(work->temp->common.rtc), data * 1000 );
+				sceRtcGetCurrentTick( &(work->temp->common.rtc) );
+				if( sceRtcCompareTick( &(work->temp->common.rtc), &(work->temp->trace.rtc) ) >= 0 ){
+					work->temp->trace.rtc = 0;
+					continue;
 				}
 				break;
 			case MACROMGR_BUTTONS_PRESS:
-				if( ! data ) continue;
-				params->temp.common.lastButtons |= data;
+				work->temp->common.lastButtons |= data;
 				break;
 			case MACROMGR_BUTTONS_RELEASE:
-				if( ! data ) continue;
-				params->temp.common.lastButtons ^= data;
+				work->temp->common.lastButtons ^= data;
 				break;
 			case MACROMGR_BUTTONS_CHANGE:
-				if( ! data ) continue;
-				params->temp.common.lastButtons = data;
+				work->temp->common.lastButtons = data;
 				break;
 			case MACROMGR_ANALOG_MOVE:
-				params->temp.common.analogX = MACROMGR_GET_ANALOG_X( data );
-				params->temp.common.analogY = MACROMGR_GET_ANALOG_Y( data );
+				work->temp->common.analogX = MACROMGR_GET_ANALOG_X( data );
+				work->temp->common.analogY = MACROMGR_GET_ANALOG_Y( data );
 				break;
 			case MACROMGR_RAPIDFIRE_START:
-				if( ! data ) continue;
-				mfRapidfireSetRapid(
-					params->temp.trace.rfUid,
-					data,
-					MACROMGR_GET_RAPIDPDELAY( sub ),
-					MACROMGR_GET_RAPIDRDELAY( sub ),
-					true
-				);
+				if( work->temp->trace.rfUid ){
+					mfRapidfireSetRapid(
+						work->temp->trace.rfUid,
+						data,
+						MACROMGR_GET_RAPIDPDELAY( sub ),
+						MACROMGR_GET_RAPIDRDELAY( sub ),
+						true
+					);
+				}
 				break;
 			case MACROMGR_RAPIDFIRE_STOP:
-				if( ! data ) continue;
-				mfRapidfireClear( params->temp.trace.rfUid, data );
+				if( work->temp->trace.rfUid ) mfRapidfireClear( work->temp->trace.rfUid, data );
 				break;
 			default:
 				continue;
 		}
 		
-		mfRapidfireExec( params->temp.trace.rfUid, MF_UPDATE, pad );
+		if( work->temp->trace.rfUid ) mfRapidfireExec( work->temp->trace.rfUid, MF_UPDATE, pad );
 		
 		/* ボタンを更新 */
-		pad->Buttons |= params->temp.common.lastButtons;
+		pad->Buttons |= work->temp->common.lastButtons;
 		
 		/* 最後にマクロで指定されたアナログスティックの座標が実座標よりも動いていれば上書き */
-		if( abs( params->temp.common.analogX - MACROMGR_ANALOG_CENTER ) > abs( pad->Lx - MACROMGR_ANALOG_CENTER ) )
-			pad->Lx = params->temp.common.analogX;
+		if( abs( work->temp->common.analogX - MACROMGR_ANALOG_CENTER ) > abs( pad->Lx - MACROMGR_ANALOG_CENTER ) )
+			pad->Lx = work->temp->common.analogX;
 		
-		if( abs( params->temp.common.analogY - MACROMGR_ANALOG_CENTER ) > abs( pad->Ly - MACROMGR_ANALOG_CENTER ) )
-			pad->Ly = params->temp.common.analogY;
+		if( abs( work->temp->common.analogY - MACROMGR_ANALOG_CENTER ) > abs( pad->Ly - MACROMGR_ANALOG_CENTER ) )
+			pad->Ly = work->temp->common.analogY;
 		
 		/* コマンド実行を一つ完了したので抜ける */
 		break;
-	} while( ( params->temp.cmd = macromgrNext( params->temp.cmd ) ) );
+	} while( ( work->temp->cmd = macromgrNext( work->temp->cmd ) ) );
 	
 	/* コマンドを次に進める */
-	if( params->temp.cmd && action != MACROMGR_DELAY ){
-		params->temp.cmd = macromgrNext( params->temp.cmd );
-		sceRtcGetCurrentTick( &(params->temp.common.rtc) );
+	if( work->temp->cmd && action != MACROMGR_DELAY ){
+		work->temp->cmd = macromgrNext( work->temp->cmd );
+		sceRtcGetCurrentTick( &(work->temp->common.rtc) );
 	}
 	
 	/* 全コマンド実行終了したかどうか */
-	if( params->temp.cmd ){
+	if( work->temp->cmd ){
+		return true;
+	} else if( ! work->temp->trace.loopRest || ( work->temp->trace.loopRest > 1 ) ){
+		if( work->temp->trace.loopRest ) work->temp->trace.loopRest--;
+		work->temp->common.lastButtons = 0;
+		work->temp->common.analogX     = MACROMGR_ANALOG_CENTER;
+		work->temp->common.analogY     = MACROMGR_ANALOG_CENTER;
+		work->temp->cmd = macromgrSeek( work->actionData->macro, 0, MACROMGR_SEEK_SET, NULL );
+		sceRtcGetCurrentTick( &(work->temp->common.rtc) );
 		return true;
 	} else{
-		sceRtcGetCurrentTick( &(params->temp.common.rtc) );
 		return false;
 	}
 }
 
 static void macro_mfengine_warning( void )
 {
-	pbPrint( pbOffsetChar( 3 ), pbOffsetLine( 4 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, MF_STR_MACRO_ENGINE_IS_OFF );
-	mfMenuWait( MF_MESSAGE_DELAY );
+	if( ! mfDialogMessage( MF_STR_ERROR, MF_STR_MACRO_ENGINE_IS_OFF, 0, false ) ){
+		pbPrint( pbOffsetChar( 3 ), pbOffsetLine( 4 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, MF_STR_MACRO_ENGINE_IS_OFF );
+		mfMenuWait( MF_MESSAGE_DELAY );
+	}
 	mfMenuProc( NULL );
 }

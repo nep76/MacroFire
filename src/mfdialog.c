@@ -5,19 +5,21 @@
 	ダイアログラッパー
 
 =========================================================*/
-#include "mfdialog.h"
+#include "mfdialog_internal.h"
+#include "util/strutil.h"
 
 /*=========================================================
 	ローカル関数
 =========================================================*/
-bool mfdialog_draw( CdialogStatus ( *statf )( void ), int ( *updatef )( void ) );
-bool mfdialog_result( int ( *shutdownf )( void ), CdialogResult ( *resultf )( void ), void ( *destroyf )( void ) );
+static bool mfdialog_draw( CdialogStatus ( *statf )( void ), int ( *updatef )( void ) );
+static bool mfdialog_result( int ( *shutdownf )( void ), CdialogResult ( *resultf )( void ), void ( *destroyf )( void ) );
 
 /*=========================================================
 	ローカル変数
 =========================================================*/
-static MfDialogType st_dialog_type = MFDIALOG_NONE;
-static bool st_getfilename_timeout = false;
+static MfDialogType st_dialog_type   = MF_DIALOG_NONE;
+static bool st_last_result = true;
+static bool st_getfilename_timeout = false; /* 必要性調査 */
 
 /*=========================================================
 	関数
@@ -39,14 +41,19 @@ inline void mfDialogFinish( void )
 	cdialogFinish();
 }
 
+inline bool mfDialogLastResult( void )
+{
+	return st_last_result;
+}
+
 /*-----------------------------------------------
 	メッセージダイアログ
 -----------------------------------------------*/
-bool mfDialogMessageInit( const char *title, const char *message, bool yesno )
+bool mfDialogMessage( const char *title, const char *message, unsigned int error, bool yesno )
 {
 	CdialogMessageData *data;
 	
-	if( st_dialog_type != MFDIALOG_NONE || cdialogMessageInit( NULL ) < 0 ) return false;
+	if( st_dialog_type != MF_DIALOG_NONE || cdialogMessageInit( NULL ) < 0 ) return false;
 	
 	dbgprint( "Init dialog: message" );
 	
@@ -54,6 +61,10 @@ bool mfDialogMessageInit( const char *title, const char *message, bool yesno )
 	if( title   ) strutilCopy( data->title,   title,   CDIALOG_MESSAGE_TITLE_LENGTH );
 	if( message ) strutilCopy( data->message, message, CDIALOG_MESSAGE_LENGTH );
 	data->options = CDIALOG_DISPLAY_CENTER;
+	if( error ){
+		data->options   |= CDIALOG_MESSAGE_ERROR;
+		data->errorcode = error;
+	}
 	if( yesno ) data->options |= CDIALOG_MESSAGE_YESNO;
 	
 	if( cdialogMessageStart( 0, 0 ) < 0 ){
@@ -61,8 +72,8 @@ bool mfDialogMessageInit( const char *title, const char *message, bool yesno )
 		return false;
 	}
 	
-	mfMenuDisableQuickQuit();
-	st_dialog_type = MFDIALOG_MESSAGE;
+	mfMenuDisable( MF_MENU_EXIT );
+	st_dialog_type = MF_DIALOG_MESSAGE;
 	
 	return true;
 }
@@ -80,11 +91,11 @@ bool mfDialogMessageResult( void )
 /*-----------------------------------------------
 	SOSK
 -----------------------------------------------*/
-bool mfDialogSoskInit( const char *title, char *text, size_t length, unsigned int availkb )
+bool mfDialogSosk( const char *title, char *text, size_t length, unsigned int availkb )
 {
 	CdialogSoskData *data;
 	
-	if( st_dialog_type != MFDIALOG_NONE || cdialogSoskInit( NULL ) < 0 ) return false;
+	if( st_dialog_type != MF_DIALOG_NONE || cdialogSoskInit( NULL ) < 0 ) return false;
 	
 	dbgprint( "Init dialog: sosk" );
 	
@@ -100,8 +111,8 @@ bool mfDialogSoskInit( const char *title, char *text, size_t length, unsigned in
 		return false;
 	}
 	
-	mfMenuDisableQuickQuit();
-	st_dialog_type = MFDIALOG_SOSK;
+	mfMenuDisable( MF_MENU_EXIT );
+	st_dialog_type = MF_DIALOG_SOSK;
 	
 	return true;
 }
@@ -119,11 +130,11 @@ bool mfDialogSoskResult( void )
 /*-----------------------------------------------
 	数値
 -----------------------------------------------*/
-bool mfDialogNumeditInit( const char *title, const char *unit, void *num, uint32_t max )
+bool mfDialogNumedit( const char *title, const char *unit, void *num, uint32_t max )
 {
 	CdialogNumeditData *data;
 	
-	if( st_dialog_type != MFDIALOG_NONE || cdialogNumeditInit( NULL ) < 0 ) return false;
+	if( st_dialog_type != MF_DIALOG_NONE || cdialogNumeditInit( NULL ) < 0 ) return false;
 	
 	dbgprint( "Init dialog: numedit" );
 	
@@ -139,8 +150,8 @@ bool mfDialogNumeditInit( const char *title, const char *unit, void *num, uint32
 		return false;
 	}
 	
-	mfMenuDisableQuickQuit();
-	st_dialog_type = MFDIALOG_NUMEDIT;
+	mfMenuDisable( MF_MENU_EXIT );
+	st_dialog_type = MF_DIALOG_NUMEDIT;
 	
 	return true;
 }
@@ -158,11 +169,11 @@ bool mfDialogNumeditResult( void )
 /*-----------------------------------------------
 	ファイル名取得
 -----------------------------------------------*/
-bool mfDialogGetfilenameInit( const char *title, const char *initdir, const char *initname, char *path, size_t pathmax, unsigned int options )
+bool mfDialogGetfilename( const char *title, const char *initdir, const char *initname, char *path, size_t pathmax, unsigned int options )
 {
 	CdialogGetfilenameData *data;
 	
-	if( st_dialog_type != MFDIALOG_NONE || cdialogGetfilenameInit( NULL ) < 0 ) return false;
+	if( st_dialog_type != MF_DIALOG_NONE || cdialogGetfilenameInit( NULL ) < 0 ) return false;
 	
 	dbgprint( "Init dialog: getfilename" );
 	
@@ -181,8 +192,8 @@ bool mfDialogGetfilenameInit( const char *title, const char *initdir, const char
 		return false;
 	}
 	
-	mfMenuDisableQuickQuit();
-	st_dialog_type = MFDIALOG_GETFILENAME;
+	mfMenuDisable( MF_MENU_EXIT );
+	st_dialog_type = MF_DIALOG_GETFILENAME;
 	
 	return true;
 }
@@ -235,11 +246,11 @@ bool mfDialogGetfilenameResult( void )
 /*-----------------------------------------------
 	ボタン取得
 -----------------------------------------------*/
-bool mfDialogDetectbuttonsInit( const char *title, PadutilButtons availbtns, PadutilButtons *buttons )
+bool mfDialogDetectbuttons( const char *title, PadutilButtons availbtns, PadutilButtons *buttons )
 {
 	CdialogDetectbuttonsData *data;
 	
-	if( st_dialog_type != MFDIALOG_NONE || cdialogDetectbuttonsInit( NULL ) < 0 ) return false;
+	if( st_dialog_type != MF_DIALOG_NONE || cdialogDetectbuttonsInit( NULL ) < 0 ) return false;
 	
 	dbgprint( "Init dialog: detectbuttons" );
 	
@@ -254,8 +265,8 @@ bool mfDialogDetectbuttonsInit( const char *title, PadutilButtons availbtns, Pad
 		return false;
 	}
 	
-	mfMenuDisableQuickQuit();
-	st_dialog_type = MFDIALOG_DETECTBUTTONS;
+	mfMenuDisable( MF_MENU_EXIT );
+	st_dialog_type = MF_DIALOG_DETECTBUTTONS;
 	
 	return true;
 }
@@ -273,7 +284,7 @@ bool mfDialogDetectbuttonsResult( void )
 /*=========================================================
 	ローカル関数
 =========================================================*/
-bool mfdialog_draw( CdialogStatus ( *statf )( void ), int ( *updatef )( void ) )
+static bool mfdialog_draw( CdialogStatus ( *statf )( void ), int ( *updatef )( void ) )
 {
 	CdialogStatus status;
 	
@@ -287,7 +298,7 @@ bool mfdialog_draw( CdialogStatus ( *statf )( void ), int ( *updatef )( void ) )
 	}
 }
 
-bool mfdialog_result( int ( *shutdownf )( void ), CdialogResult ( *resultf )( void ), void ( *destroyf )( void ) )
+static bool mfdialog_result( int ( *shutdownf )( void ), CdialogResult ( *resultf )( void ), void ( *destroyf )( void ) )
 {
 	CdialogResult result;
 	
@@ -296,8 +307,10 @@ bool mfdialog_result( int ( *shutdownf )( void ), CdialogResult ( *resultf )( vo
 	
 	destroyf();
 	
-	mfMenuEnableQuickQuit();
-	st_dialog_type = MFDIALOG_NONE;
+	mfMenuEnable( MF_MENU_EXIT );
+	st_dialog_type = MF_DIALOG_NONE;
 	
-	return result == CDIALOG_ACCEPT ? true : false;
+	st_last_result = result == CDIALOG_ACCEPT ? true : false;
+	
+	return st_last_result;
 }

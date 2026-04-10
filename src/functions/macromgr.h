@@ -64,12 +64,12 @@ typedef enum {
 	MACROMGR_RAPIDFIRE_STOP
 } MacromgrAction;
 
-typedef struct macro_data {
+typedef struct macromgr_data {
 	MacromgrAction action;
 	MacromgrData data;
 	MacromgrData sub;
-	struct macro_data *next;
-	struct macro_data *prev;
+	struct macromgr_data *next;
+	struct macromgr_data *prev;
 } MacromgrCommand;
 
 /*=========================================================

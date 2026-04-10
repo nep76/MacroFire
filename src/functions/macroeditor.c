@@ -130,7 +130,7 @@ void macroeditorTerm( void )
 
 #define PRINT_CMD( xoff, yoff, color, str )       pbPrint( pbOffsetChar( 3 + xoff ), pbOffsetLine( 4 + yoff ), color, MF_COLOR_TEXT_BG, str )
 #define PRINTF_CMD( xoff, yoff, color, str, ... ) pbPrintf( pbOffsetChar( 3 + xoff ), pbOffsetLine( 4 + yoff ), color, MF_COLOR_TEXT_BG, str, __VA_ARGS__ )
-bool macroeditorMain( void )
+bool macroeditorMain( MfMessage message )
 {
 	MacromgrCommand *cmd;
 	MacromgrAction  action;
@@ -142,7 +142,7 @@ bool macroeditorMain( void )
 	
 	unsigned int text_color, guide_color;
 	
-	bool nowedit =  st_params->menu.tables || mfDialogCurrentType() ? true : false;
+	bool nowedit =  st_params->menu.tables || mfMenuMaskDialogMessage( message ) ? true : false;
 	
 	rest_lines  = mfMenuScroll( st_params->selectedPos, MACROEDITOR_LINES_PER_PAGE, st_params->numberOfCmd );
 	line_number = rest_lines + 1;
@@ -182,7 +182,7 @@ bool macroeditorMain( void )
 			case MACROMGR_DELAY:
 				offset += PRINT_CMD( offset, line_coord, text_color, "Delay" );
 				offset += PRINT_CMD( offset, line_coord, guide_color, " ------------> " );
-				/* USE_KERNEL_LIBC ‚¾‚Æ %llu ‚ª‚È‚º‚Èí‚É0 */
+				/* USE_KERNEL_LIBC ‚¾‚Æ %llu ‚ª‚È‚º‚©í‚É0 */
 				PRINTF_CMD( offset, line_coord, text_color, "%u %s", (unsigned int)data, st_params->dialogPref.delay.unit );
 				break;
 			case MACROMGR_BUTTONS_PRESS:
@@ -227,16 +227,11 @@ bool macroeditorMain( void )
 				mfMenuDestroyTables( st_params->menu.tables );
 				st_params->menu.tables = NULL;
 			}
+		} else if( message & MF_DM_FINISH ){
+			macromgrSetCommand( st_params->selected.cmd, st_params->selected.action, st_params->selected.data, st_params->selected.sub );
 		} else{
-			MfDialogType dialog;
-			if( ( dialog = mfDialogCurrentType() ) ){
-				mfMenuDrawDialog( dialog, true );
-				if( mfDialogCurrentType() ){
-					return true;
-				}
-			}
+			return true;
 		}
-		macromgrSetCommand( st_params->selected.cmd, st_params->selected.action, st_params->selected.data, st_params->selected.sub );
 	} else{
 		mfMenuSetInfoText( MF_MENU_INFOTEXT_COMMON_CTRL | MF_MENU_INFOTEXT_MOVABLEPAGE_CTRL | MF_MENU_INFOTEXT_SET_LOWER_LINE, "(%s)%s, (%s)%s, (%s)%s (L)%s, (R)%s", mfMenuAcceptSymbol(), MF_STR_MACROEDITOR_CTRL_EDIT, PB_SYM_PSP_TRIANGLE, MF_STR_MACROEDITOR_CTRL_CHANGE, PB_SYM_PSP_SQUARE, MF_STR_MACROEDITOR_CTRL_DELETE, MF_STR_MACROEDITOR_CTRL_INS_BEFORE, MF_STR_MACROEDITOR_CTRL_INS_AFTER );
 		if( mfMenuIsPressed( mfMenuCancelButton() ) ){
@@ -244,16 +239,16 @@ bool macroeditorMain( void )
 		} else if( mfMenuIsPressed( mfMenuAcceptButton() ) ) {
 			switch( st_params->selected.action ){
 				case MACROMGR_DELAY:
-					mfDialogNumeditInit( "Delay", st_params->dialogPref.delay.unit,  &(st_params->selected.data), st_params->dialogPref.delay.max );
+					mfDialogNumedit( "Delay", st_params->dialogPref.delay.unit,  &(st_params->selected.data), st_params->dialogPref.delay.max );
 					break;
 				case MACROMGR_BUTTONS_PRESS:
-					mfDialogDetectbuttonsInit( "Buttons press", st_params->dialogPref.buttons.availButtons, (PadutilButtons *)&(st_params->selected.data) );
+					mfDialogDetectbuttons( "Buttons press", st_params->dialogPref.buttons.availButtons, (PadutilButtons *)&(st_params->selected.data) );
 					break;
 				case MACROMGR_BUTTONS_RELEASE:
-					mfDialogDetectbuttonsInit( "Buttons release", st_params->dialogPref.buttons.availButtons, (PadutilButtons *)&(st_params->selected.data) );
+					mfDialogDetectbuttons( "Buttons release", st_params->dialogPref.buttons.availButtons, (PadutilButtons *)&(st_params->selected.data) );
 					break;
 				case MACROMGR_BUTTONS_CHANGE:
-					mfDialogDetectbuttonsInit( "Buttons change", st_params->dialogPref.buttons.availButtons, (PadutilButtons *)&(st_params->selected.data) );
+					mfDialogDetectbuttons( "Buttons change", st_params->dialogPref.buttons.availButtons, (PadutilButtons *)&(st_params->selected.data) );
 					break;
 				case MACROMGR_ANALOG_MOVE:
 					st_params->menu.tables = mfMenuCreateTables( 1, 2, 1 );
@@ -273,7 +268,7 @@ bool macroeditorMain( void )
 					mfMenuInitTable( st_params->menu.tables );
 					break;
 				case MACROMGR_RAPIDFIRE_STOP:
-					mfDialogDetectbuttonsInit( "Rapidfire stop", st_params->dialogPref.buttons.availButtons, (PadutilButtons *)&(st_params->selected.data) );
+					mfDialogDetectbuttons( "Rapidfire stop", st_params->dialogPref.buttons.availButtons, (PadutilButtons *)&(st_params->selected.data) );
 					break;
 			}
 		} else if( mfMenuIsPressed( PSP_CTRL_SQUARE ) ){
@@ -340,7 +335,7 @@ bool macroeditorMain( void )
 -----------------------------------------------*/
 static bool macroeditor_ctrl_edit_analog_x( MfMessage message, const char *label, void *var, void *pref, void *ex )
 {
-	if( message == MF_CM_DIALOG_FINISH ){
+	if( message == MF_DM_FINISH ){
 		((struct macroeditor_command_data *)var)->data = MACROMGR_SET_ANALOG_XY( ((struct macroeditor_command_data *)var)->temp, MACROMGR_GET_ANALOG_Y( ((struct macroeditor_command_data *)var)->data ) );
 		return false;
 	} else if( message == MF_CM_INFO ){
@@ -349,7 +344,7 @@ static bool macroeditor_ctrl_edit_analog_x( MfMessage message, const char *label
 		if( mfMenuIsPressed( mfMenuAcceptButton() ) ){
 			MfCtrlDefGetNumberPref *numpref = pref;
 			((struct macroeditor_command_data *)var)->temp = MACROMGR_GET_ANALOG_X( ((struct macroeditor_command_data *)var)->data );
-			mfDialogNumeditInit( label, numpref->unit, &(((struct macroeditor_command_data *)var)->temp), numpref->max );
+			mfDialogNumedit( label, numpref->unit, &(((struct macroeditor_command_data *)var)->temp), numpref->max );
 		}
 	}
 	return true;
@@ -357,7 +352,7 @@ static bool macroeditor_ctrl_edit_analog_x( MfMessage message, const char *label
 
 static bool macroeditor_ctrl_edit_analog_y( MfMessage message, const char *label, void *var, void *pref, void *ex )
 {
-	if( message == MF_CM_DIALOG_FINISH ){
+	if( message == MF_DM_FINISH ){
 		((struct macroeditor_command_data *)var)->data = MACROMGR_SET_ANALOG_XY( MACROMGR_GET_ANALOG_X( ((struct macroeditor_command_data *)var)->data ), ((struct macroeditor_command_data *)var)->temp );
 		return false;
 	} else if( message == MF_CM_INFO ){
@@ -366,7 +361,7 @@ static bool macroeditor_ctrl_edit_analog_y( MfMessage message, const char *label
 		if( mfMenuIsPressed( mfMenuAcceptButton() ) ){
 			MfCtrlDefGetNumberPref *numpref = pref;
 			((struct macroeditor_command_data *)var)->temp = MACROMGR_GET_ANALOG_Y( ((struct macroeditor_command_data *)var)->data );
-			mfDialogNumeditInit( label, numpref->unit, &(((struct macroeditor_command_data *)var)->temp), numpref->max );
+			mfDialogNumedit( label, numpref->unit, &(((struct macroeditor_command_data *)var)->temp), numpref->max );
 		}
 	}
 	return true;
@@ -375,7 +370,7 @@ static bool macroeditor_ctrl_edit_analog_y( MfMessage message, const char *label
 
 static bool macroeditor_ctrl_edit_rapid_pd( MfMessage message, const char *label, void *var, void *pref, void *ex )
 {
-	if( message == MF_CM_DIALOG_FINISH ){
+	if( message == MF_DM_FINISH ){
 		((struct macroeditor_command_data *)var)->sub = MACROMGR_SET_RAPIDDELAY( ((struct macroeditor_command_data *)var)->temp, MACROMGR_GET_RAPIDRDELAY( ((struct macroeditor_command_data *)var)->sub ) );
 		return false;
 	} else if( message == MF_CM_INFO ){
@@ -384,7 +379,7 @@ static bool macroeditor_ctrl_edit_rapid_pd( MfMessage message, const char *label
 		if( mfMenuIsPressed( mfMenuAcceptButton() ) ){
 			MfCtrlDefGetNumberPref *numpref = pref;
 			((struct macroeditor_command_data *)var)->temp = MACROMGR_GET_RAPIDPDELAY( ((struct macroeditor_command_data *)var)->sub );
-			mfDialogNumeditInit( label, numpref->unit, &(((struct macroeditor_command_data *)var)->temp), numpref->max );
+			mfDialogNumedit( label, numpref->unit, &(((struct macroeditor_command_data *)var)->temp), numpref->max );
 		}
 	}
 	return true;
@@ -393,7 +388,7 @@ static bool macroeditor_ctrl_edit_rapid_pd( MfMessage message, const char *label
 
 static bool macroeditor_ctrl_edit_rapid_rd( MfMessage message, const char *label, void *var, void *pref, void *ex )
 {
-	if( message == MF_CM_DIALOG_FINISH ){
+	if( message == MF_DM_FINISH ){
 		((struct macroeditor_command_data *)var)->sub = MACROMGR_SET_RAPIDDELAY( MACROMGR_GET_RAPIDPDELAY( ((struct macroeditor_command_data *)var)->sub ), ((struct macroeditor_command_data *)var)->temp );
 		return false;
 	} else if( message == MF_CM_INFO ){
@@ -402,7 +397,7 @@ static bool macroeditor_ctrl_edit_rapid_rd( MfMessage message, const char *label
 		if( mfMenuIsPressed( mfMenuAcceptButton() ) ){
 			MfCtrlDefGetNumberPref *numpref = pref;
 			((struct macroeditor_command_data *)var)->temp = MACROMGR_GET_RAPIDRDELAY( ((struct macroeditor_command_data *)var)->sub );
-			mfDialogNumeditInit( label, numpref->unit, &(((struct macroeditor_command_data *)var)->temp), numpref->max );
+			mfDialogNumedit( label, numpref->unit, &(((struct macroeditor_command_data *)var)->temp), numpref->max );
 		}
 	}
 	return true;
@@ -410,7 +405,7 @@ static bool macroeditor_ctrl_edit_rapid_rd( MfMessage message, const char *label
 
 static bool macroeditor_ctrl_set_buttons( MfMessage message, const char *label, void *var, void *pref, void *ex )
 {
-	if( message == MF_CM_DIALOG_FINISH ){
+	if( message == MF_DM_FINISH ){
 		return false;
 	} else{
 		return mfCtrlDefGetButtons( message, label, var, pref, ex );

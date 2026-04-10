@@ -9,7 +9,6 @@
 
 struct dmem_heap {
 	HeapUID uid;
-	size_t maxFreeSize;
 	size_t count;
 	struct dmem_heap *next;
 };

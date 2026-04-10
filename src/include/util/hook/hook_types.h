@@ -11,7 +11,7 @@
 /* PSPLinkから拝借 */
 struct hook_syscall_table_header
 {
-	struct hook_syscall_table_header *next; /* 次のテーブル(って何?)へのポインタ */
+	void *next; /* 次のテーブル(って何?)へのポインタ */
 	unsigned int offset;                    /* offset to substract from syscall code (substractって何?) */
 	unsigned int num;                       /* テーブルの全エントリ数 */
 	unsigned int size;                      /* テーブル全体のサイズ(バイト単位) */

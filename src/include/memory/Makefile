@@ -1,6 +1,8 @@
 SUBDIR = \
 	memory \
 	heap \
-	dmem
+	dmem \
+	heap_kernel \
+	dmem_kernel
 
 include ../chain.mak

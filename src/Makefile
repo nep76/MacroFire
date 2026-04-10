@@ -36,9 +36,6 @@
 # PSPLINK用にデバッグメッセージをprintf出力する:
 #     WITH_PSPLINK_DEBUG=1
 #
-# メモリの割り付け/解放をPSPLINKへ出力 (使用するスタックメモリが増えることに注意)
-#     WITH_PSPLINK_DEBUG=1 WITH_MEMORY_DEBUG=1
-#
 #======================================
 
 TARGET = macrofire
@@ -66,13 +63,14 @@ LIBDIR  = $(BASEPATH)/lib
 CFLAGS      = -Os -G0 -Wall -fno-strict-aliasing
 ASFLAGS     = $(CFLAGS)
 LDFLAGS     = 
-LIBS        = -lpsppower_driver -lpsphprm_driver -lpspge -lpsprtc -lpsputility -lm
-CLASSG_LIBS = -lcdialog -lovmsg -linimgr -ldirh -lfiomgr -lpadctrl -lpadutil -lpb -ldmem -lheap -lmemory -lmakepath -lstrutil -lhook
+LIBS        = -lpspumd -lpsppower_driver -lpsphprm_driver -lpspge -lpsprtc -lpsputility -lm
+CLASSG_LIBS = -lcdialog -lovmsg -linimgr -ldirh -lfiomgr -lpadctrl -lpadutil -lpb -ldmem_kernel -lheap_kernel -lmemory -lmakepath -lstrutil -lhook
 
 OBJS = \
 	exports.o \
 	sceDmac.o \
 	sceUtility.o \
+	sceUmd.o \
 	mfmain.o \
 	mfanalogstick.o \
 	mfrapidfire.o \
@@ -89,14 +87,12 @@ LIBS := $(CLASSG_LIBS) $(LIBS)
 
 ifdef WITH_PSPLINK_DEBUG
 	CFLAGS += -fno-builtin-printf -g -DDEBUG=1
-endif
-
-ifdef WITH_MEMORY_DEBUG
-	CFLAGS += -DMEMORY_DEBUG
+	WITH_LIBS_DEBUG=1
 endif
 
 ifdef WITH_EXCEPTION_HANDLER
 	CFLAGS += -DMF_WITH_EXCEPTION_HANDLER -g
+	WITH_LIBS_DEBUG=1
 endif
 
 ifdef WITH_JAPANESE
@@ -114,10 +110,15 @@ else
 	LIBS += -lpspkernel -lc -lpspuser
 endif
 
+export WITH_LIBS_DEBUG
+
 PSPSDK = $(shell psp-config --pspsdk-path)
 include $(PSPSDK)/lib/build_prx.mak
 
-everything: libs $(TARGET)
+everything:
+	@-rm $(TARGET).elf $(TARGET).prx
+	@make libs
+	@make $(TARGET)
 
 allclean: libsclean clean
 

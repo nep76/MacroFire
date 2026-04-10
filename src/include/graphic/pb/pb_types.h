@@ -6,7 +6,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
-#include "cgerrs.h"
+#include "cgerrno.h"
 
 #define PB_SWAP( a, b ) { \
 	int t = *(int *)a; \

@@ -12,16 +12,14 @@
 #include <pspsuspend.h>
 #include <psputility.h>
 #include <stdarg.h>
-#include "memory/memory.h"
-#include "memory/heap.h"
 
 /*=========================================================
 	ローカル定数
 =========================================================*/
 #define MF_MENU_MAX_NUMBER_OF_THREADS 64
 
-#define MF_MENU_STACK_SIZE( x ) ( sizeof( void * ) * ( x ) )
-#define MF_MENU_STACK_NUM       16
+#define MF_MENU_STACK_SIZE( x ) ( sizeof( struct MfMenuStackData ) * ( x ) )
+#define MF_MENU_STACK_NUM       8
 
 #define MF_MENU_SUSPEND_THREADS false
 #define MF_MENU_RESUME_THREADS  true
@@ -47,91 +45,104 @@
 /*=========================================================
 	ローカル型宣言
 =========================================================*/
-struct mf_frame_buffers {
-	void         *origaddr;
-	unsigned int frameSize;
-	int  bufferWidth;
-	int  pixelFormat;
+struct MfMenuFrameBuffer {
+	void         *OrigAddr;
+	unsigned int Size;
+	int  Width;
+	int  PixelFormat;
 	
-	void *vrambase;
-	void *vram;
-	void *display;
-	void *draw;
-	void *clear;
-	bool volatileMem;
+	void *VramBase;
+	void *Vram;
+	void *Disp;
+	void *Draw;
+	void *Clear;
 };
 
-struct mf_threads {
-	SceUID list[MF_MENU_MAX_NUMBER_OF_THREADS];
-	int    count;
+struct MfMenuThreads {
+	SceUID List[MF_MENU_MAX_NUMBER_OF_THREADS];
+	int    Count;
 };
 
-struct mf_menu_pos {
-	MfMenuTable *last;
-	unsigned short currentTable;
-	unsigned short currentRow;
-	unsigned short currentCol;
-	MfMenuProc extra;
+struct MfMenuPosition {
+	unsigned short CurTable;
+	unsigned short CurRow;
+	unsigned short CurCol;
 };
 
-struct mf_menu_stack {
-	MfProc       *memory;
-	unsigned int index;
-	unsigned int size;
+struct MfMenuMessage {
+	MfMenuMessage   Main;
+	MfMessage       Sub;
 };
 
-struct mf_menu_input {
-	SceCtrlData *pad;
-	MfHprmKey   *hprmKey;
-	PadctrlUID  uid;
+struct MfMenuExtra {
+	MfMenuExtraProc Proc;
+	void            *Argp;
+};
+
+struct MfMenuStackData {
+	MfProc *Proc;
+	struct MfMenuPosition Pos;
+};
+
+struct MfMenuStack {
+	struct MfMenuStackData *Data;
+	unsigned int Index;
+	unsigned int Size;
+};
+
+struct MfMenuInput {
+	SceCtrlData *Pad;
+	MfHprmKey   *HprmKey;
+	PadctrlUID  Uid;
 	
-	unsigned int acceptButton;
-	unsigned int cancelButton;
-	
-	char *acceptSymbol;
-	char *cancelSymbol;
+	struct {
+		unsigned int Button;
+		char *Symbol;
+	} Accept, Cancel;
 };
 
-struct mf_menu_pref {
-	bool useVolatileMem;
-	bool useGraphicsMem;
-	PadutilRemap *remap;
+struct MfMenuPref {
+	bool LowMemoryMode;
+	PadutilRemap *Remap;
 };
 
-struct mf_menu_info {
-	char text[MF_MENU_INFOTEXT_LENGTH];
-	unsigned int options;
+struct MfMenuInfoBar {
+	char Text[MF_MENU_INFOTEXT_LENGTH];
+	unsigned int Options;
 };
 
-struct mf_menu_params {
-	struct mf_frame_buffers frameBuffer;
-	struct mf_threads       threads;
-	struct mf_menu_pos      menu;
-	struct mf_menu_input    ctrl;
-	struct mf_menu_stack    stack;
-	struct mf_menu_info     info;
-	MfDialogType lastDialogType;
-	unsigned char noQuickQuitCount;
-	unsigned int  flags;
-	unsigned int  waitMicroSecForUpdate;
-	MfFuncMenu proc, nextproc;
-};
+struct MfMenuParams {
+	struct MfMenuFrameBuffer FrameBuffer;
+	struct MfMenuThreads     Thread;
+	struct MfMenuPosition    Menu;
+	struct MfMenuInput       Ctrl;
+	struct MfMenuStack       Stack;
+	struct MfMenuInfoBar     Info;
+	struct MfMenuMessage     CurrentMessage;
+	struct MfMenuMessage     NextMessage;
+	struct MfMenuExtra       Extra;
+	PadutilButtonName        *ButtonSymbolTable;
+	MfDialogType LastDialogType;
+	unsigned int  Flags;
+	unsigned int  WaitMicroSecForUpdate;
+	MfFuncMenu Proc, NextProc;
+} ;
 
-enum mf_menu_stack_ctrl {
+enum MfMenuStackAction {
 	MF_MENU_STACK_CREATE,
 	MF_MENU_STACK_PUSH,
 	MF_MENU_STACK_POP,
 	MF_MENU_STACK_DESTROY
 };
 
-enum mf_menu_move_directions {
+enum MfMenuMoveDirection {
 	MF_MENU_MOVE_UP,
 	MF_MENU_MOVE_RIGHT,
 	MF_MENU_MOVE_DOWN,
 	MF_MENU_MOVE_LEFT
 };
 	
-struct mf_main_pref {
+struct MfMenuMainPref{
 	bool engine;
 	PadutilButtons menu;
 	PadutilButtons toggle;
@@ -144,36 +155,36 @@ struct mf_main_pref {
 #ifdef DEBUG_ENABLED
 static void mf_debug( void );
 #endif
+static bool mf_menu_init_params( struct MfMenuParams *params, SceCtrlData *pad, MfHprmKey *hk );
+static bool mf_menu_init_graphics( void );
 static bool mf_menu_get_target_threads( SceUID *thread_id_list, int *thread_id_count );
 static void mf_menu_change_threads_stat( bool stat, SceUID *thread_id_list, int thread_id_count );
-static bool mf_alloc_buffers( struct mf_frame_buffers *fb, bool graphics_mem, bool volatile_mem );
-static void mf_free_buffers( struct mf_frame_buffers *fb );
+static bool mf_alloc_buffers( struct MfMenuFrameBuffer *fb, bool graphics_mem );
+static void mf_free_buffers( struct MfMenuFrameBuffer *fb );
 static void mf_draw_frame( bool lowmem );
-static void mf_menu_init_tables( MfMenuTable *menu, unsigned short menucnt );
-static void mf_menu_draw_tables( MfMenuTable *menu, unsigned short menucnt, struct mf_menu_pos *pos );
-static bool mf_menu_move_table( enum mf_menu_move_directions dir, MfMenuTable *menu, unsigned short menucnt, struct mf_menu_pos *pos );
+static void mf_menu_send_message_for_items( MfMenuTable *menu, unsigned short menucnt, MfMessage message );
+static bool mf_menu_move_table( enum MfMenuMoveDirection dir, MfMenuTable *menu, unsigned short menucnt, struct MfMenuPosition *pos );
 static bool mf_menu_nearest_table( unsigned int pri, unsigned int sec, unsigned int *save_pri, unsigned int *save_sec );
 static bool mf_menu_farest_table( unsigned int pri, unsigned int sec, unsigned int *save_pri, unsigned int *save_sec );
-static bool mf_menu_select_table_vertical( MfMenuTable *menu, unsigned short targ_tid, struct mf_menu_pos *pos, bool reverse );
-static bool mf_menu_select_table_horizontal( MfMenuTable *menu, unsigned short targ_tid, struct mf_menu_pos *pos, bool reverse );
-static bool mf_menu_stack( struct mf_menu_stack *stack, enum mf_menu_stack_ctrl ctrl, void *menu );
+static bool mf_menu_select_table_vertical( MfMenuTable *menu, unsigned short targ_tid, struct MfMenuPosition *pos, bool reverse );
+static bool mf_menu_select_table_horizontal( MfMenuTable *menu, unsigned short targ_tid, struct MfMenuPosition *pos, bool reverse );
+static bool mf_menu_stack( struct MfMenuStack *stack, enum MfMenuStackAction ctrl, void *menu, struct MfMenuPosition *pos );
 static unsigned int mf_label_width( char *str );
 static void mf_root_menu( MfMenuMessage message );
-bool mf_menu_ctrl_engine_stat( MfMessage message, const char *label, void *var, void *unused, void *ex );
+bool mf_control_engine( MfMessage message, const char *label, void *var, void *unused, void *ex );
 static void mf_menu_mute( bool mute );
 static void mf_menu_indicator( void );
 
 /*=========================================================
 	ローカル変数
 =========================================================*/
-static SceUID st_thread_id_list_first[MF_MENU_MAX_NUMBER_OF_THREADS];
-static int    st_thread_id_count_first;
+static struct MfMenuThreads st_systhread;
+static struct MfMenuPref    st_pref;
+static struct MfMenuParams  *st_params;
 
-static struct mf_menu_pref   st_pref;
-static struct mf_menu_params *st_params;
-
-static PadutilButtonName *st_symbols;
-
+/*=========================================================
+	関数
+=========================================================*/
 #ifdef DEBUG_ENABLED
 static void mf_debug( void )
 {
@@ -212,25 +223,32 @@ static void mf_debug( void )
 -----------------------------------------------*/
 bool mfMenuInit( void )
 {
-	if( sceKernelGetThreadmanIdList( SCE_KERNEL_TMID_Thread, st_thread_id_list_first, MF_MENU_MAX_NUMBER_OF_THREADS, &st_thread_id_count_first ) < 0 ){
+	if( sceKernelGetThreadmanIdList( SCE_KERNEL_TMID_Thread, st_systhread.List, MF_MENU_MAX_NUMBER_OF_THREADS, &(st_systhread.Count) ) < 0 ){
 		dbgprint( "Failed to get a first thread-id list" );
 		return false;
 	}
 	sceCtrlSetSamplingMode( PSP_CTRL_MODE_ANALOG );
 	
 	/* 設定初期化 */
-	st_pref.useVolatileMem = false;
-	st_pref.useGraphicsMem = true;
-	st_pref.remap          = NULL;
+	st_pref.LowMemoryMode = false;
+	st_pref.Remap         = NULL;
 	
 	return true;
 }
 
+/*-----------------------------------------------
+	メニューの終了
+	
+	AlternativeButtons設定が行われていれば破棄する。
+-----------------------------------------------*/
 void mfMenuDestroy( void )
 {
-	if( st_pref.remap ) padutilDestroyRemapArray( st_pref.remap );
+	if( st_pref.Remap ) padutilDestroyRemapArray( st_pref.Remap );
 }
 
+/*-----------------------------------------------
+	設定ファイルのロード
+-----------------------------------------------*/
 void mfMenuIniLoad( IniUID ini, char *buf, size_t len )
 {
 	unsigned short i, j;
@@ -239,14 +257,12 @@ void mfMenuIniLoad( IniUID ini, char *buf, size_t len )
 	
 	for( i = 0, j = 0; i < MF_MENU_ALT_BUTTONS_COUNT; i++ ){
 		if( inimgrGetString( ini, "AlternativeButtons", button_names[i].name, buf, len ) > 0 ){
-			if( ! st_pref.remap ) st_pref.remap = padutilCreateRemapArray( MF_MENU_ALT_BUTTONS_COUNT );
-			st_pref.remap[j].realButtons = mfConvertButtonN2C( buf );
-			st_pref.remap[j].remapButtons  = button_names[i].button;
+			if( ! st_pref.Remap ) st_pref.Remap = padutilCreateRemapArray( MF_MENU_ALT_BUTTONS_COUNT );
+			st_pref.Remap[j].realButtons = mfConvertButtonN2C( buf );
+			st_pref.Remap[j].remapButtons  = button_names[i].button;
 		}
 	}
-	
-	inimgrGetBool( ini, section, "UseGraphicsMemory", &(st_pref.useGraphicsMem) );
-	inimgrGetBool( ini, section, "UseVolatileMemory", &(st_pref.useVolatileMem) );
+	inimgrGetBool( ini, section, "ForcedLowMemoryMode", &(st_pref.LowMemoryMode) );
 }
 
 void mfMenuIniSave( IniUID ini, char *buf, size_t len )
@@ -261,104 +277,85 @@ void mfMenuIniSave( IniUID ini, char *buf, size_t len )
 		inimgrSetString( ini, "AlternativeButtons", button_names[i].name, "" );
 	}
 	
-	inimgrSetBool( ini, MF_INI_SECTION_DEFAULT, "UseGraphicsMemory", true );
-	inimgrSetBool( ini, MF_INI_SECTION_DEFAULT, "UseVolatileMemory", false );
+	inimgrSetBool( ini, MF_INI_SECTION_DEFAULT, "ForcedLowMemoryMode", false );
 }
 
 void mfMenuWait( unsigned int microsec )
 {
-	if( ! st_params ) return;
-	st_params->waitMicroSecForUpdate = microsec;
+	st_params->WaitMicroSecForUpdate = microsec;
 }
 
 void mfMenuProc( MfMenuProc proc )
 {
-	if( ! st_params ) return;
-	st_params->nextproc = proc;
+	st_params->NextProc = proc;
 }
 
-bool mfMenuSetExtra( MfMenuProc extra )
+bool mfMenuSetExtra( MfMenuExtraProc extra, void *argp )
 {
-	if( ! st_params || st_params->menu.extra ){
-		return false;
-	}
+	if( st_params->Extra.Proc ) return false;
 	
-	st_params->menu.extra = extra;
-	( st_params->menu.extra )( MF_MM_INIT );
+	st_params->Extra.Proc = extra;
+	st_params->Extra.Argp = argp;
+	( st_params->Extra.Proc )( MF_MM_INIT, st_params->Extra.Argp );
 	
 	return true;
 }
 
 void mfMenuExitExtra( void )
 {
-	if( ! st_params ) return;
-	
-	( st_params->menu.extra )( MF_MM_TERM );
-	st_params->menu.extra = NULL;
+	( st_params->Extra.Proc )( MF_MM_TERM, st_params->Extra.Argp );
+	st_params->Extra.Proc = NULL;
+	st_params->Extra.Argp = NULL;
 	
 	mfMenuResetKeyRepeat();
 }
 
-void mfMenuEnableQuickQuit( void )
+void mfMenuSendSignal( MfSignalMessage sig )
 {
-	if( ! st_params ) return;
-	
-	st_params->noQuickQuitCount--;
-	if( st_params->noQuickQuitCount < 0 ) st_params->noQuickQuitCount = 0;
-	dbgprintf( "Decreased menu-noQuickQuitCount count: %d", st_params->noQuickQuitCount );
-}
-
-void mfMenuDisableQuickQuit( void )
-{
-	if( ! st_params ) return;
-	
-	st_params->noQuickQuitCount++;
-	dbgprintf( "Increased menu-noQuickQuitCount count: %d", st_params->noQuickQuitCount );
+	st_params->NextMessage.Sub = sig;
 }
 
 void mfMenuEnable( unsigned int flags )
 {
-	if( ! st_params ) return;
-	st_params->flags |= flags;
+	st_params->Flags |= flags;
 }
 
 void mfMenuDisable( unsigned int flags )
 {
-	if( ! st_params ) return;
-	st_params->flags &= ~flags;
+	st_params->Flags &= ~flags;
 }
 
 unsigned int mfMenuGetFlags( void )
 {
-	return ( st_params ? st_params->flags : 0 );
+	return st_params->Flags;
 }
 
 char *mfMenuButtonsSymbolList( PadutilButtons buttons, char *str, size_t len )
 {
-	padutilGetButtonNamesByCode( st_symbols, buttons, " ", 0, str, len );
+	padutilGetButtonNamesByCode( st_params->ButtonSymbolTable, buttons, " ", 0, str, len );
 	return str;
 }
 
 bool mfMenuDrawDialog( MfDialogType dialog, bool update )
 {
 	switch( dialog ){
-		case MFDIALOG_MESSAGE:
+		case MF_DIALOG_MESSAGE:
 			if( update   ) update = mfDialogMessageDraw();
 			if( ! update ) mfDialogMessageResult();
 			return true;
-		case MFDIALOG_SOSK:
+		case MF_DIALOG_SOSK:
 			if( update   ) update = mfDialogSoskDraw();
 			if( ! update ) mfDialogSoskResult();
 			return true;
-		case MFDIALOG_NUMEDIT:
+		case MF_DIALOG_NUMEDIT:
 			if( update   ) update = mfDialogNumeditDraw();
 			if( ! update ) mfDialogNumeditResult();
 			return true;
-		case MFDIALOG_GETFILENAME:
+		case MF_DIALOG_GETFILENAME:
 			if( update   ) update = mfDialogGetfilenameDraw();
 			if( ! update ) mfDialogGetfilenameResult();
 			return true;
-		case MFDIALOG_DETECTBUTTONS:
+		case MF_DIALOG_DETECTBUTTONS:
 			if( update   ) update = mfDialogDetectbuttonsDraw();
 			if( ! update ) mfDialogDetectbuttonsResult();
 			return true;
@@ -369,157 +366,186 @@ bool mfMenuDrawDialog( MfDialogType dialog, bool update )
 
 void mfMenuInitTables( MfMenuTable menu[], unsigned short menucnt )
 {
-	if( ! st_params ) return;
+	st_params->Menu.CurTable = 0;
+	st_params->Menu.CurRow   = 0;
+	st_params->Menu.CurCol   = 0;
 	
-	dbgprint( "Initializing next menu entries" );
-	st_params->menu.currentTable = 0;
-	st_params->menu.currentRow   = 0;
-	st_params->menu.currentCol   = 0;
-	st_params->menu.last         = menu;
-	
-	mf_menu_init_tables( menu, menucnt );
+	mf_menu_send_message_for_items( menu, menucnt, MF_CM_INIT );
 }
 
-bool mfMenuDrawTables( MfMenuTable menu[], unsigned short menucnt, unsigned int opt )
+void mfMenuTermTables( MfMenuTable menu[], unsigned short menucnt )
 {
-	struct mf_menu_pos dupe_pos;
+	mf_menu_send_message_for_items( menu, menucnt, MF_CM_TERM );
+}
+
+bool mfMenuDrawTables( MfMenuTable menu[], unsigned short cnt, unsigned int opt )
+{
+	/* 選択可能な項目(コントロールが設定されていてActivateされている)が一つもないと無限ループ */
+	
+	unsigned short i, row, col;
+	unsigned int *col_width, width, col_offset, row_offset;
+	char labelbuf[MF_CTRL_BUFFER_LENGTH];
+	struct MfMenuPosition dupe_pos;
 	bool refind = true;
-	MfDialogType dialog;
-	MfCtrlMessage message;
 	
-	if( ! st_params ) return false;
-	
-	/* メニュースタック用 */
-	if( st_params->menu.last != menu ) mfMenuInitTables( menu, menucnt );
-	
-	/* メニューラベルを取得し描画 */
-	mf_menu_draw_tables( menu, menucnt, &(st_params->menu) );
-	
-	if( st_params->menu.extra ){
-		/* 拡張関数が設定されていれば実行 */
-		( st_params->menu.extra )( MF_MM_PROC );
-		message = MF_CM_EXTRA;
-	} else if( ! ( opt & MF_MENU_DISPLAY_ONLY ) ){
-		/* ダイアログの確認 */
-		dialog = mfDialogCurrentType();
-		
-		/* メッセージを確定 */
-		if( dialog != MFDIALOG_NONE ){
-			if( st_params->lastDialogType != dialog ){
-				message = MF_CM_DIALOG_START;
-				st_params->lastDialogType = dialog;
-			} else{
-				message = MF_CM_DIALOG_UPDATE;
+	/* ラベルを描画 */
+	for( i = 0; i < cnt; i++ ){
+		if( menu[i].label ){
+			col_offset = pbOffsetChar( 2 );
+			row_offset = pbOffsetLine( 1 ) + 2;
+			pbPrint( menu[i].x, menu[i].y,  MF_COLOR_TEXT_LABEL, MF_COLOR_TEXT_BG, menu[i].label );
+			pbLine( menu[i].x + pbMeasureString( menu[i].label ) + ( pbOffsetChar( 1 ) >> 1 ), menu[i].y + ( pbOffsetLine( 1 ) >>1 ), SCR_WIDTH - pbOffsetChar( 6 ), menu[i].y + ( pbOffsetLine( 1 ) >>1 ), MF_COLOR_TEXT_LABEL );
+		} else{
+			col_offset = 0;
+			row_offset = 0;
+		}
+		for( col = 0; col < menu[i].cols; col++ ){
+			col_width = ( menu[i].colsWidth && ( menu[i].colsWidth[col] == 0 ) ) ? &(menu[i].colsWidth[col]) : NULL;
+			if( menu[i].colsWidth && col ) col_offset += menu[i].colsWidth[col - 1] + 1;
+			for( row = 0; row < menu[i].rows; row++ ){
+				labelbuf[0] = '\0';
+				if( menu[i].entry[row][col].ctrl ){
+					( menu[i].entry[row][col].ctrl )(
+						MF_CM_LABEL | st_params->CurrentMessage.Sub,
+						menu[i].entry[row][col].label,
+						menu[i].entry[row][col].var,
+						menu[i].entry[row][col].arg,
+						labelbuf
+					);
+				}
+				if( labelbuf[0] == '\0' ) strutilCopy( labelbuf, menu[i].entry[row][col].label, sizeof( labelbuf ) );
+				
+				if( labelbuf[0] != '\0' ){
+					pbPrint(
+						menu[i].x + col_offset,
+						menu[i].y + row_offset + pbOffsetLine( row ),
+						(
+							i == st_params->Menu.CurTable && row == st_params->Menu.CurRow && col == st_params->Menu.CurCol ? MF_COLOR_TEXT_FC :
+							menu[i].entry[row][col].active ? MF_COLOR_TEXT_FG :
+							                                 MF_COLOR_TEXT_INACT
+						),
+						MF_COLOR_TEXT_BG,
+						labelbuf
+					);
+					
+					if( col_width ){
+						width = mf_label_width( labelbuf );
+						if( *col_width < width ) *col_width = width;
+					}
+				}
 			}
-		} else if( st_params->lastDialogType != dialog ){
-			message = MF_CM_DIALOG_FINISH;
-			st_params->lastDialogType = dialog;
-			mfMenuResetKeyRepeat();
-		} else{
-			message = MF_CM_PROC;
 		}
-		
-		/* ダイアログを描画 */
-		mfMenuDrawDialog( dialog, true );
-	} else{
-		message = MF_CM_PROC;
 	}
 	
-	/* ダイアログメッセージの場合は先行処理 */
-	if( message != MF_CM_PROC ){
-		if( message != MF_CM_EXTRA && menu[st_params->menu.currentTable].entry[st_params->menu.currentRow][st_params->menu.currentCol].ctrl ){
-			if( ! ( menu[st_params->menu.currentTable].entry[st_params->menu.currentRow][st_params->menu.currentCol].ctrl )(
-				message,
-				menu[st_params->menu.currentTable].entry[st_params->menu.currentRow][st_params->menu.currentCol].label,
-				menu[st_params->menu.currentTable].entry[st_params->menu.currentRow][st_params->menu.currentCol].var,
-				menu[st_params->menu.currentTable].entry[st_params->menu.currentRow][st_params->menu.currentCol].arg,
-				NULL
-			) ) return false;
-		}
-		if( message == MF_CM_DIALOG_FINISH ){
-			message = MF_CM_PROC;
+	
+	if( ! ( opt & MF_MENU_DISPLAY_ONLY ) ){
+		MfCtrlMessage ctrlmsg;
+		
+		if( st_params->Extra.Proc ){
+			/* 拡張関数が設定されていれば実行 */
+			( st_params->Extra.Proc )( MF_MM_PROC | st_params->CurrentMessage.Sub, st_params->Extra.Argp );
+			ctrlmsg = ( st_params->Extra.Proc ? MF_CM_WAIT : MF_CM_CONTINUE );
+		} else if( mfMenuMaskDialogMessage( st_params->CurrentMessage.Sub ) ){
+			ctrlmsg = ( ! ( st_params->CurrentMessage.Sub & MF_DM_FINISH ) ? MF_CM_WAIT : MF_CM_CONTINUE );
 		} else{
-			return true;
+			ctrlmsg = MF_CM_PROC;
 		}
+		
+		if( menu[st_params->Menu.CurTable].entry[st_params->Menu.CurRow][st_params->Menu.CurCol].active ){
+			if( menu[st_params->Menu.CurTable].entry[st_params->Menu.CurRow][st_params->Menu.CurCol].ctrl ){
+				if( !
+					( menu[st_params->Menu.CurTable].entry[st_params->Menu.CurRow][st_params->Menu.CurCol].ctrl )(
+						ctrlmsg | st_params->CurrentMessage.Sub,
+						menu[st_params->Menu.CurTable].entry[st_params->Menu.CurRow][st_params->Menu.CurCol].label,
+						menu[st_params->Menu.CurTable].entry[st_params->Menu.CurRow][st_params->Menu.CurCol].var,
+						menu[st_params->Menu.CurTable].entry[st_params->Menu.CurRow][st_params->Menu.CurCol].arg,
+						NULL
+					)
+				) return false;
+			}
+			if( st_params->CurrentMessage.Sub & ( MF_DM_START | MF_DM_UPDATE ) ) return true;
+		}
+	} else{
+		return true;
 	}
+	
+	/* 拡張関数が設定されていればここまで */
+	if( st_params->Extra.Proc ) return true;
 	
 	/* BACKの検出 */
 	if( mfMenuIsPressed( mfMenuCancelButton() ) ) return false;
 	
-	/* オプション処理 */
-	if( ( opt & MF_MENU_DISPLAY_ONLY ) || message == MF_CM_EXTRA ) return true;
-	
 	/* 情報バーのデータを取得 */
 	{
-		unsigned int opt = menu[st_params->menu.currentTable].cols == 1 ? 0 : MF_MENU_INFOTEXT_MULTICOLUMN_CTRL;
+		unsigned int opt = menu[st_params->Menu.CurTable].cols == 1 ? 0 : MF_MENU_INFOTEXT_MULTICOLUMN_CTRL;
 		
-		if( menu[st_params->menu.currentTable].entry[st_params->menu.currentRow][st_params->menu.currentCol].active ){
-			( menu[st_params->menu.currentTable].entry[st_params->menu.currentRow][st_params->menu.currentCol].ctrl )(
-				MF_CM_INFO,
-				menu[st_params->menu.currentTable].entry[st_params->menu.currentRow][st_params->menu.currentCol].label,
-				menu[st_params->menu.currentTable].entry[st_params->menu.currentRow][st_params->menu.currentCol].var,
-				menu[st_params->menu.currentTable].entry[st_params->menu.currentRow][st_params->menu.currentCol].arg,
+		if( menu[st_params->Menu.CurTable].entry[st_params->Menu.CurRow][st_params->Menu.CurCol].active ){
+			( menu[st_params->Menu.CurTable].entry[st_params->Menu.CurRow][st_params->Menu.CurCol].ctrl )(
+				MF_CM_INFO | st_params->CurrentMessage.Sub,
+				menu[st_params->Menu.CurTable].entry[st_params->Menu.CurRow][st_params->Menu.CurCol].label,
+				menu[st_params->Menu.CurTable].entry[st_params->Menu.CurRow][st_params->Menu.CurCol].var,
+				menu[st_params->Menu.CurTable].entry[st_params->Menu.CurRow][st_params->Menu.CurCol].arg,
 				&opt
 			);
 		}
-		if( st_params->info.text[0] == '\0' ) mfMenuSetInfoText( MF_MENU_INFOTEXT_COMMON_CTRL, "" );
+		if( st_params->Info.Text[0] == '\0' ) mfMenuSetInfoText( MF_MENU_INFOTEXT_COMMON_CTRL, "" );
 	}
 	
 	/* 現在の位置をバックアップ */
-	dupe_pos = st_params->menu;
+	dupe_pos = st_params->Menu;
 	
 	/* 操作 */
 	while( refind ){
 		refind = false;
 		
 		if( mfMenuIsPressed( PSP_CTRL_UP ) ){
-			if( st_params->menu.currentRow ){
-				st_params->menu.currentRow--;
-			} else if( ! mf_menu_move_table( MF_MENU_MOVE_UP, menu, menucnt, &(st_params->menu) ) ){
+			if( st_params->Menu.CurRow ){
+				st_params->Menu.CurRow--;
+			} else if( ! mf_menu_move_table( MF_MENU_MOVE_UP, menu, cnt, &(st_params->Menu) ) ){
 				refind = true;
 				break;
 			}
 		} else if( mfMenuIsPressed( PSP_CTRL_DOWN ) ){
-			if( st_params->menu.currentRow < menu[st_params->menu.currentTable].rows - 1 ){
-				st_params->menu.currentRow++;
-			} else if( ! mf_menu_move_table( MF_MENU_MOVE_DOWN, menu, menucnt, &(st_params->menu) ) ){
+			if( st_params->Menu.CurRow < menu[st_params->Menu.CurTable].rows - 1 ){
+				st_params->Menu.CurRow++;
+			} else if( ! mf_menu_move_table( MF_MENU_MOVE_DOWN, menu, cnt, &(st_params->Menu) ) ){
 				refind = true;
 				break;
 			}
 		} else if( mfMenuIsPressed( PSP_CTRL_LEFT ) ){
-			if( st_params->menu.currentCol ){
-				st_params->menu.currentCol--;
-			} else if( ! mf_menu_move_table( MF_MENU_MOVE_LEFT, menu, menucnt, &(st_params->menu) ) ){
+			if( st_params->Menu.CurCol ){
+				st_params->Menu.CurCol--;
+			} else if( ! mf_menu_move_table( MF_MENU_MOVE_LEFT, menu, cnt, &(st_params->Menu) ) ){
 				refind = true;
 				break;
 			}
 		} else if( mfMenuIsPressed( PSP_CTRL_RIGHT ) ){
-			if( st_params->menu.currentCol < menu[st_params->menu.currentTable].cols - 1 ){
-				st_params->menu.currentCol++;
-			} else if( ! mf_menu_move_table( MF_MENU_MOVE_RIGHT, menu, menucnt, &(st_params->menu) ) ){
+			if( st_params->Menu.CurCol < menu[st_params->Menu.CurTable].cols - 1 ){
+				st_params->Menu.CurCol++;
+			} else if( ! mf_menu_move_table( MF_MENU_MOVE_RIGHT, menu, cnt, &(st_params->Menu) ) ){
 				refind = true;
 				break;
 			}
 		}
 		
-		if( ! menu[st_params->menu.currentTable].entry[st_params->menu.currentRow][st_params->menu.currentCol].active ){
+		if( ! menu[st_params->Menu.CurTable].entry[st_params->Menu.CurRow][st_params->Menu.CurCol].active ){
 			short pos_pos, pos_neg;
 			if( mfMenuIsAnyPressed( PSP_CTRL_UP | PSP_CTRL_DOWN ) ){
 				refind = true;
-				pos_pos = st_params->menu.currentCol + 1;
-				pos_neg = st_params->menu.currentCol - 1;
+				pos_pos = st_params->Menu.CurCol + 1;
+				pos_neg = st_params->Menu.CurCol - 1;
 				while( refind && ( pos_pos >= 0 || pos_neg >= 0 ) ){
-					if( pos_pos >= menu[st_params->menu.currentTable].cols ) pos_pos = -1;
+					if( pos_pos >= menu[st_params->Menu.CurTable].cols ) pos_pos = -1;
 					
 					if( pos_neg >= 0 ){
-						if( menu[st_params->menu.currentTable].entry[st_params->menu.currentRow][pos_neg].active ){
-							st_params->menu.currentCol = pos_neg;
+						if( menu[st_params->Menu.CurTable].entry[st_params->Menu.CurRow][pos_neg].active ){
+							st_params->Menu.CurCol = pos_neg;
 							refind = false;
 						}
 						pos_neg--;
 					}else if( pos_pos >= 0 ){
-						if( menu[st_params->menu.currentTable].entry[st_params->menu.currentRow][pos_pos].active ){
-							st_params->menu.currentCol = pos_pos;
+						if( menu[st_params->Menu.CurTable].entry[st_params->Menu.CurRow][pos_pos].active ){
+							st_params->Menu.CurCol = pos_pos;
 							refind = false;
 						}
 						pos_pos++;
@@ -527,20 +553,20 @@ bool mfMenuDrawTables( MfMenuTable menu[], unsigned short menucnt, unsigned int 
 				}
 			} else if( mfMenuIsAnyPressed( PSP_CTRL_RIGHT | PSP_CTRL_LEFT ) ){
 				refind = true;
-				pos_pos = st_params->menu.currentRow + 1;
-				pos_neg = st_params->menu.currentRow - 1;
+				pos_pos = st_params->Menu.CurRow + 1;
+				pos_neg = st_params->Menu.CurRow - 1;
 				while( refind && ( pos_pos >= 0 || pos_neg >= 0 ) ){
-					if( pos_pos >= menu[st_params->menu.currentTable].rows ) pos_pos = -1;
+					if( pos_pos >= menu[st_params->Menu.CurTable].rows ) pos_pos = -1;
 					
 					if( pos_neg >= 0 ){
-						if( menu[st_params->menu.currentTable].entry[pos_neg][st_params->menu.currentCol].active ){
-							st_params->menu.currentRow = pos_neg;
+						if( menu[st_params->Menu.CurTable].entry[pos_neg][st_params->Menu.CurCol].active ){
+							st_params->Menu.CurRow = pos_neg;
 							refind = false;
 						}
 						pos_neg--;
 					}else if( pos_pos >= 0 ){
-						if( menu[st_params->menu.currentTable].entry[pos_pos][st_params->menu.currentCol].active ){
-							st_params->menu.currentRow = pos_pos;
+						if( menu[st_params->Menu.CurTable].entry[pos_pos][st_params->Menu.CurCol].active ){
+							st_params->Menu.CurRow = pos_pos;
 							refind = false;
 						}
 						pos_pos++;
@@ -548,84 +574,61 @@ bool mfMenuDrawTables( MfMenuTable menu[], unsigned short menucnt, unsigned int 
 				}
 			}
 		}
-		
-		if( menu[st_params->menu.currentTable].entry[st_params->menu.currentRow][st_params->menu.currentCol].active ){
-			if( ! ( menu[st_params->menu.currentTable].entry[st_params->menu.currentRow][st_params->menu.currentCol].ctrl )(
-				message,
-				menu[st_params->menu.currentTable].entry[st_params->menu.currentRow][st_params->menu.currentCol].label,
-				menu[st_params->menu.currentTable].entry[st_params->menu.currentRow][st_params->menu.currentCol].var,
-				menu[st_params->menu.currentTable].entry[st_params->menu.currentRow][st_params->menu.currentCol].arg,
-				NULL
-			) ) return false;
-		}
 	}
 	
-	if( refind ) st_params->menu = dupe_pos;
+	if( refind ) st_params->Menu = dupe_pos;
 	
 	return true;
 }
 
-
 unsigned int mfMenuAcceptButton( void )
 {
-	return st_params->ctrl.acceptButton;
+	return st_params->Ctrl.Accept.Button;
 }
 
 unsigned int mfMenuCancelButton( void )
 {
-	return st_params->ctrl.cancelButton;
+	return st_params->Ctrl.Cancel.Button;
 }
 
 char *mfMenuAcceptSymbol( void )
 {
-	return st_params->ctrl.acceptSymbol;
+	return st_params->Ctrl.Accept.Symbol;
 }
 
 char *mfMenuCancelSymbol( void )
 {
-	return st_params->ctrl.cancelSymbol;
+	return st_params->Ctrl.Cancel.Symbol;
 }
 
 inline SceCtrlData *mfMenuGetCurrentPadData( void )
 {
-	if( ! st_params ) return 0;
-	
-	return st_params->ctrl.pad;
+	return st_params->Ctrl.Pad;
 }
 
 inline unsigned int mfMenuGetCurrentButtons( void )
 {
-	if( ! st_params ) return 0;
-	
-	return st_params->ctrl.pad->Buttons;
+	return st_params->Ctrl.Pad->Buttons;
 }
 
 inline unsigned char mfMenuGetCurrentAnalogStickX( void )
 {
-	if( ! st_params ) return 0;
-	
-	return st_params->ctrl.pad->Lx;
+	return st_params->Ctrl.Pad->Lx;
 }
 
 inline unsigned char mfMenuGetCurrentAnalogStickY( void )
 {
-	if( ! st_params ) return 0;
-	
-	return st_params->ctrl.pad->Ly;
+	return st_params->Ctrl.Pad->Ly;
 }
 
 inline MfHprmKey mfMenuGetCurrentHprmKey( void )
 {
-	if( ! st_params ) return 0;
-	
-	return *(st_params->ctrl.hprmKey);
+	return *(st_params->Ctrl.HprmKey);
 }
 
 inline void mfMenuResetKeyRepeat( void )
 {
-	if( ! st_params ) return;
-	
-	padctrlResetRepeat( st_params->ctrl.uid );
+	padctrlResetRepeat( st_params->Ctrl.Uid );
 }
 
 unsigned int mfMenuScroll( int selected, unsigned int viewlines, unsigned int maxlines )
@@ -680,64 +683,88 @@ void mfMenuActiveTableEntry( MfMenuTable *menu, unsigned short tableid, unsigned
 
 void mfMenuInactiveTableEntry( MfMenuTable *menu, unsigned short tableid, unsigned short row, unsigned short col )
 {
-	menu[--tableid].entry[--row][--col].active = false;
+	tableid--;
+	row--;
+	col--;
+	menu[tableid].entry[row][col].active = false;
 }
 
-static bool mf_menu_move_table( enum mf_menu_move_directions dir, MfMenuTable *menu, unsigned short menucnt, struct mf_menu_pos *pos )
+void mfMenuActiveTable( MfMenuTable *menu, unsigned short tableid )
+{
+	unsigned short row, col;
+	
+	for( row = menu[tableid - 1].rows; row; row-- ){
+		for( col = menu[tableid - 1].cols; col; col-- ){
+			mfMenuActiveTableEntry( menu, tableid, row , col );
+		}
+	}
+}
+
+void mfMenuInactiveTable( MfMenuTable *menu, unsigned short tableid )
+{
+	unsigned short row, col;
+	
+	for( row = menu[tableid - 1].rows; row; row-- ){
+		for( col = menu[tableid - 1].cols; col; col-- ){
+			mfMenuInactiveTableEntry( menu, tableid, row , col );
+		}
+	}
+}
+
+static bool mf_menu_move_table( enum MfMenuMoveDirection dir, MfMenuTable *menu, unsigned short menucnt, struct MfMenuPosition *pos )
 {
 	unsigned short i;
-	unsigned short target_table = pos->currentTable;
+	unsigned short target_table = pos->CurTable;
 	unsigned int   save_diff_x  = ~0;
 	unsigned int   save_diff_y  = ~0;
 	
 	/* 入力方向にもっとも近いテーブルを探す */
-	
 	dbgprint( "Out of menu-range. find a next table..." );
 	switch( dir ){
 		case MF_MENU_MOVE_UP:
 			for( i = 0; i < menucnt; i++ ){
-				if( menu[pos->currentTable].y <= menu[i].y ) continue;
-				if( mf_menu_nearest_table( abs( menu[pos->currentTable].y - menu[i].y ), abs( menu[pos->currentTable].x - menu[i].x ), &save_diff_y, &save_diff_x ) ){
+				if( menu[pos->CurTable].y <= menu[i].y ) continue;
+				if( mf_menu_nearest_table( abs( menu[pos->CurTable].y - menu[i].y ), abs( menu[pos->CurTable].x - menu[i].x ), &save_diff_y, &save_diff_x ) ){
 					target_table = i;
 				}
 			}
-			if( target_table != pos->currentTable ){
+			if( target_table != pos->CurTable ){
 				return mf_menu_select_table_vertical( menu, target_table, pos, false );
 			} else{
 				break;
 			}
 		case MF_MENU_MOVE_RIGHT:
 			for( i = 0; i < menucnt; i++ ){
-				if( menu[pos->currentTable].x >= menu[i].x ) continue;
-				if( mf_menu_nearest_table( abs( menu[pos->currentTable].x - menu[i].x ), abs( menu[pos->currentTable].y - menu[i].y ), &save_diff_x, &save_diff_y ) ){
+				if( menu[pos->CurTable].x >= menu[i].x ) continue;
+				if( mf_menu_nearest_table( abs( menu[pos->CurTable].x - menu[i].x ), abs( menu[pos->CurTable].y - menu[i].y ), &save_diff_x, &save_diff_y ) ){
 					target_table = i;
 				}
 			}
-			if( target_table != pos->currentTable ){
+			if( target_table != pos->CurTable ){
 				return mf_menu_select_table_horizontal( menu, target_table, pos, false );
 			} else{
 				break;
 			}
 		case MF_MENU_MOVE_DOWN:
 			for( i = 0; i < menucnt; i++ ){
-				if( menu[pos->currentTable].y >= menu[i].y ) continue;
-				if( mf_menu_nearest_table( abs( menu[pos->currentTable].y - menu[i].y ), abs( menu[pos->currentTable].x - menu[i].x ), &save_diff_y, &save_diff_x ) ){
+				if( menu[pos->CurTable].y >= menu[i].y ) continue;
+				if( mf_menu_nearest_table( abs( menu[pos->CurTable].y - menu[i].y ), abs( menu[pos->CurTable].x - menu[i].x ), &save_diff_y, &save_diff_x ) ){
 					target_table = i;
 				}
 			}
-			if( target_table != pos->currentTable ){
+			if( target_table != pos->CurTable ){
 				return mf_menu_select_table_vertical( menu, target_table, pos, false );
 			} else{
 				break;
 			}
 		case MF_MENU_MOVE_LEFT:
 			for( i = 0; i < menucnt; i++ ){
-				if( menu[pos->currentTable].x <= menu[i].x ) continue;
-				if( mf_menu_nearest_table( abs( menu[pos->currentTable].x - menu[i].x ), abs( menu[pos->currentTable].y - menu[i].y ), &save_diff_x, &save_diff_y ) ){
+				if( menu[pos->CurTable].x <= menu[i].x ) continue;
+				if( mf_menu_nearest_table( abs( menu[pos->CurTable].x - menu[i].x ), abs( menu[pos->CurTable].y - menu[i].y ), &save_diff_x, &save_diff_y ) ){
 					target_table = i;
 				}
 			}
-			if( target_table != pos->currentTable ){
+			if( target_table != pos->CurTable ){
 				return mf_menu_select_table_horizontal( menu, target_table, pos, false );
 			} else{
 				break;
@@ -751,32 +778,32 @@ static bool mf_menu_move_table( enum mf_menu_move_directions dir, MfMenuTable *m
 	switch( dir ){
 		case MF_MENU_MOVE_UP:
 			for( i = 0; i < menucnt; i++ ){
-				if( menu[pos->currentTable].y >= menu[i].y ) continue;
-				if( mf_menu_farest_table( abs( menu[pos->currentTable].y - menu[i].y ), abs( menu[pos->currentTable].x - menu[i].x ), &save_diff_y, &save_diff_x ) ){
+				if( menu[pos->CurTable].y >= menu[i].y ) continue;
+				if( mf_menu_farest_table( abs( menu[pos->CurTable].y - menu[i].y ), abs( menu[pos->CurTable].x - menu[i].x ), &save_diff_y, &save_diff_x ) ){
 					target_table = i;
 				}
 			}
 			return mf_menu_select_table_vertical( menu, target_table, pos, true );
 		case MF_MENU_MOVE_RIGHT:
 			for( i = 0; i < menucnt; i++ ){
-				if( menu[pos->currentTable].x <= menu[i].x ) continue;
-				if( mf_menu_farest_table( abs( menu[pos->currentTable].x - menu[i].x ), abs( menu[pos->currentTable].y - menu[i].y ), &save_diff_x, &save_diff_y ) ){
+				if( menu[pos->CurTable].x <= menu[i].x ) continue;
+				if( mf_menu_farest_table( abs( menu[pos->CurTable].x - menu[i].x ), abs( menu[pos->CurTable].y - menu[i].y ), &save_diff_x, &save_diff_y ) ){
 					target_table = i;
 				}
 			}
 			return mf_menu_select_table_horizontal( menu, target_table, pos, true );
 		case MF_MENU_MOVE_DOWN:
 			for( i = 0; i < menucnt; i++ ){
-				if( menu[pos->currentTable].y <= menu[i].y ) continue;
-				if( mf_menu_farest_table( abs( menu[pos->currentTable].y - menu[i].y ), abs( menu[pos->currentTable].x - menu[i].x ), &save_diff_y, &save_diff_x ) ){
+				if( menu[pos->CurTable].y <= menu[i].y ) continue;
+				if( mf_menu_farest_table( abs( menu[pos->CurTable].y - menu[i].y ), abs( menu[pos->CurTable].x - menu[i].x ), &save_diff_y, &save_diff_x ) ){
 					target_table = i;
 				}
 			}
 			return mf_menu_select_table_vertical( menu, target_table, pos, true );
 		case MF_MENU_MOVE_LEFT:
 			for( i = 0; i < menucnt; i++ ){
-				if( menu[pos->currentTable].x >= menu[i].x ) continue;
-				if( mf_menu_farest_table( abs( menu[pos->currentTable].x - menu[i].x ), abs( menu[pos->currentTable].y - menu[i].y ), &save_diff_x, &save_diff_y ) ){
+				if( menu[pos->CurTable].x >= menu[i].x ) continue;
+				if( mf_menu_farest_table( abs( menu[pos->CurTable].x - menu[i].x ), abs( menu[pos->CurTable].y - menu[i].y ), &save_diff_x, &save_diff_y ) ){
 					target_table = i;
 				}
 			}
@@ -824,14 +851,14 @@ static bool mf_menu_farest_table( unsigned int pri, unsigned int sec, unsigned i
 	return false;
 }
 
-static bool mf_menu_select_table_horizontal( MfMenuTable *menu, unsigned short targ_tid, struct mf_menu_pos *pos, bool reverse )
+static bool mf_menu_select_table_horizontal( MfMenuTable *menu, unsigned short targ_tid, struct MfMenuPosition *pos, bool reverse )
 {
-	if( pos->currentTable == targ_tid ){
-		dbgprintf( "Selected same table id: Col %d, %d", pos->currentCol, menu[targ_tid].cols );
-		pos->currentCol = pos->currentCol ? 0 : menu[targ_tid].cols - 1;
+	if( pos->CurTable == targ_tid ){
+		dbgprintf( "Selected same table id: Col %d, %d", pos->CurCol, menu[targ_tid].cols );
+		pos->CurCol = pos->CurCol ? 0 : menu[targ_tid].cols - 1;
 	} else{
 		unsigned short i, targ_row = 0, targ_col = 0;
-		unsigned int current_y = menu[pos->currentTable].y + pbOffsetLine( pos->currentRow );
+		unsigned int current_y = menu[pos->CurTable].y + pbOffsetLine( pos->CurRow );
 		unsigned int diff_y, last_diff_y = ~0;
 		
 		for( i = 0; i < menu[targ_tid].rows; i++ ){
@@ -842,34 +869,33 @@ static bool mf_menu_select_table_horizontal( MfMenuTable *menu, unsigned short t
 			}
 		}
 		
-		if( menu[pos->currentTable].x > menu[targ_tid].x ){
+		if( menu[pos->CurTable].x > menu[targ_tid].x ){
 			targ_col = reverse ? 0 : menu[targ_tid].cols - 1;
 		} else{
 			targ_col = reverse ? menu[targ_tid].cols - 1 : 0;
 		}
 		
-		pos->currentTable = targ_tid;;
-		pos->currentRow   = targ_row;
-		pos->currentCol   = targ_col;
+		pos->CurTable = targ_tid;;
+		pos->CurRow   = targ_row;
+		pos->CurCol   = targ_col;
 	}
 	
 	return true;
 }
 
-static bool mf_menu_select_table_vertical( MfMenuTable *menu, unsigned short targ_tid, struct mf_menu_pos *pos, bool reverse )
+static bool mf_menu_select_table_vertical( MfMenuTable *menu, unsigned short targ_tid, struct MfMenuPosition *pos, bool reverse )
 {
-	
-	if( pos->currentTable == targ_tid ){
-		dbgprintf( "Selected same table id: Row %d, %d", pos->currentRow, menu[targ_tid].rows );
-		pos->currentRow = pos->currentRow ? 0 : menu[targ_tid].rows - 1;
+	if( pos->CurTable == targ_tid ){
+		dbgprintf( "Selected same table id: Row %d, %d", pos->CurRow, menu[targ_tid].rows );
+		pos->CurRow = pos->CurRow ? 0 : menu[targ_tid].rows - 1;
 	} else{
 		unsigned short i, targ_row = 0, targ_col = 0;
-		unsigned int current_x = menu[pos->currentTable].x;
+		unsigned int current_x = menu[pos->CurTable].x;
 		unsigned int comp_x, diff_x, last_diff_x = ~0;
 
-		if( menu[pos->currentTable].colsWidth ){
-			for( i = 0; i < pos->currentCol; i++ ){
-				current_x += menu[pos->currentTable].colsWidth[i];
+		if( menu[pos->CurTable].colsWidth ){
+			for( i = 0; i < pos->CurCol; i++ ){
+				current_x += menu[pos->CurTable].colsWidth[i];
 			}
 		}
 		
@@ -883,15 +909,15 @@ static bool mf_menu_select_table_vertical( MfMenuTable *menu, unsigned short tar
 			if( menu[targ_tid].colsWidth ) comp_x += menu[targ_tid].colsWidth[i];
 		}
 		
-		if( menu[pos->currentTable].y > menu[targ_tid].y ){
+		if( menu[pos->CurTable].y > menu[targ_tid].y ){
 			targ_row = reverse ? 0 : menu[targ_tid].rows - 1;
 		} else{
 			targ_row = reverse ? menu[targ_tid].rows - 1 : 0;
 		}
 		
-		pos->currentTable = targ_tid;
-		pos->currentRow   = targ_row;
-		pos->currentCol   = targ_col;
+		pos->CurTable = targ_tid;
+		pos->CurRow   = targ_row;
+		pos->CurCol   = targ_col;
 	}
 	return true;
 }
@@ -912,20 +938,20 @@ static unsigned int mf_label_width( char *str )
 		lnstart = lnend++;
 	}
 	
-	return max_width ? max_width : strlen( str );
+	return pbOffsetChar( max_width ? max_width : strlen( str ) );
 }
 
-static void mf_menu_init_tables( MfMenuTable *menu, unsigned short menucnt )
+static void mf_menu_send_message_for_items( MfMenuTable *menu, unsigned short menucnt, MfMessage message )
 {
 	unsigned short i, row, col;
 	
-	dbgprint( "Sending message MF_CM_INIT to menu items..." );
+	dbgprintf( "Sending message %X to menu items...", message );
 	for( i = 0; i < menucnt; i++ ){
 		for( row = 0; row < menu[i].rows; row++ ){
 			for( col = 0; col < menu[i].cols; col++ ){
 				dbgprintf( "Init \"%s\" (%d,%d,%d)", menu[i].entry[row][col].label, i, row, col );
 				if( menu[i].entry[row][col].ctrl ) ( menu[i].entry[row][col].ctrl )(
-					MF_CM_INIT,
+					message,
 					menu[i].entry[row][col].label,
 					menu[i].entry[row][col].var,
 					menu[i].entry[row][col].arg,
@@ -934,69 +960,14 @@ static void mf_menu_init_tables( MfMenuTable *menu, unsigned short menucnt )
 			}
 		}
 	}
-	dbgprint( "MF_CM_INIT completed" );
-}
-
-static void mf_menu_draw_tables( MfMenuTable *menu, unsigned short menucnt, struct mf_menu_pos *pos )
-{
-	unsigned short i, row, col;
-	unsigned int *col_width, width, col_offset, row_offset;
-	char labelbuf[MF_CTRL_BUFFER_LENGTH];
-	
-	for( i = 0; i < menucnt; i++ ){
-		if( menu[i].label ){
-			col_offset = pbOffsetChar( 2 );
-			row_offset = pbOffsetLine( 1 ) + 2;
-			pbPrint( menu[i].x, menu[i].y,  MF_COLOR_TEXT_LABEL, MF_COLOR_TEXT_BG, menu[i].label );
-			pbLineRel( menu[i].x, menu[i].y + pbOffsetLine( 1 ), pbOffsetChar( 40 ), 0, MF_COLOR_TEXT_LABEL );
-		} else{
-			col_offset = 0;
-			row_offset = 0;
-		}
-		for( col = 0; col < menu[i].cols; col++ ){
-			col_width = ( menu[i].colsWidth && ( menu[i].colsWidth[col] == 0 ) ) ? &(menu[i].colsWidth[col]) : NULL;
-			if( menu[i].colsWidth && col ) col_offset += pbOffsetChar( menu[i].colsWidth[col - 1] + 1 );
-			for( row = 0; row < menu[i].rows; row++ ){
-				labelbuf[0] = '\0';
-				if( menu[i].entry[row][col].ctrl ){
-					( menu[i].entry[row][col].ctrl )(
-						MF_CM_LABEL,
-						menu[i].entry[row][col].label,
-						menu[i].entry[row][col].var,
-						menu[i].entry[row][col].arg,
-						labelbuf
-					);
-				}
-				if( labelbuf[0] == '\0' ) strutilCopy( labelbuf, menu[i].entry[row][col].label, sizeof( labelbuf ) );
-				
-				if( labelbuf[0] != '\0' ){
-					pbPrint(
-						menu[i].x + col_offset,
-						menu[i].y + row_offset + pbOffsetLine( row ),
-						(
-							i == pos->currentTable && row == pos->currentRow && col == pos->currentCol ? MF_COLOR_TEXT_FC :
-							menu[i].entry[row][col].active ? MF_COLOR_TEXT_FG :
-							                                 MF_COLOR_TEXT_INACT
-						),
-						MF_COLOR_TEXT_BG,
-						labelbuf
-					);
-					
-					if( col_width ){
-						width = mf_label_width( labelbuf );
-						if( *col_width < width ) *col_width = width;
-					}
-				}
-			}
-		}
-	}
+	dbgprint( "Completed" );
 }
 
 static void mf_root_menu( MfMenuMessage message )
 {
 	static MfMenuTable *menu;
 	static HeapUID pheap;
-	static struct mf_main_pref *main_pref;
+	static struct MfMenuMainPref *main_pref;
 	
 	switch( message ){
 		case MF_MM_INIT:
@@ -1007,19 +978,21 @@ static void mf_root_menu( MfMenuMessage message )
 				4, 1,
 				gMftabEntryCount, 1
 			);
-			pheap = mfHeapCreate( 2, sizeof( struct mf_main_pref ) + sizeof( MfCtrlDefGetButtonsPref ) );
+			pheap = mfMemoryTempHeapCreate( 2, sizeof( struct MfMenuMainPref ) + sizeof( MfCtrlDefGetButtonsPref ) );
 			if( ! menu || ! pheap ){
 				if( menu  ) mfMenuDestroyTables( menu );
-				if( pheap ) mfHeapDestroy( pheap );
+				if( pheap ) mfMemoryHeapDestroy( pheap );
 				return;
 			}
 			
 			{
 				unsigned short row;
 				void *menuproc;
+				MfCtrlDefGetButtonsPref *hotkey_pref = mfMemoryHeapCalloc( pheap, sizeof( MfCtrlDefGetButtonsPref ) );;
+				main_pref = mfMemoryHeapCalloc( pheap, sizeof( struct MfMenuMainPref ) );
+				dbgprintf( "%d", sceKernelHeapTotalFreeSize( pheap ) );
+				dbgprintf( "%p %p", main_pref, hotkey_pref );
 				
-				MfCtrlDefGetButtonsPref *hotkey_pref = mfHeapCalloc( pheap, sizeof( MfCtrlDefGetButtonsPref ) );
-				main_pref = mfHeapCalloc( pheap, sizeof( struct mf_main_pref ) );
 				main_pref->engine             = mfIsEnabled();
 				main_pref->menu               = mfGetMenuButtons();
 				main_pref->toggle             = mfGetToggleButtons();
@@ -1028,7 +1001,7 @@ static void mf_root_menu( MfMenuMessage message )
 				hotkey_pref->availButtons = MF_HOTKEY_BUTTONS;
 				
 				mfMenuSetTablePosition( menu, 1, pbOffsetChar( 5 ), pbOffsetLine( 4 ) + 2 );
-				mfMenuSetTableEntry( menu, 1, 1, 1, MF_STR_HOME_MACROFIRE_ENGINE, mf_menu_ctrl_engine_stat, &(main_pref->engine), NULL );
+				mfMenuSetTableEntry( menu, 1, 1, 1, MF_STR_HOME_MACROFIRE_ENGINE, mf_control_engine, &(main_pref->engine), NULL );
 				
 				mfMenuSetTablePosition( menu, 2, pbOffsetChar( 5 ), pbOffsetLine( 6 ) + 2 );
 				mfMenuSetTableLabel( menu, 2, MF_STR_HOME_MACROFIRE_PREFERENCE );
@@ -1055,15 +1028,15 @@ static void mf_root_menu( MfMenuMessage message )
 			mfSetToggleButtons( main_pref->toggle );
 			
 			if( mfNotificationThreadId() && ! main_pref->statusNotification ){
-				dbgprint( "Notification thread shutting down..." );
+				dbgprint( "Notification thread is shutting down..." );
 				mfNotificationShutdownStart();
 			} else if( ! mfNotificationThreadId() && main_pref->statusNotification ){
-				dbgprint( "Notification thread starting..." );
+				dbgprint( "Notification thread is starting..." );
 				mfNotificationStart();
 			}
 			
 			mfMenuDestroyTables( menu );
-			mfHeapDestroy( pheap );
+			mfMemoryHeapDestroy( pheap );
 			return;
 		default:
 			if( ! mfMenuDrawTables( menu, 3, MF_MENU_NO_OPTIONS ) ) mfMenuProc( NULL );
@@ -1073,24 +1046,117 @@ static void mf_root_menu( MfMenuMessage message )
 /*-----------------------------------------------
 	メニュー メインループ
 -----------------------------------------------*/
+static bool mf_menu_init_params( struct MfMenuParams *params, SceCtrlData *pad, MfHprmKey *hk )
+{
+	int ox_swap;
+	
+	/* メニュースタックを確保 */
+	if( ! mf_menu_stack( &(st_params->Stack), MF_MENU_STACK_CREATE, NULL, NULL ) ) return false;
+	
+	/* ボタンシンボルリスト生成 */
+	st_params->ButtonSymbolTable = padutilCreateButtonSymbols();
+	if( ! st_params->ButtonSymbolTable ) return false;
+	
+	/* ダイアログ初期化 */
+	mfDialogInit( st_pref.Remap );
+	st_params->LastDialogType = mfDialogCurrentType();
+	
+	/* コントロール */
+	st_params->Ctrl.Pad     = pad;
+	st_params->Ctrl.HprmKey = hk;
+	st_params->Ctrl.Uid     = padctrlNew();
+	if( st_params->Ctrl.Uid < 0 ){
+		dbgprintf( "Failed to get a PadctrlUID: %x", st_params->Ctrl.Uid );
+		st_params->Ctrl.Uid = 0;
+		return false;
+	}
+	
+	/* ○×ボタン入れ替えチェック */
+	if( sceUtilityGetSystemParamInt( PSP_SYSTEMPARAM_ID_INT_UNKNOWN,  &ox_swap ) == PSP_SYSTEMPARAM_RETVAL_FAIL ){
+		ox_swap = PSP_UTILITY_ACCEPT_CIRCLE;
+	}
+	if( ox_swap == PSP_UTILITY_ACCEPT_CROSS ){
+		st_params->Ctrl.Accept.Button = PSP_CTRL_CROSS;
+		st_params->Ctrl.Cancel.Button = PSP_CTRL_CIRCLE;
+		st_params->Ctrl.Accept.Symbol = PB_SYM_PSP_CROSS;
+		st_params->Ctrl.Cancel.Symbol = PB_SYM_PSP_CIRCLE;
+		
+		/* ×ボタンが決定の場合、ダイアログの環境フラグをセット */
+		cdialogEnable( CDIALOG_ACCEPT_CROSS );
+	} else{
+		st_params->Ctrl.Accept.Button = PSP_CTRL_CIRCLE;
+		st_params->Ctrl.Cancel.Button = PSP_CTRL_CROSS;
+		st_params->Ctrl.Accept.Symbol = PB_SYM_PSP_CIRCLE;
+		st_params->Ctrl.Cancel.Symbol = PB_SYM_PSP_CROSS;
+	}
+	/* リピートボタンを設定 */
+	padctrlSetRepeatButtons( st_params->Ctrl.Uid,
+		PSP_CTRL_UP | PSP_CTRL_RIGHT | PSP_CTRL_DOWN | PSP_CTRL_LEFT |
+		st_params->Ctrl.Accept.Button | PSP_CTRL_SQUARE | PSP_CTRL_RTRIGGER | PSP_CTRL_LTRIGGER
+	);
+	
+	/* メッセージを初期化 */
+	st_params->CurrentMessage.Main = MF_MM_PROC; /* 最初に送るメッセージ */
+	st_params->CurrentMessage.Sub  = 0;
+	st_params->NextMessage.Main    = 0;
+	st_params->NextMessage.Sub     = 0;
+	
+	return true;
+}
+
+static bool mf_menu_init_graphics( void )
+{
+	/* pbライブラリ初期化 */
+	dbgprint( "Initializing pb..." );
+	if( sceDisplayGetFrameBuf( &(st_params->FrameBuffer.OrigAddr), &(st_params->FrameBuffer.Width), &(st_params->FrameBuffer.PixelFormat), PSP_DISPLAY_SETBUF_IMMEDIATE ) != 0 || ! st_params->FrameBuffer.OrigAddr || ! st_params->FrameBuffer.Width ) return false;
+	
+	pbInit();
+	pbEnable( PB_NO_CACHE | PB_BLEND );
+	
+	/* フレームバッファとして使用するメモリを確保 */
+	dbgprint( "Allocating memory for frame buffers..." );
+	st_params->FrameBuffer.Size = pbGetFrameBufferDataSize( st_params->FrameBuffer.PixelFormat, st_params->FrameBuffer.Width );
+	if( ! mf_alloc_buffers( &(st_params->FrameBuffer), ! st_pref.LowMemoryMode ) ) return false;
+	
+	/* クリア用背景作成 */
+	if( st_params->FrameBuffer.Clear ){
+		/* 描画準備 */
+		pbSetDisplayBuffer( st_params->FrameBuffer.PixelFormat, st_params->FrameBuffer.Clear, st_params->FrameBuffer.Width );
+		pbApply();
+		
+		/* 現在表示されている画面をクリア用背景にコピー */
+		sceDisplayWaitVblankStart();
+		sceDmacMemcpy( st_params->FrameBuffer.Clear, st_params->FrameBuffer.OrigAddr, st_params->FrameBuffer.Size );
+		
+		pbFillRect( 0, 0, SCR_WIDTH, SCR_HEIGHT, MF_COLOR_BG );
+		mf_draw_frame( false );
+	}
+	
+	/* ダブルバッファリングを有効化 */
+	if( st_params->FrameBuffer.Draw ){
+		pbSetDrawBuffer( st_params->FrameBuffer.PixelFormat, st_params->FrameBuffer.Draw, st_params->FrameBuffer.Width );
+		pbEnable( PB_DOUBLE_BUFFER );
+	}
+	pbSetDisplayBuffer( st_params->FrameBuffer.PixelFormat, st_params->FrameBuffer.Disp, st_params->FrameBuffer.Width );
+	
+	return true;
+}
+
 void mfMenuMain( SceCtrlData *pad, MfHprmKey *hk )
 {
-#ifdef MEMORY_DEBUG
-	dbgprintf( "Memory block %d leaked", memoryGetAllocCount() );
-#endif
-	
 	/* ユーザメモリからメニュー用の作業域を確保 */
-	st_params = memoryExalloc( "MacroFireMenuParams", MEMORY_USER, 0, sizeof( struct mf_menu_params ), PSP_SMEM_High, NULL );
-	dbgprintf( "Allocating memory for menu: %p: %d bytes", st_params, sizeof( struct mf_menu_params ) );
+	st_params = mfMemoryTempAlloc( sizeof( struct MfMenuParams ) );
+	dbgprintf( "Allocating memory for menu: %p: %d bytes", st_params, sizeof( struct MfMenuParams ) );
 	if( ! st_params ){
 		dbgprint( "Not enough available memory for menu" );
 		return;
 	}
-	memset( st_params, 0, sizeof( struct mf_menu_params ) );
+	memset( st_params, 0, sizeof( struct MfMenuParams ) );
 	
 	/* サスペンド/リジュームするスレッドの一覧を作成し、サスペンドする */
-	if( ! mf_menu_get_target_threads( st_params->threads.list, &(st_params->threads.count) ) ) goto DESTROY;
-	mf_menu_change_threads_stat( MF_MENU_SUSPEND_THREADS, st_params->threads.list, st_params->threads.count );
+	if( ! mf_menu_get_target_threads( st_params->Thread.List, &(st_params->Thread.Count) ) ) goto DESTROY;
+	mf_menu_change_threads_stat( MF_MENU_SUSPEND_THREADS, st_params->Thread.List, st_params->Thread.Count )
+	;
 	/* すぐに止まらないスレッドもある? */
 	sceDisplayWaitVblankStart();
 	
@@ -1100,120 +1166,41 @@ void mfMenuMain( SceCtrlData *pad, MfHprmKey *hk )
 	/* APIがフックされている場合、一時的に元に戻す */
 	if( mfIsEnabled() ) mfUnhook();
 	
-	/* メニュースタックを確保 */
-	if( ! mf_menu_stack( &(st_params->stack), MF_MENU_STACK_CREATE, NULL ) ) goto DESTROY;
+	/* paramsを初期化 */
+	if( ! mf_menu_init_params( st_params, pad, hk ) ) goto DESTROY;
 	
-	/* ボタンシンボルリスト生成 */
-	st_symbols = padutilCreateButtonSymbols();
-	if( ! st_symbols ) goto DESTROY;
+	/* グラフィックを初期化 */
+	if( ! mf_menu_init_graphics() ) goto DESTROY;
 	
-	/* pbライブラリ初期化 */
-	dbgprint( "Initializing pb..." );
-	if( sceDisplayGetFrameBuf( &(st_params->frameBuffer.origaddr), &(st_params->frameBuffer.bufferWidth), &(st_params->frameBuffer.pixelFormat), PSP_DISPLAY_SETBUF_IMMEDIATE ) != 0 || ! st_params->frameBuffer.origaddr || ! st_params->frameBuffer.bufferWidth ) goto DESTROY;
+	/* メニューフラグの初期化 */
+	mfMenuEnable( MF_MENU_SCREEN_UPDATE | MF_MENU_EXIT );
 	
-	pbInit();
-	pbEnable( PB_NO_CACHE | PB_BLEND );
-	
-	/* フレームバッファとして使用するメモリを確保 */
-	dbgprint( "Allocating memory for frame buffers..." );
-	st_params->frameBuffer.frameSize = pbGetFrameBufferDataSize( st_params->frameBuffer.pixelFormat, st_params->frameBuffer.bufferWidth );
-	if( ! mf_alloc_buffers( &(st_params->frameBuffer), st_pref.useGraphicsMem, st_pref.useVolatileMem ) ) goto DESTROY;
-	
-	/* クリア用背景作成 */
-	if( st_params->frameBuffer.clear ){
-		/* 描画準備 */
-		pbSetDisplayBuffer( st_params->frameBuffer.pixelFormat, st_params->frameBuffer.clear, st_params->frameBuffer.bufferWidth );
-		pbApply();
-		
-		/* 現在表示されている画面をクリア用背景にコピー */
-		sceDisplayWaitVblankStart();
-		sceDmacMemcpy( st_params->frameBuffer.clear, st_params->frameBuffer.origaddr, st_params->frameBuffer.frameSize );
-		
-		pbFillRect( 0, 0, SCR_WIDTH, SCR_HEIGHT, MF_COLOR_BG );
-		mf_draw_frame( false );
-	}
-	
-	/* ダブルバッファリングを有効化 */
-	if( st_params->frameBuffer.draw ){
-		pbSetDrawBuffer( st_params->frameBuffer.pixelFormat, st_params->frameBuffer.draw, st_params->frameBuffer.bufferWidth );
-		pbEnable( PB_DOUBLE_BUFFER );
-	}
-	pbSetDisplayBuffer( st_params->frameBuffer.pixelFormat, st_params->frameBuffer.display, st_params->frameBuffer.bufferWidth );
-	
-	/* ダイアログ初期化 */
-	mfDialogInit( st_pref.remap );
-	st_params->lastDialogType = mfDialogCurrentType();
-	
-	/* コントロール */
-	st_params->ctrl.pad     = pad;
-	st_params->ctrl.hprmKey = hk;
-	st_params->ctrl.uid     = padctrlNew();
-	if( st_params->ctrl.uid < 0 ){
-		dbgprintf( "Failed to get a PadctrlUID: %x", st_params->ctrl.uid );
-		st_params->ctrl.uid = 0;
-		goto DESTROY;
-	}
-	
-	{
-		/* ○×ボタン入れ替えチェック */
-		int ox_swap;
-		
-		if( sceUtilityGetSystemParamInt( PSP_SYSTEMPARAM_ID_INT_UNKNOWN,  &ox_swap ) == PSP_SYSTEMPARAM_RETVAL_FAIL ){
-			ox_swap = PSP_UTILITY_ACCEPT_CIRCLE;
-		}
-		if( ox_swap == PSP_UTILITY_ACCEPT_CROSS ){
-			st_params->ctrl.acceptButton = PSP_CTRL_CROSS;
-			st_params->ctrl.cancelButton = PSP_CTRL_CIRCLE;
-			st_params->ctrl.acceptSymbol = PB_SYM_PSP_CROSS;
-			st_params->ctrl.cancelSymbol = PB_SYM_PSP_CIRCLE;
-			
-			/* ×ボタンが決定の場合、ダイアログの環境フラグをセット */
-			cdialogEnable( CDIALOG_ACCEPT_CROSS );
-		} else{
-			st_params->ctrl.acceptButton = PSP_CTRL_CIRCLE;
-			st_params->ctrl.cancelButton = PSP_CTRL_CROSS;
-			st_params->ctrl.acceptSymbol = PB_SYM_PSP_CIRCLE;
-			st_params->ctrl.cancelSymbol = PB_SYM_PSP_CROSS;
-			
-			
-		}
-		/* リピートボタンを設定 */
-		padctrlSetRepeatButtons( st_params->ctrl.uid,
-			PSP_CTRL_UP | PSP_CTRL_RIGHT | PSP_CTRL_DOWN | PSP_CTRL_LEFT |
-			st_params->ctrl.acceptButton | PSP_CTRL_SQUARE | PSP_CTRL_RTRIGGER | PSP_CTRL_LTRIGGER
-		);
-	}
-	
-	mfMenuEnable( MF_MENU_SCREEN_UPDATE );
-	
-	/* ルートメニュー */
-	st_params->proc = (MfFuncMenu)mf_root_menu;
-	( st_params->proc )( MF_MM_INIT );
-	
-	dbgprint( "Starting menu-loop" );
-	sceDisplayWaitVblankStart();
+	/* ルートメニュー設定 */
+	st_params->Proc = (MfFuncMenu)mf_root_menu;
+	( st_params->Proc )( MF_MM_INIT );
 	
 	/* 設定したフレームバッファで描画準備 */
+	sceDisplayWaitVblankStart();
 	pbApply();
 	pbSync( PB_BUFSYNC_NEXTFRAME );
 	
+	dbgprint( "Starting menu-loop" );
 	while( gRunning ){
 		/* 背景を描画 */
-		if( st_params->frameBuffer.clear ){
-			sceDmacMemcpy( pbGetCurrentDrawBufferAddr(), st_params->frameBuffer.clear, st_params->frameBuffer.frameSize );
+		if( st_params->FrameBuffer.Clear ){
+			sceDmacMemcpy( pbGetCurrentDrawBufferAddr(), st_params->FrameBuffer.Clear, st_params->FrameBuffer.Size );
 			mf_menu_indicator();
-		} else if( st_params->frameBuffer.draw ){
-			memset( pbGetCurrentDrawBufferAddr(), 0, st_params->frameBuffer.frameSize );
+		} else if( st_params->FrameBuffer.Draw ){
+			memset( pbGetCurrentDrawBufferAddr(), 0, st_params->FrameBuffer.Size );
 			mf_draw_frame( false );
 			mf_menu_indicator();
 		} else{
-			SceCtrlData dupe_pad = *(st_params->ctrl.pad);
-			const PadutilAnalogStick *anlg_context = mfGetAnalogStickContext();
-			padutilAdjustAnalogStick( anlg_context, &dupe_pad );
-			if( ( ( dupe_pad.Buttons | padutilGetAnalogStickDirection( dupe_pad.Lx,  dupe_pad.Ly, 0 ) ) & MF_HOTKEY_BUTTONS ) || ( st_params->flags & MF_MENU_SCREEN_UPDATE ) ){
+			SceCtrlData dupe_pad = *(st_params->Ctrl.Pad);
+			padutilAdjustAnalogStick( mfGetAnalogStickContext(), &dupe_pad );
+			if( ( ( dupe_pad.Buttons | padutilGetAnalogStickDirection( dupe_pad.Lx,  dupe_pad.Ly, 0 ) ) & MF_HOTKEY_BUTTONS ) || ( st_params->Flags & MF_MENU_SCREEN_UPDATE ) ){
 				pbDisable( PB_NO_DRAW );
 				mfMenuDisable( MF_MENU_SCREEN_UPDATE );
-				memset( pbGetCurrentDrawBufferAddr(), 0, st_params->frameBuffer.frameSize );
+				memset( pbGetCurrentDrawBufferAddr(), 0, st_params->FrameBuffer.Size );
 				mf_draw_frame( true );
 				mf_menu_indicator();
 			} else{
@@ -1221,40 +1208,89 @@ void mfMenuMain( SceCtrlData *pad, MfHprmKey *hk )
 			}
 		}
 		
-		padctrlPeekBuffer( st_params->ctrl.uid, st_params->ctrl.pad, 1 );
-		padutilRemap( st_pref.remap, padutilSetPad( mfMenuGetCurrentButtons() ) | padutilSetHprm( mfMenuGetCurrentHprmKey() ), st_params->ctrl.pad, st_params->ctrl.hprmKey, true );
+		padctrlPeekBuffer( st_params->Ctrl.Uid, st_params->Ctrl.Pad, 1 );
+		padutilRemap( st_pref.Remap, padutilSetPad( mfMenuGetCurrentButtons() ) | padutilSetHprm( mfMenuGetCurrentHprmKey() ), st_params->Ctrl.Pad, st_params->Ctrl.HprmKey, true );
 		
 #ifdef DEBUG_ENABLED
 		mf_debug();
 #endif
 		
-		if( ( st_params->flags & MF_MENU_FORCED_QUIT ) || ! st_params->proc || ( ! st_params->noQuickQuitCount && ( st_params->ctrl.pad->Buttons & ( PSP_CTRL_START | PSP_CTRL_HOME ) ) ) ) break;
+		/*
+			MF_MENU_FORCED_QUITがセットされたか、
+			MF_MENU_EXITが有効な状態でSTART/HOMEを押下したか、
+			次のプロシージャが存在しなければメニューを抜ける。
+		*/
+		if(
+			( st_params->Flags & MF_MENU_FORCED_QUIT ) ||
+			( ( st_params->Flags & MF_MENU_EXIT ) && ( st_params->Ctrl.Pad->Buttons & ( PSP_CTRL_START | PSP_CTRL_HOME ) ) ) ||
+			! st_params->Proc
+		) break;
 		
 		/* 情報バーをクリア */
-		st_params->info.text[0] = '\0';
-		st_params->info.options = 0;
+		st_params->Info.Text[0] = '\0';
+		st_params->Info.Options = 0;
 		
-		st_params->nextproc = st_params->proc;
-		( st_params->proc )( st_params->menu.extra ? MF_MM_EXTRA : MF_MM_PROC );
+		/* 次のメニュープロシージャは今回と同じと仮定 */
+		st_params->NextProc = st_params->Proc;
 		
-		/* 情報バーを描画 */
-		pbPrint(
-			pbOffsetChar( 3 ),
-			pbOffsetLine( 32 ) - ( st_params->info.options & MF_MENU_INFOTEXT_SET_MIDDLE_LINE ? 0 : ( pbOffsetLine( 1 ) >> 1 ) ),
-			st_params->info.options & MF_MENU_INFOTEXT_ERROR ? MF_COLOR_TEXT_FC : MF_COLOR_TEXT_FG,
-			MF_COLOR_TEXT_BG,
-			st_params->info.text
-		);
+		/* ダイアログ状況取得 */
+		MfDialogType dialog = mfDialogCurrentType();
+		if( dialog ){
+			if( st_params->LastDialogType != dialog ){
+				st_params->CurrentMessage.Sub |= MF_DM_START;
+			} else{
+				st_params->CurrentMessage.Sub |= MF_DM_UPDATE;
+			}
+		} else if( st_params->LastDialogType ){
+			st_params->CurrentMessage.Sub |= MF_DM_FINISH;
+		}
+		st_params->LastDialogType = dialog;
 		
-		if( ! st_params->nextproc ){
+		/* プロシージャ実行 */
+		( st_params->Proc )( st_params->CurrentMessage.Main | st_params->CurrentMessage.Sub );
+		
+		/* ダイアログを確定 */
+		if( dialog != MF_DIALOG_NONE ){
+			mfMenuDrawDialog( dialog, true );
+		} else if( st_params->LastDialogType ){
+			st_params->LastDialogType = dialog;
+			mfMenuResetKeyRepeat();
+		} else{
+			/* 情報バーを描画 */
+			pbPrint(
+				pbOffsetChar( 3 ),
+				pbOffsetLine( 32 ) - ( st_params->Info.Options & MF_MENU_INFOTEXT_SET_MIDDLE_LINE ? 0 : ( pbOffsetLine( 1 ) >> 1 ) ),
+				st_params->Info.Options & MF_MENU_INFOTEXT_ERROR ? MF_COLOR_TEXT_FC : MF_COLOR_TEXT_FG,
+				MF_COLOR_TEXT_BG,
+				st_params->Info.Text
+			);
+		}
+		
+		/* 次のメニューメッセージを確定 */
+		if( st_params->Extra.Proc || mfDialogCurrentType() != MF_DIALOG_NONE ){
+			st_params->NextMessage.Main = MF_MM_WAIT;
+		} else if( st_params->CurrentMessage.Main == MF_MM_WAIT ){
+			st_params->NextMessage.Main = MF_MM_CONTINUE;
+		} else{
+			st_params->NextMessage.Main = MF_MM_PROC;
+		}
+		
+		/* 次のフレームのメッセージを設定 */
+		st_params->CurrentMessage.Main = st_params->NextMessage.Main;
+		st_params->CurrentMessage.Sub  = st_params->NextMessage.Sub;
+		st_params->NextMessage.Main    = 0;
+		st_params->NextMessage.Sub     = 0;
+		
+		/* 次のメニュープロシージャが変更されていれば設定 */
+		if( ! st_params->NextProc ){
 			dbgprint( "Menu back" );
-			( st_params->proc )( MF_MM_TERM );
-			mf_menu_stack( &(st_params->stack), MF_MENU_STACK_POP, &(st_params->proc) );
-		} else if( st_params->nextproc != st_params->proc ){
+			( st_params->Proc )( MF_MM_TERM );
+			mf_menu_stack( &(st_params->Stack), MF_MENU_STACK_POP, &(st_params->Proc), &(st_params->Menu) );
+		} else if( st_params->NextProc != st_params->Proc ){
 			dbgprint( "Menu enter" );
-			mf_menu_stack( &(st_params->stack), MF_MENU_STACK_PUSH, st_params->proc );
-			st_params->proc = st_params->nextproc;
-			( st_params->proc )( MF_MM_INIT );
+			mf_menu_stack( &(st_params->Stack), MF_MENU_STACK_PUSH, st_params->Proc, &(st_params->Menu) );
+			st_params->Proc = st_params->NextProc;
+			( st_params->Proc )( MF_MM_INIT );
 		}
 		
 		/* 表示バッファと描画バッファを切り替える */
@@ -1262,9 +1298,9 @@ void mfMenuMain( SceCtrlData *pad, MfHprmKey *hk )
 		pbSwapBuffers( PB_BUFSYNC_IMMEDIATE );
 		
 		/* 指定時間待つ */
-		if( st_params->waitMicroSecForUpdate ){
-			sceKernelDelayThread( st_params->waitMicroSecForUpdate );
-			st_params->waitMicroSecForUpdate = 0;
+		if( st_params->WaitMicroSecForUpdate ){
+			sceKernelDelayThread( st_params->WaitMicroSecForUpdate );
+			st_params->WaitMicroSecForUpdate = 0;
 			mfMenuEnable( MF_MENU_SCREEN_UPDATE );
 			sceDisplayWaitVblankStart();
 		}
@@ -1276,9 +1312,9 @@ void mfMenuMain( SceCtrlData *pad, MfHprmKey *hk )
 	sceKernelDelayThread( 300000 );
 	
 	/* メニュースタックに詰まれているメニュー全てにMF_MM_TERMを送る */
-	while( st_params->proc ){
-		( st_params->proc )( MF_MM_TERM );
-		mf_menu_stack( &(st_params->stack), MF_MENU_STACK_POP, &(st_params->proc) );
+	while( st_params->Proc ){
+		( st_params->Proc )( MF_MM_TERM );
+		mf_menu_stack( &(st_params->Stack), MF_MENU_STACK_POP, &(st_params->Proc), &(st_params->Menu) );
 	}
 	
 	/* ダイアログを終了 */
@@ -1289,14 +1325,13 @@ void mfMenuMain( SceCtrlData *pad, MfHprmKey *hk )
 	
 	DESTROY:
 		dbgprint( "Destroying menu..." );
-		mf_menu_stack( &(st_params->stack), MF_MENU_STACK_DESTROY, NULL );
+		mf_menu_stack( &(st_params->Stack), MF_MENU_STACK_DESTROY, NULL, NULL );
 		
 		dbgprint( "Memory block return to the system..." );
-		padctrlDestroy( st_params->ctrl.uid );
+		padctrlDestroy( st_params->Ctrl.Uid );
 		padutilDestroyButtonSymbols();
-		st_symbols = NULL;
 		
-		mf_free_buffers( &(st_params->frameBuffer) );
+		mf_free_buffers( &(st_params->FrameBuffer) );
 		
 		/* サウンドを戻す */
 		mf_menu_mute( false );
@@ -1304,32 +1339,27 @@ void mfMenuMain( SceCtrlData *pad, MfHprmKey *hk )
 		/* メニュー起動前にAPIをフックしていた場合は、フックしなおす */
 		if( mfIsEnabled() ) mfHook();
 		
-		dbgprint( "Resuming threads..." );
 		/* 他のスレッドをリジューム */
+		dbgprint( "Resuming threads..." );
 		sceDisplayWaitVblankStart();
-		mf_menu_change_threads_stat( MF_MENU_RESUME_THREADS, st_params->threads.list, st_params->threads.count );
+		mf_menu_change_threads_stat( MF_MENU_RESUME_THREADS, st_params->Thread.List, st_params->Thread.Count );
 		
 		/* スレッドリスト用のメモリを解放 */
 		dbgprint( "Menu finish" );
-		memoryFree( st_params );
+		mfMemoryFree( st_params );
 		
 		/* ディスプレイを点灯させる */
 		sceDisplayWaitVblankStart();
 		sceDisplayWaitVblankStart();
 		sceDisplayEnable();
-#ifdef MEMORY_DEBUG
-		dbgprintf( "Memory block remain count %d", memoryGetAllocCount() );
-#endif
 }
 
 void mfMenuSetInfoText( unsigned int options, char *format, ... )
 {
 	va_list ap;
-	char *strtop = st_params->info.text;
+	char *strtop = st_params->Info.Text;
 	
-	if( ! st_params ) return;
-	
-	st_params->info.options = options;
+	st_params->Info.Options = options;
 	
 	if( ( options & MF_MENU_INFOTEXT_COMMON_CTRL ) ){
 		if( options & MF_MENU_INFOTEXT_MULTICOLUMN_CTRL ){
@@ -1349,7 +1379,7 @@ void mfMenuSetInfoText( unsigned int options, char *format, ... )
 	}
 	
 	va_start( ap, format );
-	vsnprintf( strtop, MF_MENU_INFOTEXT_LENGTH - (unsigned int)( strtop - st_params->info.text ), format, ap );
+	vsnprintf( strtop, MF_MENU_INFOTEXT_LENGTH - (unsigned int)( strtop - st_params->Info.Text ), format, ap );
 	va_end( ap );
 }
 
@@ -1391,13 +1421,13 @@ MfMenuTable *mfMenuCreateTables( unsigned short tables, ... )
 		
 		dbgprintf( "Table size: %d, %d", tablecells[i].rows, tablecells[i].cols );
 		
-		allocsize += sizeof( MfMenuEntry * ) * tablecells[i].rows + sizeof( MfMenuEntry   ) * tablecells[i].cols;
+		allocsize += sizeof( MfMenuEntry * ) * tablecells[i].rows + sizeof( MfMenuEntry ) * tablecells[i].cols;
 		if( tablecells[i].cols > 1 ) allocsize += sizeof( unsigned int ) * tablecells[i].cols;
 	}
 	va_end( ap );
 	
 	dbgprintf( "Allocating memory for menu-tables: %d bytes", allocsize );
-	table = (MfMenuTable *)memoryExalloc( "MacroFireMenuTables", MEMORY_USER, 0, allocsize, PSP_SMEM_High, NULL );
+	table = (MfMenuTable *)mfMemoryTempAlloc( allocsize );
 	if( ! table ){
 		dbgprint( "Failed to allocate memory" );
 		return NULL;
@@ -1441,10 +1471,10 @@ MfMenuTable *mfMenuCreateTables( unsigned short tables, ... )
 
 void mfMenuDestroyTables( MfMenuTable *table )
 {
-	memoryFree( table );
+	mfMemoryFree( table );
 }
 
-bool mf_menu_ctrl_engine_stat( MfMessage message, const char *label, void *var, void *unused, void *ex )
+bool mf_control_engine( MfMessage message, const char *label, void *var, void *unused, void *ex )
 {
 	bool prev_stat = *((bool *)var);
 	bool ret = mfCtrlDefBool( message, label, var, unused, ex );
@@ -1483,43 +1513,48 @@ static void mf_menu_indicator( void )
 	pbPutChar( pbOffsetChar( 1 ), pbOffsetLine( 1 ), MF_COLOR_TITLE, MF_COLOR_TRANSPARENT, lst_working_indicator[lst_working_indicator_index++] );
 }
 
-static bool mf_menu_stack( struct mf_menu_stack *stack, enum mf_menu_stack_ctrl ctrl, void *menu )
+static bool mf_menu_stack( struct MfMenuStack *stack, enum MfMenuStackAction ctrl, void *menu, struct MfMenuPosition *pos )
 {
 	switch( ctrl ){
 		case MF_MENU_STACK_CREATE:
-			stack->index = 0;
-			stack->size  = MF_MENU_STACK_SIZE( MF_MENU_STACK_NUM );
-			stack->memory = memoryExalloc( "MacroFireMenuStack", MEMORY_USER, 0, stack->size, PSP_SMEM_High, NULL );
-			dbgprintf( "Allocating memory for menu-stack: %p: %d bytes", stack->memory, stack->size );
-			return stack->memory ? true : false;
+			stack->Index = 0;
+			stack->Size  = MF_MENU_STACK_SIZE( MF_MENU_STACK_NUM );
+			stack->Data  = (struct MfMenuStackData *)mfMemoryTempAlloc( stack->Size );
+			dbgprintf( "Allocating memory for menu-stack: %p: %d bytes", stack->Data, stack->Size );
+			return stack->Data ? true : false;
 		case MF_MENU_STACK_PUSH:
-			if( stack->index >= MF_MENU_STACK_NUM ){
-				void *old_stack = stack->memory;
-				stack->size += MF_MENU_STACK_SIZE( MF_MENU_STACK_NUM );
-				stack->memory = (MfProc *)memoryRealloc( stack->memory, stack->size );
-				dbgprintf( "Re-allocating memory for menu-stack: %p: %d bytes", stack->memory, stack->size );
-				if( ! stack->memory ){
+			if( stack->Index >= MF_MENU_STACK_NUM ){
+				void *old_stack = stack->Data;
+				stack->Size += MF_MENU_STACK_SIZE( MF_MENU_STACK_NUM );
+				stack->Data = (struct MfMenuStackData *)mfMemoryRealloc( stack->Data, stack->Size );
+				dbgprintf( "Re-allocating memory for menu-stack: %p: %d bytes", stack->Data, stack->Size );
+				if( ! stack->Data ){
 					dbgprint( "Failed to re-allocate memory" );
-					stack->memory = old_stack;
+					stack->Data = old_stack;
 					return false;
+				} else{
+					mfMemoryFree( old_stack );
 				}
 			}
-			dbgprintf( "Menu address push to menu-stack: %p", menu );
-			stack->memory[stack->index] = menu;
-			stack->index++;
+			stack->Data[stack->Index].Proc = menu;
+			if( pos ) stack->Data[stack->Index].Pos = *pos;
+			dbgprintf( "Menu address push to menu-stack: %p", stack->Data[stack->Index].Proc );
+			stack->Index++;
 			return true;
 		case MF_MENU_STACK_POP:
-			if( stack->index ){
-				stack->index--;
-				dbgprintf( "Menu address pop from menu-stack: %p", stack->memory[stack->index] );
-				*((void **)menu) = stack->memory[stack->index];
+			if( stack->Index ){
+				stack->Index--;
+				dbgprintf( "Menu address pop from menu-stack: %p", stack->Data[stack->Index].Proc );
+				*((void **)menu) = stack->Data[stack->Index].Proc;
+				if( pos ) *pos = stack->Data[stack->Index].Pos;
 				return true;
 			} else{
 				*((void **)menu) = NULL;
+				if( pos ) memset( pos, 0, sizeof( struct MfMenuPosition ) );
 				return false;
 			}
 		case MF_MENU_STACK_DESTROY:
-			memoryFree( stack->memory );
+			mfMemoryFree( stack->Data );
 			return true;
 	}
 	return false;
@@ -1528,9 +1563,7 @@ static bool mf_menu_stack( struct mf_menu_stack *stack, enum mf_menu_stack_ctrl 
 static bool mf_menu_get_target_threads( SceUID *thread_id_list, int *thread_id_count )
 {
 	int i, j;
-	SceUID selfid;
-	
-	selfid    = sceKernelGetThreadId();
+	SceUID selfid = sceKernelGetThreadId();
 	
 	if( sceKernelGetThreadmanIdList( SCE_KERNEL_TMID_Thread, thread_id_list, MF_MENU_MAX_NUMBER_OF_THREADS, thread_id_count ) < 0 ){
 		dbgprint( "Failed to get a thread-id list" );
@@ -1538,9 +1571,9 @@ static bool mf_menu_get_target_threads( SceUID *thread_id_list, int *thread_id_c
 	}
 	
 	for( i = 0; i < *thread_id_count; i++ ){
-		for( j = 0; j < st_thread_id_count_first; j++ ){
+		for( j = 0; j < st_systhread.Count; j++ ){
 			if(
-				( thread_id_list[i] == st_thread_id_list_first[j] ) ||
+				( thread_id_list[i] == st_systhread.List[j] ) ||
 				( thread_id_list[i] == selfid )
 			 ) thread_id_list[i] = 0;
 		}
@@ -1574,78 +1607,66 @@ static void mf_menu_change_threads_stat( bool stat, SceUID *thread_id_list, int 
 	if( notific_id ) mfNotificationPrintTerm();
 }
 
-static bool mf_alloc_buffers( struct mf_frame_buffers *fb, bool graphics_mem, bool volatile_mem )
+static bool mf_alloc_buffers( struct MfMenuFrameBuffer *fb, bool graphics_mem )
 {
-	int vram_size = sceGeEdramGetSize();
+	unsigned char frame_num = graphics_mem ? sceKernelMaxFreeMemSize() / fb->Size : 0;
 	
-	fb->vrambase  = (void *)( (unsigned int)sceGeEdramGetAddr() | PB_DISABLE_CACHE );
+	fb->VramBase  = (void *)( (unsigned int)sceGeEdramGetAddr() | PB_DISABLE_CACHE );
 	
-	dbgprintf( "Detect current display buffer addr: %p", fb->origaddr );
+	dbgprintf( "Detect current display buffer addr: %p", fb->OrigAddr );
 	
-	if( graphics_mem && volatile_mem && scePowerVolatileMemTryLock( 0, &(fb->vram), &vram_size ) == 0 ){
-		dbgprintf( "Memory allocated from 4MB extra RAM: %d bytes", vram_size );
-		sceDmacMemcpy( fb->vram, fb->vrambase, vram_size );
-		fb->display = fb->vrambase;
-		fb->draw    = (void *)( (unsigned int)(fb->display) + fb->frameSize );
-		fb->clear   = (void *)( (unsigned int)(fb->draw) + fb->frameSize );
-		fb->volatileMem   = true;
-	} else{
-		unsigned char frame_num = graphics_mem ? sceKernelMaxFreeMemSize() / fb->frameSize : 0;
+	if( frame_num >= 3 ){
+		fb->Vram = mfMemoryTempAlloc( fb->Size * 3 );
+		if( ! fb->Vram ) return false;
 		
-		if( frame_num >= 3 ){
-			fb->vram = memoryExalloc( "MacroFireMenuVRAMBackup", MEMORY_USER, 0, fb->frameSize * 3, PSP_SMEM_High, NULL );
-			if( ! fb->vram ) return false;
-			
-			dbgprintf( "Memory allocated: %d bytes", fb->frameSize * 3 );
-			sceDmacMemcpy( fb->vram, fb->vrambase, fb->frameSize * 3 );
-			fb->display = fb->vrambase;
-			fb->draw    = (void *)( (unsigned int)(fb->display) + fb->frameSize );
-			fb->clear   = (void *)( (unsigned int)(fb->draw) + fb->frameSize );
-		} else if( frame_num >= 2 ){
-			fb->display = fb->origaddr;
-			fb->draw    = memoryExalloc( "MacroFireMenuDrawClearBuffers", MEMORY_USER, 16, fb->frameSize * 2, PSP_SMEM_High, NULL );
-			if( ! fb->draw ) return false;
-			dbgprintf( "Memory allocated for draw/clear buffers: %d bytes", fb->frameSize *2 );
-			fb->clear = (void *)( (unsigned int)(fb->draw) + fb->frameSize );
-		} else if( frame_num >= 1 ){
-			fb->display = fb->origaddr;
-			fb->draw    = memoryExalloc( "MacroFireMenuDrawBuffer", MEMORY_USER, 16, fb->frameSize, PSP_SMEM_High, NULL );
-			if( ! fb->draw ) return false;
-			dbgprintf( "Memory allocated for draw buffer: %d bytes", fb->frameSize );
-		} else{
-			dbgprint( "Not enough available memory: only use current display buffer" );
-			fb->display = fb->origaddr;
-		}
+		dbgprintf( "Memory allocated: %d bytes", fb->Size * 3 );
+		sceDmacMemcpy( fb->Vram, fb->VramBase, fb->Size * 3 );
+		fb->Disp  = fb->VramBase;
+		fb->Draw  = (void *)( (unsigned int)(fb->Disp) + fb->Size );
+		fb->Clear = (void *)( (unsigned int)(fb->Draw) + fb->Size );
+	} else if( frame_num >= 2 ){
+		fb->Disp = fb->OrigAddr;
+		fb->Draw = mfMemoryTempAlign( 16, fb->Size * 2 );
+		if( ! fb->Draw ) return false;
+		dbgprintf( "Memory allocated for draw/clear buffers: %d bytes", fb->Size *2 );
+		fb->Clear = (void *)( (unsigned int)(fb->Draw) + fb->Size );
+	} else if( frame_num >= 1 ){
+		fb->Disp = fb->OrigAddr;
+		fb->Draw = mfMemoryTempAlign( 16, fb->Size );
+		if( ! fb->Draw ) return false;
+		dbgprintf( "Memory allocated for draw buffer: %d bytes", fb->Size );
+	} else{
+		dbgprint( "Not enough available memory: only use current display buffer" );
+		fb->Disp = fb->OrigAddr;
 	}
+	
 	return true;
 }
 
-static void mf_free_buffers( struct mf_frame_buffers *fb )
+static void mf_free_buffers( struct MfMenuFrameBuffer *fb )
 {
 	sceDisplayWaitVblankStart();
-	sceDisplaySetFrameBuf( fb->origaddr, fb->bufferWidth, fb->pixelFormat, PSP_DISPLAY_SETBUF_IMMEDIATE );
+	sceDisplaySetFrameBuf( fb->OrigAddr, fb->Width, fb->PixelFormat, PSP_DISPLAY_SETBUF_IMMEDIATE );
 	
-	if( fb->vram ){
+	if( fb->Vram ){
 		dbgprint( "Restore vram buffer" );
-		sceDmacMemcpy( fb->vrambase, fb->vram, fb->frameSize * 3 );
-	} else if( fb->clear ){
-		sceDmacMemcpy( fb->origaddr, fb->clear, fb->frameSize );
+		sceDmacMemcpy( fb->VramBase, fb->Vram, fb->Size * 3 );
+	} else if( fb->Clear ){
+		sceDmacMemcpy( fb->OrigAddr, fb->Clear, fb->Size );
 	}
 	
 	dbgprint( "Free memory for frame buffers" );
-	if( fb->volatileMem ){
-		scePowerVolatileMemUnlock( 0 );
-	} else if( fb->vram ){
-		memoryFree( fb->vram );
-	} else if( fb->draw ){
-		memoryFree( fb->draw );
+	if( fb->Vram ){
+		mfMemoryFree( fb->Vram );
+	} else if( fb->Draw ){
+		mfMemoryFree( fb->Draw );
 	}
 }
 
 static void mf_draw_frame( bool lowmem )
 {
 	/* これらのセクション名は、内容が同じである場合、ポインタレベルで同じである */
-	const char *targid = mfGetIniTargetSection();
+	const char *targid = mfGetGameId();
 	const char *loadid = mfGetIniSection();
 	
 	pbFillRect( 0, 0, SCR_WIDTH, pbOffsetLine( 3 ), MF_COLOR_TITLE_BAR );
@@ -1653,20 +1674,16 @@ static void mf_draw_frame( bool lowmem )
 	pbPrintf( pbOffsetChar( 3 ), pbOffsetLine( 1 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, MF_TITLE, MF_VERSION );
 	pbPrint( pbOffsetChar( 47 ), SCR_HEIGHT - pbOffsetLine( 1 ), ( MF_COLOR_TEXT_FG & 0x00ffffff ) | 0x33000000, MF_COLOR_TEXT_BG, MF_AUTHOR );
 	
-	pbPrintf( pbOffsetChar( 32 ), pbOffsetLine( 1 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, "[ID: %s", targid );
+	pbPrintf( pbOffsetChar( 34 ), pbOffsetLine( 1 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, "[ID: %s", targid );
 	if( targid == loadid ){
-		pbPrint( pbOffsetChar( 32 + 5 + strlen( targid ) ), pbOffsetLine( 1 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, "]" );
+		pbPrint( pbOffsetChar( 34 + 5 + strlen( targid ) ), pbOffsetLine( 1 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, "]" );
 	} else{
-		pbPrintf( pbOffsetChar( 32 + 5 + strlen( targid ) ), pbOffsetLine( 1 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, " / %s: %s]", MF_STR_HOME_LOADED, loadid );
+		pbPrintf( pbOffsetChar( 34 + 5 + strlen( targid ) ), pbOffsetLine( 1 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, " / %s: %s]", MF_STR_HOME_LOADED, loadid );
 	}
 	
-	if( mfHookIncomplete() ){
-		pbPrint( pbOffsetChar( 44 ), pbOffsetLine( 2 ) + ( pbOffsetLine( 1 ) >> 1 ), MF_COLOR_EX4, MF_COLOR_TEXT_BG, MF_STR_HOME_NOT_PERFECT_WORK );
-	}
+	if( mfHookIncomplete() ) pbPrint( pbOffsetChar( 44 ), pbOffsetLine( 2 ) + ( pbOffsetLine( 1 ) >> 1 ), MF_COLOR_EX4, MF_COLOR_TEXT_BG, MF_STR_HOME_NOT_PERFECT_WORK );
 	
-	if( lowmem ){
-		pbPrintf( 0, 0, MF_COLOR_EX4, MF_COLOR_TEXT_BG, "<%s>", MF_STR_HOME_LOW_MEMORY_MODE );
-	}
+	if( lowmem ) pbPrintf( 0, 0, MF_COLOR_EX4, MF_COLOR_TEXT_BG, "<%s>", MF_STR_HOME_LOW_MEMORY_MODE );
 	
 #ifdef MF_WITH_EXCEPTION_HANDLER
 		pbPrint( SCR_WIDTH - pbOffsetChar( 12 ), 0, MF_COLOR_EX4, MF_COLOR_TEXT_BG, "<for DEBUG>" );

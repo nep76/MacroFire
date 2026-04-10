@@ -42,8 +42,9 @@ int cdialogMessageInit( CdialogMessageParams *params )
 	
 	/* 初期化 */
 	st_params->data.title[0]   = '\0';
-	st_params->data.options    = 0;
 	st_params->data.message[0] = '\0';
+	st_params->data.errorcode  = 0;
+	st_params->data.options    = 0;
 	st_params->data.width      = 0;
 	st_params->data.height     = 0;
 	st_params->data.callback   = NULL;
@@ -94,8 +95,11 @@ int cdialogMessageStartNoLock( unsigned short x, unsigned short y )
 	if( st_params->data.height ) h = st_params->data.height;
 	
 	/* 固定幅と固定行を加算 */
-	st_params->base.width  = w + pbOffsetChar( 4 );
+	st_params->base.width  = w + pbOffsetChar( 2 );
 	st_params->base.height = h + pbOffsetLine( 6 );
+	
+	/* エラー出力の場合はエラーコード表示用の高さを確保 */
+	if( st_params->data.options & CDIALOG_MESSAGE_ERROR ) st_params->base.height += pbOffsetLine( 2 );
 	
 	st_params->base.x = pbOffsetChar( x );
 	st_params->base.y = pbOffsetLine( y );
@@ -180,13 +184,7 @@ static void cdialog_message_count_width_and_height( const char *str, unsigned in
 
 static void cdialog_message_draw( struct cdialog_dev_base_params *base, CdialogMessageData *data )
 {
-	char ans[32];
-	
-	if( data->options & CDIALOG_MESSAGE_YESNO ){
-		snprintf( ans, sizeof( ans ), "[%s]%s [%s]%s", cdialogDevAcceptSymbol(), CDIALOG_STR_MESSAGE_YES, cdialogDevCancelSymbol(), CDIALOG_STR_MESSAGE_NO );
-	} else{
-		snprintf( ans, sizeof( ans ), "[%s]%s", cdialogDevAcceptSymbol(), CDIALOG_STR_MESSAGE_OK );
-	}
+	char buf[32];
 	
 	/* 枠を描画 */
 	pbFillRectRel( base->x, base->y, base->width, base->height, base->color->bg );
@@ -208,13 +206,31 @@ static void cdialog_message_draw( struct cdialog_dev_base_params *base, CdialogM
 		PB_TRANSPARENT,
 		data->message
 	);
+	
 	if( data->callback ) ( data->callback )( base->x + pbOffsetChar( 1 ), base->y + pbOffsetLine( 3 ), base->color );
 	
+	if( data->options & CDIALOG_MESSAGE_ERROR ){
+		snprintf( buf, sizeof( buf ), "(0x%X)", data->errorcode );
+		pbPrintf(
+			base->x + ( base->width >> 1 ) - ( pbMeasureString( buf ) >> 1 ),
+			base->y + + base->height - pbOffsetLine( 4 ),
+			base->color->fcfg,
+			PB_TRANSPARENT,
+			buf
+		);
+	}
+	
+	if( data->options & CDIALOG_MESSAGE_YESNO ){
+		snprintf( buf, sizeof( buf ), "[%s]%s [%s]%s", cdialogDevAcceptSymbol(), CDIALOG_STR_MESSAGE_YES, cdialogDevCancelSymbol(), CDIALOG_STR_MESSAGE_NO );
+	} else{
+		snprintf( buf, sizeof( buf ), "[%s]%s", cdialogDevAcceptSymbol(), CDIALOG_STR_MESSAGE_OK );
+	}
+	
 	pbPrint(
-		base->x + ( base->width >> 1 ) - ( pbMeasureString( ans ) >> 1 ),
+		base->x + ( base->width >> 1 ) - ( pbMeasureString( buf ) >> 1 ),
 		base->y + + base->height - pbOffsetLine( 2 ),
 		base->color->fcfg,
 		PB_TRANSPARENT,
-		ans
+		buf
 	);
 }

@@ -12,7 +12,7 @@
 #include <string.h>
 #include "memory/memory.h"
 #include "graphic/pb.h"
-#include "cgerrs.h"
+#include "cgerrno.h"
 
 /*=========================================================
 	Œ^éŒ¾
@@ -58,7 +58,7 @@ int ovmsgInit( void )
 {
 	st_stat = OVMSG_INIT;
 	
-	st_params = (struct ovmsg_params *)memoryAllocEx( "OverlayMessageParams", MEMORY_USER, 0, sizeof( struct ovmsg_params ) + OVMSG_LENGTH, PSP_SMEM_High, NULL );
+	st_params = (struct ovmsg_params *)memoryExalloc( "OverlayMessageParams", MEMORY_USER, 0, sizeof( struct ovmsg_params ) + OVMSG_LENGTH, PSP_SMEM_High, NULL );
 	if( ! st_params ) return  CG_ERROR_NOT_ENOUGH_MEMORY;
 	
 	st_params->semaId = sceKernelCreateSema( "CgOverlayMessage", 0, 1, 1, 0 );

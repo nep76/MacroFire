@@ -2,4 +2,4 @@
 
 #include "pspimport.s"
 
-	IMPORT_START	"sceUtility",0x40090000
+	IMPORT_START "sceUtility",0x40090000

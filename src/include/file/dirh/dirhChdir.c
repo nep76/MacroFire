@@ -1,6 +1,7 @@
 /* dirhChdir.c */
 
 #include "dirh_types.h"
+#include "util/strutil.h"
 
 static int dirh_make_entries( const char *dirpath, struct dirh_entry *entry, struct dirh_thread_dopen_params **thdopen, unsigned int timeout, bool alloc_high );
 static int dirh_dopen_wrapper( SceSize args, void *argp );

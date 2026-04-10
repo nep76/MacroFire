@@ -19,6 +19,7 @@
 #include "pad/padctrl.h"
 #include "pad/padutil.h"
 #include "graphic/pb.h"
+#include "mfmemory.h"
 
 /*=========================================================
 	マクロ
@@ -39,6 +40,10 @@
 	padutilSetPad( MF_TARGET_BUTTONS | ( PSP_CTRL_NOTE | PSP_CTRL_SCREEN | PSP_CTRL_VOLUP | PSP_CTRL_VOLDOWN ) ) |\
 	padutilSetHprm( PADUTIL_HPRM_NORMAL_KEYS ) \
 )
+
+#define mfIsPressed( buttons, target )     ( ( ( buttons ) & ( target ) ) == ( target ) ? true : false )
+#define mfIsOnlyPressed( buttons, target ) ( ( buttons ) == ( target ) ? true : false )
+#define mfIsAnyPressed( buttons, target )  ( ( buttons ) &  ( target ) ? true : false )
 
 /*=========================================================
 	型宣言
@@ -68,14 +73,6 @@ typedef enum {
 } MfAppId;
 
 /*-----------------------------------------------
-	CPUの実行モード。
------------------------------------------------*/
-typedef enum {
-	MF_CALLER_KERNEL = 0,
-	MF_CALLER_USER
-} MfCallerMode;
-
-/*-----------------------------------------------
 	パッドデータの取得方法
 -----------------------------------------------*/
 typedef enum {
@@ -91,28 +88,47 @@ typedef u32 MfHprmKey;
 
 /*-----------------------------------------------
 	メッセージ
+	
+	ルートメッセージは各ファンクションの起点に送られ、
+	他のメッセージを組み合わされて送られることはない。
 -----------------------------------------------*/
 typedef unsigned int MfMessage;
 typedef enum {
-	MF_MS_INIT = 0,
-	MF_MS_INI_LOAD,
-	MF_MS_INI_CREATE,
-	MF_MS_TERM,
-	MF_MS_HOOK,
-	MF_MS_TOGGLE,
-	MF_MS_MENU,
-} MfMainMessage;
+	MF_MS_INIT       = 0x00000001,
+	MF_MS_INI_LOAD   = 0x00000002,
+	MF_MS_INI_CREATE = 0x00000004,
+	MF_MS_TERM       = 0x00000008,
+	MF_MS_HOOK       = 0x00000010,
+	MF_MS_TOGGLE     = 0x00000020,
+	MF_MS_MENU       = 0x00000040
+} MfRootMessage;
+	
+typedef enum {
+	MF_DM_START  = 0x00010000,
+	MF_DM_UPDATE = 0x00020000,
+	MF_DM_FINISH = 0x00040000,
+} MfDialogMessage;
 
+typedef enum {
+	MF_SM_1 = 0x01000000,
+	MF_SM_2 = 0x02000000,
+	MF_SM_3 = 0x04000000,
+	MF_SM_4 = 0x08000000,
+	MF_SM_5 = 0x10000000,
+	MF_SM_6 = 0x20000000,
+	MF_SM_7 = 0x40000000,
+	MF_SM_8 = 0x80000000
+} MfSignalMessage;
+
+/*-----------------------------------------------
+	プロシージャ
+-----------------------------------------------*/
 typedef void ( *MfFuncInit   )( void );
 typedef void ( *MfFuncIni    )( IniUID, char*, size_t );
 typedef void ( *MfFuncTerm   )( void );
 typedef void ( *MfFuncHook   )( MfHookAction, SceCtrlData*, MfHprmKey* );
 typedef void ( *MfFuncToggle )( bool );
 typedef void ( *MfFuncMenu   )( MfMessage );
-
-/*-----------------------------------------------
-	プロシージャ
------------------------------------------------*/
-typedef void *( *MfProc )( MfMainMessage message );
+typedef void *( *MfProc      )( MfRootMessage message );
 
 #endif

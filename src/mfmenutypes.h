@@ -13,9 +13,14 @@
 /*=========================================================
 	É}ÉNÉç
 =========================================================*/
-#define mfMenuIsPressed( buttons )     ( ( mfMenuGetCurrentButtons() & ( buttons ) ) == ( buttons ) ? true : false )
-#define mfMenuIsOnlyPressed( buttons ) ( mfMenuGetCurrentButtons() == ( buttons ) ? true : false )
-#define mfMenuIsAnyPressed( buttons )  ( ( mfMenuGetCurrentButtons() & ( buttons ) ) ? true : false )
+
+#define mfMenuIsPressed( buttons )     mfIsPressed( mfMenuGetCurrentButtons(), ( buttons ) )
+#define mfMenuIsOnlyPressed( buttons ) mfIsOnlyPressed( mfMenuGetCurrentButtons(), ( buttons ) )
+#define mfMenuIsAnyPressed( buttons )  mfIsAnyPressed( mfMenuGetCurrentButtons(), ( buttons ) )
+
+#define mfMenuMaskMainMessage( message )   ( ( message ) & 0x0000FFFF )
+#define mfMenuMaskDialogMessage( message ) ( ( message ) & 0x00FF0000 )
+#define mfMenuMaskSignalMessage( message ) ( ( message ) & 0xFF000000 )
 
 #define MF_MESSAGE_DELAY 1000000
 #define MF_ERROR_DELAY   3000000
@@ -24,13 +29,15 @@
 	å^êÈåæ
 =========================================================*/
 typedef enum {
-	MF_MM_INIT = 0,
-	MF_MM_PROC,
-	MF_MM_TERM,
-	MF_MM_EXTRA
+	MF_MM_INIT     = 0x00000001,
+	MF_MM_PROC     = 0x00000002,
+	MF_MM_TERM     = 0x00000004,
+	MF_MM_WAIT     = 0x00000010,
+	MF_MM_CONTINUE = 0x00000020
 } MfMenuMessage;
 
-typedef void ( *MfMenuProc )( MfMenuMessage );
+typedef void ( *MfMenuProc )( MfMessage );
+typedef void ( *MfMenuExtraProc )( MfMessage, void* );
 
 typedef struct {
 	bool      active;

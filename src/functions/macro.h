@@ -9,15 +9,13 @@
 #define FUNCTION_MACRO_H
 
 #include "../macrofire.h"
-#include "memory/heap.h"
+#include "memory/heap_kernel.h"
 #include "macromgr.h"
 #include "macroeditor.h"
 
 /*=========================================================
 	É}ÉNÉç
 =========================================================*/
-#define MACRO_MAX_SLOT 10
-
 #define MACRO_NAME_LENGTH   32
 #define MACRO_HOTKEY_LENGTH 255
 

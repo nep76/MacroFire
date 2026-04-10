@@ -24,7 +24,41 @@
 #define PADUTIL_MAX_COORD  255
 #define PADUTIL_MAX_RADIUS 182 /* 辺の長さ * 2の平方根 (小数点以下切り上げ) */
 
-#define PADUTIL_PAD_NORMAL_BUTTONS (\
+#define PADUTIL_ARRAY_SELECT         0
+#define PADUTIL_ARRAY_START          1
+#define PADUTIL_ARRAY_UP             2
+#define PADUTIL_ARRAY_RIGHT          3
+#define PADUTIL_ARRAY_DOWN           4
+#define PADUTIL_ARRAY_LEFT           5
+#define PADUTIL_ARRAY_ANALOG_UP      6
+#define PADUTIL_ARRAY_ANALOG_RIGHT   7
+#define PADUTIL_ARRAY_ANALOG_DOWN    8
+#define PADUTIL_ARRAY_ANALOG_LEFT    9
+#define PADUTIL_ARRAY_LTRIGGER       10
+#define PADUTIL_ARRAY_RTRIGGER       11
+#define PADUTIL_ARRAY_TRIANGLE       12
+#define PADUTIL_ARRAY_CIRCLE         13
+#define PADUTIL_ARRAY_CROSS          14
+#define PADUTIL_ARRAY_SQUARE         15
+#define PADUTIL_ARRAY_HOME           16
+#define PADUTIL_ARRAY_HOLD           17
+#define PADUTIL_ARRAY_NOTE           18
+#define PADUTIL_ARRAY_SCREEN         19
+#define PADUTIL_ARRAY_VOLUP          20
+#define PADUTIL_ARRAY_VOLDOWN        21
+#define PADUTIL_ARRAY_WLAN_UP        22
+#define PADUTIL_ARRAY_REMOTE         23
+#define PADUTIL_ARRAY_DISC           24
+#define PADUTIL_ARRAY_MS             25
+#define PADUTIL_ARRAY_HPRM_PLAYPAUSE 26
+#define PADUTIL_ARRAY_HPRM_FORWARD   27
+#define PADUTIL_ARRAY_HPRM_BACK      28
+#define PADUTIL_ARRAY_HPRM_VOLUP     29
+#define PADUTIL_ARRAY_HPRM_VOLDOWN   30
+#define PADUTIL_ARRAY_HPRM_HOLD      31
+#define PADUTIL_ARRAY_END            32
+
+#define PADUTIL_PAD_USERMODE_BUTTONS (\
 	PSP_CTRL_START    |\
 	PSP_CTRL_SELECT   |\
 	PSP_CTRL_UP       |\
@@ -36,12 +70,16 @@
 	PSP_CTRL_TRIANGLE |\
 	PSP_CTRL_CIRCLE   |\
 	PSP_CTRL_CROSS    |\
-	PSP_CTRL_SQUARE   |\
-	PSP_CTRL_HOME     |\
-	PSP_CTRL_NOTE     |\
-	PSP_CTRL_SCREEN   |\
-	PSP_CTRL_VOLUP    |\
-	PSP_CTRL_VOLDOWN  \
+	PSP_CTRL_SQUARE   \
+)
+
+#define PADUTIL_PAD_NORMAL_BUTTONS (\
+	PADUTIL_PAD_USERMODE_BUTTONS |\
+	PSP_CTRL_HOME                |\
+	PSP_CTRL_NOTE                |\
+	PSP_CTRL_SCREEN              |\
+	PSP_CTRL_VOLUP               |\
+	PSP_CTRL_VOLDOWN             \
 )
 
 #define PADUTIL_PAD_TOGGLE_BUTTONS (\
@@ -192,6 +230,18 @@ typedef enum {
 /*=========================================================
 	関数
 =========================================================*/
+/*-----------------------------------------------
+	padutilCreateButtonSymbols/Names
+	
+	ボタンコードをボタン名のプリセット。
+	Symbolsでは各ボタンのシンボル、Namesでは各ボタンの名前をセットしたPadutilButtonNames配列を返す。
+	PadutilButtonNamesは本来リストだが、連続したメモリを確保しているため、配列としてアクセス可能。
+	
+	配列の末尾はボタンコード0、ボタン名NULLのエントリが必ずセットされる。
+	
+	PADUTIL_ARRAY_*定数で任意のボタンの添え字を指定可能。
+	PADUTIL_ARRAY_ENDは、前述の末尾のエントリを指す。
+-----------------------------------------------*/
 PadutilButtonName *padutilCreateButtonSymbols( void );
 void padutilDestroyButtonSymbols( void );
 

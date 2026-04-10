@@ -33,11 +33,14 @@ typedef struct {
 } CdialogDetectbuttonsData;
 
 struct cdialog_detectbuttons_work {
-	bool detecting;
-	bool waitForRelease;
+	unsigned int flags;
 	PadutilButtons buttons;
 	char buf[CDIALOG_DETECTBUTTONS_BUF_LENGTH];
 	PadutilButtonName *buttonNames;
+	
+	PadutilButtonName **availButtonNames;
+	unsigned char availButtonCount;
+	unsigned char index;
 };
 
 typedef struct {

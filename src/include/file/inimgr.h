@@ -20,7 +20,7 @@
 #include "memory/dmem.h"
 #include "file/fiomgr.h"
 #include "util/strutil.h"
-#include "cgerrs.h"
+#include "cgerrno.h"
 
 #ifdef PSP_USE_KERNEL_LIBC
 #include "sysclib.h"
@@ -29,7 +29,7 @@
 /*-----------------------------------------------
 	íËêî
 -----------------------------------------------*/
-#define INIMGR_SECTION_BUFFER  64
+#define INIMGR_SECTION_BUFFER  32
 #define INIMGR_ENTRY_BUFFER   255
 
 #define INIMGR_ERROR_INVALID_SIGNATURE -1

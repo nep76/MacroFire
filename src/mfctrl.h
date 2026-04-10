@@ -8,14 +8,17 @@
 #ifndef MFCTRL_H
 #define MFCTRL_H
 
-#define MFEXCLUDE_CTRL
 #include "macrofire.h"
-#undef MFEXCLUDE_CTRL
 
 /*=========================================================
 	マクロ
 =========================================================*/
 #define MF_CTRL_BUFFER_LENGTH 250
+
+#define MF_CTRL_INI_ERROR_OK                  0
+#define MF_CTRL_INI_ERROR_INVALID_CONF        1
+#define MF_CTRL_INI_ERROR_UNSUPPORTED_VERSION 2
+#define MF_CTRL_INI_ERROR_NOT_ENOUGH_MEMORY   3
 
 /*=========================================================
 	設定構造体
@@ -28,14 +31,22 @@ typedef struct {
 typedef struct {
 	PadutilButtons availButtons;
 } MfCtrlDefGetButtonsPref;
-/*
+
+typedef enum {
+	MF_CTRL_INI_LOAD = 0x00000001,
+	MF_CTRL_INI_SAVE = 0x00000002,
+} MfCtrlDefIniAction;
+	
+typedef int ( *MfCtrlDefIniProc )( MfCtrlDefIniAction, const char* );
+
 typedef struct {
-	char *initDir;
-	char *initFilename;
-	size_t pathMax
-	unsigned int options;
-} MfCtrlDefGetFilenamePref;
-*/
+	char   *title;
+	char   *initDir;
+	char   *initFilename;
+	size_t pathMax;
+} MfCtrlDefIniPref;
+
+
 /*=========================================================
 	関数定義
 =========================================================*/
@@ -48,6 +59,7 @@ bool mfCtrlDefGetButtons( MfMessage message, const char *label, void *var, void 
 bool mfCtrlDefGetNumber( MfMessage message, const char *label, void *var, void *pref, void *ex );
 unsigned int mfCtrlVarGetNum( void *num, unsigned int max );
 void mfCtrlVarSetNum( void *num, unsigned int max, unsigned int value );
-/*bool mfCtrlDefGetFilename( MfMessage message, const char *label, void *var, void *pref, void *ex );*/
+bool mfCtrlDefIniLoad( MfMessage message, const char *label, void *loader, void *pref, void *ex );
+bool mfCtrlDefIniSave( MfMessage message, const char *label, void *saver, void *pref, void *ex );
 
 #endif

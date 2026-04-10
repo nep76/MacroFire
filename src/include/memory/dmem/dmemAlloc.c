@@ -8,23 +8,25 @@ static struct dmem_heap *dmem_heap_new( size_t heapsize, int type );
 void *dmemAlloc( DmemUID uid, size_t size )
 {
 	struct dmem_root *root = (struct dmem_root *)uid;
-	struct dmem_heap **ptr;
+	struct dmem_heap **ptr = NULL;
 	
 	if( ! root->lastUse ){
 		/* まだヒープが一つも無ければ最初のヒープを作成する */
 		root->heapList = dmem_heap_new( dmem_need_heapsize( root->minHeapSize, size ), root->allocType );
 		if( ! root->heapList ) return NULL;
 		root->lastUse = root->heapList;
-	} else if( root->lastUse->maxFreeSize < size + DMEM_HEADER_SIZE ){
+		ptr = heapAlloc( root->lastUse->uid, size + sizeof( struct dmem_heap * ) );
+	} else if( ! ( ptr = heapAlloc( root->lastUse->uid, size + sizeof( struct dmem_heap * ) ) ) ){
 		struct dmem_heap *heap;
 		
 		/* 十分な空き容量のあるヒープを探す */
 		for( heap = root->heapList; heap; heap = heap->next ){
-			if( heap->maxFreeSize >= size + DMEM_HEADER_SIZE ) break;
+			ptr = heapAlloc( heap->uid, size + sizeof( struct dmem_heap * ) );
+			if( ptr ) break;
 		}
 		
 		/* 空きが無ければ新規作成 */
-		if( ! heap ){
+		if( ! ptr ){
 			struct dmem_heap *last;
 			
 			heap = dmem_heap_new( dmem_need_heapsize( root->minHeapSize, size ), root->allocType );
@@ -32,19 +34,17 @@ void *dmemAlloc( DmemUID uid, size_t size )
 			
 			for( last = root->lastUse; last->next; last = last->next );
 			last->next = heap;
+			
+			ptr = heapAlloc( heap->uid, size + sizeof( struct dmem_heap * ) );
 		}
 		root->lastUse = heap;
 	}
 	
-	/* 空きを見つけた、あるいは新規作成したヒープからメモリを確保し、親となるヒープのポインタをセット */
-	ptr = heapAlloc( root->lastUse->uid, size + sizeof( struct dmem_heap * ) );
+	/* 親となるヒープのポインタをセット */
 	*ptr = root->lastUse;
 	
 	/* 割り当てカウントを増加 */
 	root->lastUse->count++;
-	
-	/* ヒープの空き容量を更新 */
-	root->lastUse->maxFreeSize = heapMaxFreeSize( root->lastUse->uid );
 	
 	/* 親となるヒープのポインタが書かれている部分の後ろをメモリ領域として返す */
 	return (void *)( (uintptr_t)ptr + sizeof( struct dmem_heap * ) );
@@ -64,12 +64,11 @@ static size_t dmem_need_heapsize( size_t minblock, size_t requestsize )
 static struct dmem_heap *dmem_heap_new( size_t heapsize, int type )
 {
 	struct dmem_heap *newheap;
-	HeapUID huid = heapExCreate( "DmemHeap", MEMORY_USER, 0, heapsize, type, NULL );
+	HeapUID huid = heapExCreate( "DmemHeap", MEMORY_USER, heapsize, type );
 	if( ! huid ) return NULL;
 	
 	newheap              = heapAlloc( huid, sizeof( struct dmem_heap ) );
 	newheap->uid         = huid;
-	newheap->maxFreeSize = heapMaxFreeSize( huid );
 	newheap->count       = 0;
 	newheap->next        = NULL;
 	

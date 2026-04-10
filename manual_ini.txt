@@ -1,20 +1,18 @@
-MacroFire 3.0.13
+MacroFire 3.1.0
 
 目次
 =================================================
 
   - 設定ファイルの書き方
-  - ボタン定義について
-  - 設定
-      - [Main]セクション
-      - [Menu]セクション
-      - [AlternativeButtons]セクション
-      - [AnalogStick]セクション
-      - [Default]セクション
+  - ボタン設定について
+  - macrofire.iniの検索パス
   - 起動時に読み込まれる設定ファイルをゲームごとに切り変えるには
   - MacroFireメニュー上部の[ID: xxx / Loaded: xxx]の意味
   - [ID: xxx / Loaded: Built-in]について
   - 起動時に検索されるセクションの名前と順番
+  - 設定
+      - [Default]セクション
+      - [AlternativeButtons]セクション
 
 =================================================
 
@@ -34,11 +32,11 @@ MacroFire 3.0.13
   これはWindowsのINIファイルと同じフォーマットです。
 
 
-ボタン定義について
+ボタン設定について
 -------------------------------------------------
   設定値の内容は、設定によって様々ですが、
-  単なる数値やON/OFF以外によく使っているものとして、ボタン定義があります。
-  ボタン定義は、ボタンの組み合わせを設定する場合に使用されます。
+  単なる数値やON/OFF以外によく使っているものとして、ボタン設定があります。
+  これは、ボタンの組み合わせを設定する場合に使用されます。
 
   それぞれのボタンは以下の表の名前と対応しており、
   これらの名前をひとつ、あるいは「+」でつないで複数列挙します。
@@ -92,8 +90,8 @@ MacroFire 3.0.13
       Up + Down
       Up + Right + Down + Left
 
-  にような設定も可能です。
-  ですが、通常PSPの十字ボタンは押した方向と逆側のボタンを同時に押すことはできませんので、
+  のような設定も可能です。
+  ですが、通常PSPの十字ボタンは押した方向と逆側の方向を同時に押すことはできませんので、
   これは意味をなしません。
 
   それどころか、このような設定をメニュー起動ボタンにしてしまうと、
@@ -107,145 +105,14 @@ HOMEボタンについて
   詳しくはreadme.txtの「HOMEボタンの制約」の項を参照してください。
 
 
-設定
+macrofire.iniの検索パス
 -------------------------------------------------
-  設定可能な設定名と設定値、およびその詳細を紹介します。
+  通常macrofire.iniはmacrofire.prxと同じフォルダ内から検索されますが、
+  例外として、macrofire.prxが内蔵フラッシュメモリから起動された場合に限り
 
-  [Main]セクション
-  -----------------------------------------------
-    Startup
-      設定値: ON | OFF
+    ms0:/seplugins/macrofire.ini
 
-      起動時にMacroFire Engineを有効にするかどうかを設定します。
-        OFF : 起動時に有効状態にしない。
-        ON  : 起動時に有効状態にする。
-
-    MenuButtons
-      設定値: ボタン定義
-
-      デフォルトのButtons to launch the menuを設定します。
-      詳細はreadme.txt参照。
-
-    ToggleButtons
-      設定値: ボタン定義
-
-      デフォルトのButtons to toggle the engine stateを設定します。
-      詳細はreadme.txt参照。
-
-    StatusNotification
-      設定値: ON | OFF
-
-      デフォルトのEngine status notificationを設定します。
-      詳細はreadme.txt参照。
-
-  [AlternativeButtons]セクション
-  -----------------------------------------------
-    Select
-    Start
-    Up
-    Right
-    Down
-    Left
-    Ltrigger
-    Rtrigger
-    Triangle
-    Circle
-    Cross
-    Square
-    Home
-      設定値: ボタン定義
-
-      MacroFireのメニューの中でのみ機能する代替ボタンの設定です。
-      壊れたボタンをカバーするのが主な目的です。
-      この設定でメニューを操作可能にすることで、Remap settingsを行えるようにします。
-
-      上記のボタンに対して代替ボタンを設定します。
-      設定値が空の場合は代替ボタンは設定されず、そのままボタン名通りのボタンを使います。
-
-      例えば、スタートボタンが壊れていて反応しないなどの理由により
-      スタートボタンを代替ボタンを設定したい場合は、
-      Startエントリにのみ、代替ボタンにしたいボタンの組み合わせを設定します。
-
-        Start = LTrigger + RTrigger + Select
-
-  [AnalogStick]セクション
-  -----------------------------------------------
-    Movement
-      設定値: ON | OFF
-
-      デフォルトのAnalog stick movementを設定します。
-      詳細はmanual_analogsens.txt参照。
-
-    Deadzone
-      設定値: 0-182の数値
-
-      デフォルトのDeadzone radiusを設定します。
-      詳細はmanual_analogsens.txt参照。
-
-    Sensitivity
-      設定値: 0-200の数値
-
-      デフォルトのSensitivityを設定します。
-      詳細はmanual_analogsens.txt参照。
-
-    OriginX
-      設定値: 0-255の数値
-
-      デフォルトのOrigin X-coordinateを設定します。
-      詳細はmanual_analogsens.txt参照。
-
-    OriginY
-      設定値: 0-255の数値
-
-      デフォルトのOrigin Y-coordinateを設定します。
-      詳細はmanual_analogsens.txt参照。
-
-
-  [Default]セクション
-  -----------------------------------------------
-    UseGraphicsMemory
-      設定値: ON | OFF
-
-      ユーザメモリに空きがある場合、メニュー表示用にメモリを確保することを許可します。
-      安全に使用できるはずのメモリを確保しているので、ほとんどの場合ONでも問題ないはずです。
-      ところが、希にメニューを表示した時、あるいは終了した時にフリーズするソフトがあるようで、
-      その場合はこれをOFFにすると解決する可能性があります。
-      ただし、メニュー上での操作性は低下します。
-
-    UseVolatileMemory
-      設定値: ON | OFF
-
-      UseGraphicsMemoryがONのとき、使用するメモリをユーザメモリではなく4MBのカーネルメモリを使うかどうかを設定します。
-      ユーザメモリが少ない状態でもメニューの速度を低下させずに操作できるようになります。
-      ただし、ゲーム側がこの領域のメモリを使用している場合はおそらくフリーズします。
-      ネットワークに接続するゲームではONにしないほうが無難です。
-
-    Remap
-      設定値: ファイルパス(ms0:/～)
-
-      起動時に読み込ませるボタン再割り当て設定ファイルを指定します。
-      「ms0:/」からのフルパスで記述してください。
-
-    Rapidfire
-      設定値: ファイルパス(ms0:/～)
-
-      起動時に読み込ませる連射設定ファイルを指定します。
-      「ms0:/」からのフルパスで記述してください。
-
-    Macro1
-    Macro2
-    Macro3
-    Macro4
-    Macro5
-    Macro6
-    Macro7
-    Macro8
-    Macro9
-    Macro10
-      設定値: ファイルパス(ms0:/～)
-
-      起動時に読み込ませるマクロファイルを指定します。
-      「ms0:/」からのフルパスで記述してください。
+  を常に探しに行きます。
 
 
 起動時に読み込まれる設定ファイルをゲームごとに切り変えるには
@@ -253,23 +120,28 @@ HOMEボタンについて
   macrofire.iniにゲームIDのセクション名を記入し、そこに設定を書き込みます。
   たとえば以下のように:
   
-      [ULJM-05325]
-      UseGraphicsMemory = On
-      UseVolatileMemory = Off
-      Remap     = ms0:/macrofire/remap/analog_to_dpad.ini
+      [ULJM05325]
+      Startup = On
+      MenuButtons = VolUp + VolDown
+      ToggleButtons = NOTE
+      StatusNotification = Off
+      AnalogStickMovement = On
+      AnalogStickDeadzone = 40
+      AnalogStickSensitivity = 100
+      AnalogStickOriginX = 127
+      AnalogStickOriginY = 127
+      ForcedLowMemoryMode = Off
+      Remap = ms0:/macrofire/remap/analog_to_dpad.ini
       Rapidfire = ms0:/macrofire/rapidfire/SOSE.ini
-      Macro1    = ms0:/macrofire/macro/SOSE/auto_creation_shippitsu.ini
-      Macro2    = ms0:/macrofire/macro/SOSE/auto_creation_art.ini
+      Macro1 = ms0:/macrofire/macro/SOSE/auto_creation_shippitsu.ini
+      Macro2 = ms0:/macrofire/macro/SOSE/auto_creation_art.ini
   
-  このように設定することで、ゲームIDがULJM-05325のゲームを起動したときのみ
-  設定されているファイルを読み込みます。
+  このように設定することで、
+  ゲームIDがULJM-05325のゲームを起動したときのみこの設定値を使います。
   
   このゲームIDは、ゲームを起動した状態でMacroFireのメニューを表示させると、
   最上部に表示されています。
   
-  必要のないエントリは省略できます。
-  この場合、Macro3～10は使用していないので、書いていません。
-
   書き込めるエントリは、[Default]セクションと同じです。
 
 
@@ -289,22 +161,22 @@ MacroFireメニュー上部の[ID: xxx / Loaded: xxx]の意味
   実際に読み込んだセクション名を表しています。
 
   この双方が一致すれば単純にIDのみを表示しますが、
-  読み込もうとしたIDが存在せず、別のセクションを読み込んだ場合は「ロード」部分で実際に読み込んだセクション名を表示します。
+  読み込もうとしたIDが存在せず、別のセクションを読み込んだ場合は「Loaded」部分で実際に読み込んだセクション名を表示します。
   
   例えば、
 
-      ゲームが起動され[ULJM-05325]というセクションを読み込もうとしたが、
+      ゲームが起動され[ULJM05325]というセクションを読み込もうとしたが、
       そのセクションがINIファイルに設定されていないため、最終的に[Default]セクションを読み込んだ
 
   という場合は、
 
-      [ID: ULJM-05325 / Loaded: Default]
+      [ID: ULJM05325 / Loaded: Default]
 
   と表示されます。
 
-  逆に、[ULJM-05325]を読み込もうとし、それが成功した場合は、
+  逆に、[ULJM05325]を読み込もうとし、それが成功した場合は、
 
-      [ID: ULJM-05325]
+      [ID: ULJM05325]
 
   と表示されます。
 
@@ -312,14 +184,16 @@ MacroFireメニュー上部の[ID: xxx / Loaded: xxx]の意味
   何段階かに分かれて別のセクションを探します。
 
   また、目的のセクションが見つかった場合は、それより下位のセクションは読みません。
-  例えば目的のセクションが[ULJM-05325]だった時、
+  例えば目的のセクションが[ULJM05325]だった時、
 
-      [ULJM-05325]セクションのMacro1-10には何も設定されていないが、
+      [ULJM05325]セクションのMacro1-10には何も設定されていないが、
       [Default]セクションにはMacro1-5が設定されている
 
   という場合、Macro1-10すべてに何も設定されません。
-  [ULMJ-05325]セクションのMacro1-5が空だからといって、
+  [ULMJ05325]セクションのMacro1-5が空だからといって、
   それを[Default]セクションから引っ張ってきたりはしません。
+
+  つまり、最初に一致したセクションの設定値以外は、全く読み込みません。
 
 
 [ID: xxx / Loaded: Built-in]について
@@ -341,11 +215,144 @@ MacroFireメニュー上部の[ID: xxx / Loaded: xxx]の意味
   XMB:
     [VSH] -> [Default]
 
-  POPS (今のところPOPS上でPSゲームのゲームIDを取得できない):
-    [POPS] -> [Default]
+  POPS:
+    [<ゲームID (SLPS10000など)>] -> [POPS] -> [Default]
 
-  GAME:
-    [<ゲームID (あれば)>] -> [GAME] -> [Default]
+  GAME(UMD):
+    [<ゲームID (ULJM00001など)>] -> [GAME] -> [Default]
+
+  GAME(自作ソフト):
+    [<8文字のID (自作ソフトの実行ファイルから算出されるハッシュ値の一部)>] -> [GAME] -> [Default]
+
+
+設定
+-------------------------------------------------
+  設定可能な設定名と設定値、およびその詳細を紹介します。
+
+  [Default]セクション
+  -----------------------------------------------
+    Startup
+      設定値: On | Off
+
+      起動時にMacroFire Engineを有効にするかどうかを設定します。
+        OFF : 起動時に有効状態にしない。
+        ON  : 起動時に有効状態にする。
+
+    MenuButtons
+      設定値: ボタン設定
+
+      デフォルトのButtons to launch the menuを設定します。
+      詳細はreadme.txt参照。
+
+    ToggleButtons
+      設定値: ボタン設定
+
+      デフォルトのButtons to toggle the engine stateを設定します。
+      詳細はreadme.txt参照。
+
+    StatusNotification
+      設定値: On | Off
+
+      デフォルトのStatus notificationを設定します。
+      詳細はreadme.txt参照。
+
+    AnalogStickMovement
+      設定値: On | Off
+
+      デフォルトのAnalog stick movementを設定します。
+      詳細はmanual_analogsens.txt参照。
+
+    AnalogStickDeadzone
+      設定値: 0-182の数値
+
+      デフォルトのDeadzone radiusを設定します。
+      詳細はmanual_analogsens.txt参照。
+
+    AnalogStickSensitivity
+      設定値: 0-200の数値
+
+      デフォルトのSensitivityを設定します。
+      詳細はmanual_analogsens.txt参照。
+
+    AnalogStickOriginX
+      設定値: 0-255の数値
+
+      デフォルトのOrigin X-coordinateを設定します。
+      詳細はmanual_analogsens.txt参照。
+
+    AnalogStickOriginY
+      設定値: 0-255の数値
+
+      デフォルトのOrigin Y-coordinateを設定します。
+      詳細はmanual_analogsens.txt参照。
+
+    ForcedLowMemoryMode
+      設定値: On | Off
+
+      メニュー表示用のフレームバッファを確保することを禁止します。
+      通常、メモリが少ないときに自動で有効になる「Low Memory Mode」を強制します。
+      フレームバッファは、安全に使用できるはずのメモリから確保しているので、ほとんどの場合Offでも問題ないはずですが、
+      希にメニューを表示、あるいは終了した時にフリーズするソフトがあるようで、
+      その場合はこれをOnにすると解決する可能性があります。
+      ただし、メニュー上での操作性は低下します。
+
+    Remap
+      設定値: ファイルパス(ms0:/...)
+
+      起動時に読み込ませるボタン再割り当て設定ファイルを指定します。
+      「ms0:/」からのフルパスで記述してください。
+
+    Rapidfire
+      設定値: ファイルパス(ms0:/...)
+
+      起動時に読み込ませる連射設定ファイルを指定します。
+      「ms0:/」からのフルパスで記述してください。
+
+    Macro1
+      設定値: ファイルパス(ms0:/...)
+
+      起動時に読み込ませるマクロファイルを指定します。
+      「ms0:/」からのフルパスで記述してください。
+
+      この設定値はMacro2、Macro3...と数値を上げていくことで、いくつでも設定できます。
+      ただし、数値が連続していなければなりません。
+      例えば、
+          Macro1 = ms0:/...
+          Macro2 = ms0:/...
+          Macro3 = ms0:/...
+          Macro5 = ms0:/...
+      このように設定された場合、
+      Macro4が存在しないため、MacroFireはMacro3までしか設定されていないと認識しMacro5は読み込まれません。
+
+  [AlternativeButtons]セクション
+  -----------------------------------------------
+    Select
+    Start
+    Up
+    Right
+    Down
+    Left
+    Ltrigger
+    Rtrigger
+    Triangle
+    Circle
+    Cross
+    Square
+    Home
+      設定値: ボタン設定
+
+      MacroFireのメニューの中でのみ機能する代替ボタンの設定です。
+      壊れたボタンをカバーするのが主な目的です。
+      この設定でメニューを操作可能にすることで、Remap settingsを行えるようにします。
+
+      上記のボタンに対して代替ボタンを設定します。
+      設定値が空の場合は代替ボタンは設定されず、そのままボタン名通りのボタンを使います。
+
+      例えば、スタートボタンが壊れていて反応しないなどの理由により
+      スタートボタンを代替ボタンを設定したい場合は、
+      Startエントリにのみ、代替ボタンにしたいボタンの組み合わせを設定します。
+
+        Start = LTrigger + RTrigger + Select
 
 
 -------------------------------------------------

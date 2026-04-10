@@ -8,9 +8,7 @@
 #ifndef MFRAPIDFIRE_H
 #define MFRAPIDFIRE_H
 
-#define MFEXCLUDE_RAPIDFIRE
 #include "macrofire.h"
-#undef MFEXCLUDE_RAPIDFIRE
 #include <psprtc.h>
 
 /*=========================================================
@@ -38,11 +36,27 @@ typedef enum {
 	MF_RAPIDFIRE_MODE_HOLD
 } MfRapidfireMode;
 
+typedef struct {
+	unsigned int    button;       /* 対象ボタン */
+	MfRapidfireMode mode;         /* モード */
+	unsigned int    pressDelay;   /* 連射時のディレイ */
+	unsigned int    releaseDelay; /* 連射時のディレイ */
+	unsigned int    nextDelay;    /* 次のボタンアクションまでの待ち時間 */
+	bool            autorun;      /* ボタンが押下されていなくとも自動実行するかどうか */
+	unsigned int    bitFlags;     /* モードに応じて必要なフラグがセットされる */
+} MfRapidfireData;
+
+typedef struct {
+	uint64_t lastTick;
+	MfRapidfireData pref[MF_RAPIDFIRE_NUMBER_OF_AVAIL_BUTTONS];
+} MfRapidfireParams;
+
 /*=========================================================
 	関数
 =========================================================*/
 MfRapidfireUID mfRapidfireNew( void );
 void mfRapidfireDestroy( MfRapidfireUID uid );
+MfRapidfireUID mfRapidfireBind( MfRapidfireParams *params );
 void mfRapidfireSetRapid( MfRapidfireUID uid, unsigned int buttons, unsigned int pdelay, unsigned int rdelay, bool autorun );
 void mfRapidfireSetHold( MfRapidfireUID uid, unsigned int buttons, bool autorun );
 void mfRapidfireClear( MfRapidfireUID uid, unsigned int buttons );

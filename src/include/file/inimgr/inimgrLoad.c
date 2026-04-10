@@ -7,6 +7,7 @@ static enum inimgr_line_type inimgr_parse_line( const char *line, char **start )
 int inimgrLoad( IniUID uid, const char *inipath, const char *sig, unsigned char major, unsigned char minor, unsigned char rev )
 {
 	FiomgrHandle fh;
+	int    ret = CG_ERROR_OK;
 	char   buf[INIMGR_ENTRY_BUFFER];
 	struct inimgr_callback_info *callback_info    = NULL;
 	struct inimgr_params        *params           = (struct inimgr_params *)uid;
@@ -129,7 +130,7 @@ int inimgrLoad( IniUID uid, const char *inipath, const char *sig, unsigned char 
 	if( callback_info ) callback_info->length = fiomgrTell( fh ) - callback_info->offset;
 	
 	/* コールバックセクションの処理 */
-	for( callback = params->callbacks; callback; callback = callback->next ){
+	for( callback = params->callbacks; ret == CG_ERROR_OK && callback; callback = callback->next ){
 		InimgrCallbackParams cb_params;
 		
 		if( ! callback->cb ) continue;
@@ -143,13 +144,13 @@ int inimgrLoad( IniUID uid, const char *inipath, const char *sig, unsigned char 
 			fiomgrSeek( fh, callback_info->offset, FH_SEEK_SET );
 			buf[0] = '\0';
 			
-			( (InimgrCallback)callback->cb )( INIMGR_CB_LOAD, &cb_params, buf, sizeof( buf ), callback->arg );
+			ret = ( (InimgrCallback)callback->cb )( INIMGR_CB_LOAD, &cb_params, buf, sizeof( buf ), callback->arg );
 		}
 	}
 	
 	fiomgrClose( fh );
 	
-	return CG_ERROR_OK;
+	return ret;
 	
 	/* シグネチャ異常 */
 	EXCEPTION_INVALID_SIGNATURE:

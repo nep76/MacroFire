@@ -25,14 +25,16 @@ extern "C" {
 =========================================================*/
 typedef enum {
 	CDIALOG_MESSAGE_YESNO = 0x00000001,
+	CDIALOG_MESSAGE_ERROR = 0x00000002
 } CdialogMessageOptions;
 
 typedef int ( *CdialogMessageCallback )( unsigned short x, unsigned short y, struct cdialog_dev_color *colors );
 
 typedef struct {
 	char title[CDIALOG_MESSAGE_TITLE_LENGTH];
-	unsigned int options;
 	char message[CDIALOG_MESSAGE_LENGTH];
+	unsigned int errorcode;
+	unsigned int options;
 	
 	unsigned int width, height;
 	CdialogMessageCallback callback;

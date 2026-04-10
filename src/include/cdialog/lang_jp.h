@@ -21,12 +21,14 @@
 /* ボタン検出 */
 #define CDIALOG_STR_DETECTBUTTONS_DESC            "1つ選んでください"
 #define CDIALOG_STR_DETECTBUTTONS_START           "ボタン検出開始"
+#define CDIALOG_STR_DETECTBUTTONS_CHOOSE          "リストから選択"
 #define CDIALOG_STR_DETECTBUTTONS_CLEAR           "現在のボタンをクリア"
 #define CDIALOG_STR_DETECTBUTTONS_CANCEL          "キャンセル"
 #define CDIALOG_STR_DETECTBUTTONS_ACCEPT          "決定"
 #define CDIALOG_STR_DETECTBUTTONS_CURRENT_BUTTONS "現在のボタン:"
 #define CDIALOG_STR_DETECTBUTTONS_DETECT_DESC     "組み合わせたいボタンを押してください。\n\n既に検出されているボタンをもう一度押すと終了します。"
 #define CDIALOG_STR_DETECTBUTTONS_NOW_DETECTING   "検出中..."
+#define CDIALOG_STR_DETECTBUTTONS_CHOOSE_EXIT     "終了"
 
 /* ファイル名取得 */
 #define CDIALOG_STR_GETFILENAME_SAVE_IN                 "セーブ"
