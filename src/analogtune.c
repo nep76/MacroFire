@@ -15,11 +15,11 @@ static AnalogtuneDeadzone st_deadzone = {
 };
 	
 static MfMenuItem st_menu_table[] = {
-	{ "Deadzone radius: %d %s",     mfMenuDefGetNumberProc, &(st_deadzone.r),  { { .string = "Set deadzone radius"  }, { .string = "(0-128)"  }, { .integer = 3 }, { .integer = 1 } } },
-	{ "Sensitivity    : %d %s",     mfMenuDefGetNumberProc, &(st_sensitivity), { { .string = "Set sensitivity rate" }, { .string = "% (0-200)"}, { .integer = 3 }, { .integer = 1 } } },
+	{ "Deadzone radius: %d %s",     mfMenuDefGetNumberProc, &(st_deadzone.r),  { { .string = "Set deadzone radius"  }, { .string = "(0-128)"  }, { .integer = 3 }, { .integer = 1 }, { .integer = 128 } } },
+	{ "Sensitivity    : %d %s",     mfMenuDefGetNumberProc, &(st_sensitivity), { { .string = "Set sensitivity rate" }, { .string = "% (0-200)"}, { .integer = 3 }, { .integer = 1 }, { .integer = 200 } } },
 	{ NULL },
-	{ "Origin X-coordinate: %d %s", mfMenuDefGetNumberProc, &(st_deadzone.x),  { { .string = "Set origin X-coordinate" }, { .string = "(0-255)" }, { .integer = 3 }, { .integer = 1 } } },
-	{ "Origin Y-coordinate: %d %s", mfMenuDefGetNumberProc, &(st_deadzone.y),  { { .string = "Set origin Y-coordinate" }, { .string = "(0-255)" }, { .integer = 3 }, { .integer = 1 } } },
+	{ "Origin X-coordinate: %d %s", mfMenuDefGetNumberProc, &(st_deadzone.x),  { { .string = "Set origin X-coordinate" }, { .string = "(0-255)" }, { .integer = 3 }, { .integer = 1 }, { .integer = 255 } } },
+	{ "Origin Y-coordinate: %d %s", mfMenuDefGetNumberProc, &(st_deadzone.y),  { { .string = "Set origin Y-coordinate" }, { .string = "(0-255)" }, { .integer = 3 }, { .integer = 1 }, { .integer = 255 } } },
 };
 
 /*-----------------------------------------------

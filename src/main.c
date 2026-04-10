@@ -66,8 +66,6 @@ static int mf_read_pad_buffer( MfSceCtrlDataFunc func, SceCtrlData *pad, int cou
 	int ret = ( func )( pad, count );
 	
 	analogtuneTune( pad, NULL );
-	pad->Buttons |= ctrlpadUtilGetAnalogDirection( pad->Lx, pad->Ly, 0 );
-	
 	mfRapidfire( 0, mode, pad );
 	
 	if( mode != MF_CALL_INTERNAL ){
@@ -81,12 +79,12 @@ static int mf_read_pad_buffer( MfSceCtrlDataFunc func, SceCtrlData *pad, int cou
 
 int mfCtrlPeekBufferPositive( SceCtrlData *pad, int count )
 {
-	return mf_read_pad_buffer( Hooktable[0].exported.entrypoint, pad, count, MF_CALL_READ );
+	return mf_read_pad_buffer( Hooktable[MF_CTRL_PEEK_BUFFER_POSITIVE].exported.entrypoint, pad, count, MF_CALL_READ );
 }
 
 int mfCtrlPeekBufferNegative( SceCtrlData *pad, int count )
 {
-	int ret = mf_read_pad_buffer( Hooktable[0].exported.entrypoint, pad, count, MF_CALL_READ );
+	int ret = mf_read_pad_buffer( Hooktable[MF_CTRL_PEEK_BUFFER_POSITIVE].exported.entrypoint, pad, count, MF_CALL_READ );
 	
 	pad->Buttons = ~pad->Buttons;
 	
@@ -95,12 +93,12 @@ int mfCtrlPeekBufferNegative( SceCtrlData *pad, int count )
 
 int mfCtrlReadBufferPositive( SceCtrlData *pad, int count )
 {
-	return mf_read_pad_buffer( Hooktable[2].exported.entrypoint, pad, count, MF_CALL_READ );
+	return mf_read_pad_buffer( Hooktable[MF_CTRL_READ_BUFFER_POSITIVE].exported.entrypoint, pad, count, MF_CALL_READ );
 }
 
 int mfCtrlReadBufferNegative( SceCtrlData *pad, int count )
 {
-	int ret = mf_read_pad_buffer( Hooktable[2].exported.entrypoint, pad, count, MF_CALL_READ );
+	int ret = mf_read_pad_buffer( Hooktable[MF_CTRL_READ_BUFFER_POSITIVE].exported.entrypoint, pad, count, MF_CALL_READ );
 	
 	pad->Buttons = ~pad->Buttons;
 	
@@ -113,7 +111,7 @@ int mfCtrlPeekLatch( SceCtrlLatch *latch )
 	int ret;
 	unsigned int k1 = pspSdkSetK1( 0 );
 	
-	ret = mf_read_pad_buffer( Hooktable[0].exported.entrypoint, &pad, 1, MF_CALL_LATCH );
+	ret = mf_read_pad_buffer( Hooktable[MF_CTRL_PEEK_BUFFER_POSITIVE].exported.entrypoint, &pad, 1, MF_CALL_LATCH );
 	
 	pspSdkSetK1( k1 );
 	
@@ -133,7 +131,7 @@ int mfCtrlReadLatch( SceCtrlLatch *latch )
 	int ret;
 	unsigned int k1 = pspSdkSetK1( 0 );
 	
-	ret = mf_read_pad_buffer( Hooktable[0].exported.entrypoint, &pad, 1, MF_CALL_LATCH );
+	ret = mf_read_pad_buffer( Hooktable[MF_CTRL_PEEK_BUFFER_POSITIVE].exported.entrypoint, &pad, 1, MF_CALL_LATCH );
 	
 	pspSdkSetK1( k1 );
 	
@@ -197,10 +195,10 @@ int main_thread( SceSize arglen, void *argp )
 		ini = inimgrNew();
 		if( ini > 0 ){
 			char buttons[128];
-			if( inimgrLoad( ini, "ms0:/seplugins/macrofire.ini" ) != 0 ){
+			if( inimgrLoad( ini, MFM_INI_FILENAME ) != 0 ){
 				inimgrSetBool( ini, "Main", "Startup", MF_INIDEF_MAIN_STARTUP );
-				inimgrSetString( ini, "Main", "MenuButtons",   MF_INIDEF_MAIN_MENUBUTTONSNAME );
-				inimgrSetString( ini, "Main", "ToggleButtons", MF_INIDEF_MAIN_TOGGLEBUTTONSNAME );
+				inimgrSetString( ini, "Main", "MenuButtons",   MF_INIDEF_MAIN_MENUBUTTONS );
+				inimgrSetString( ini, "Main", "ToggleButtons", MF_INIDEF_MAIN_TOGGLEBUTTONS );
 				
 				analogtuneCreateIni( ini );
 				
@@ -208,15 +206,15 @@ int main_thread( SceSize arglen, void *argp )
 					if( mftable[i].ciFunc ) ( mftable[i].ciFunc )( ini );
 				}
 				
-				inimgrSave( ini, "ms0:/seplugins/macrofire.ini" );
+				inimgrSave( ini, MFM_INI_FILENAME );
 			}
 			
 			gMfEngine = inimgrGetBool( ini, "Main", "Startup", false );
 			
-			inimgrGetString( ini, "Main", "MenuButtons", MF_INIDEF_MAIN_MENUBUTTONSNAME, buttons, sizeof( buttons ) );
+			inimgrGetString( ini, "Main", "MenuButtons", MF_INIDEF_MAIN_MENUBUTTONS, buttons, sizeof( buttons ) );
 			gMfMenu = ctrlpadUtilStringToButtons( buttons );
 			
-			inimgrGetString( ini, "Main", "ToggleButtons", MF_INIDEF_MAIN_TOGGLEBUTTONSNAME, buttons, sizeof( buttons ) );
+			inimgrGetString( ini, "Main", "ToggleButtons", MF_INIDEF_MAIN_TOGGLEBUTTONS, buttons, sizeof( buttons ) );
 			gMfToggle = ctrlpadUtilStringToButtons( buttons );
 			
 			analogtuneLoadIni( ini );
@@ -234,7 +232,7 @@ int main_thread( SceSize arglen, void *argp )
 		
 		if( st_apihooked ){
 			unsigned int k1 = pspSdkSetK1( 0 );
-			mf_read_pad_buffer( Hooktable[0].exported.entrypoint, &st_pad_data, 1, MF_CALL_INTERNAL );
+			mf_read_pad_buffer( Hooktable[MF_CTRL_PEEK_BUFFER_POSITIVE].exported.entrypoint, &st_pad_data, 1, MF_CALL_INTERNAL );
 			pspSdkSetK1( k1 );
 		} else{
 			sceCtrlPeekBufferPositive( &st_pad_data, 1 );
@@ -314,12 +312,7 @@ int module_start( SceSize arglen, void *argp )
 	SceUID thid;
 	
 	thid = sceKernelCreateThread( "MacroFire", main_thread, 32, 0x1200, 0, 0 );
-	
-	/* MacroFireへカレントディレクトリ設定 */
-	if( thid ){
-		sceIoChangeThreadCwd( thid, MFM_WORKING_DIRECTORY );
-		sceKernelStartThread( thid, arglen, argp );
-	}
+	if( thid ) sceKernelStartThread( thid, arglen, argp );
 	
 	return 0;
 }

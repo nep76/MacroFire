@@ -104,16 +104,14 @@ void macroIntr( const bool mfengine )
 void macroMain( MfCallMode mode, SceCtrlData *pad, void *argp )
 {
 	int i;
-	SceCtrlData dupe_pad;
 	
 	if( ! pad ) return;
-	dupe_pad = *pad;
 	
 	for( i = 0; i < MACRO_MAX_SLOT; i++ ){
 		if( ! st_macro[i].current.macro ) continue;
 		
 		if( st_macro[i].runButtons ){
-			bool trigger = ( ( dupe_pad.Buttons & (~( ~0 ^ st_macro[i].runButtons )) ) == st_macro[i].runButtons ) ? true : false;
+			bool trigger = ( ( ( pad->Buttons | ctrlpadUtilGetAnalogDirection( pad->Lx, pad->Ly, 0 ) ) & (~( ~0 ^ st_macro[i].runButtons )) ) == st_macro[i].runButtons ) ? true : false;
 			
 			if( trigger && st_macro[i].current.hotkeyEnable ){
 				if( st_macro[i].current.runMode == MRM_NONE ){
@@ -149,8 +147,8 @@ MfMenuRc macroMenu( SceCtrlData *pad_data, void *arg )
 			case MR_CONTINUE:
 				gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 4 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Please choose a operation." );
 				switch( selected ){
-					case MACRO_SELECT_SLOT  : gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 25 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Macro slot number" );
-					case MACRO_SET_TRIGGER  : gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 25 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Buttons to run the macro" );
+					case MACRO_SELECT_SLOT  : gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 25 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Macro slot number." ); break;
+					case MACRO_SET_TRIGGER  : gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 25 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Buttons to run the macro." ); break;
 					case MACRO_RUN_ONCE     : gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 25 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Running currently macro for once." ); break;
 					case MACRO_RUN_INFINITY : gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 25 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Running currently macro for endless." ); break;
 					case MACRO_RUN_HALT     : gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 25 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Stopping currently running macro." ); break;
@@ -264,7 +262,6 @@ static bool macro_stop( MacroEntry *entry )
 static void macro_init_tempdata( struct macro_tempdata *temp )
 {
 	temp->buttons     = 0;
-	temp->analogMove  = false;
 	temp->analogCoord = MACROMGR_ANALOG_NEUTRAL;
 	temp->rtc         = 0;
 }
@@ -532,6 +529,7 @@ static void macro_record( MfCallMode mode, SceCtrlData *pad, void *argp )
 	MacroEntry   *entry;
 	unsigned int current_buttons;
 	uint64_t     current_analog_coord = MACROMGR_ANALOG_NEUTRAL;
+	bool         analog_move          = false;
 	
 	if( mode == MF_CALL_LATCH || ! pad || ! argp ) return;
 	
@@ -539,9 +537,10 @@ static void macro_record( MfCallMode mode, SceCtrlData *pad, void *argp )
 	current_buttons = pad->Buttons & 0x0000FFFF;
 	if( entry->analogStick ){
 		current_analog_coord = MACROMGR_SET_ANALOG_XY( pad->Lx, pad->Ly );
+		if( current_analog_coord != entry->current.temp.analogCoord ) analog_move = true;
 	}
 	
-	if( entry->current.temp.buttons == current_buttons && entry->current.temp.analogCoord ){
+	if( entry->current.temp.buttons == current_buttons && ! analog_move ){
 		/* ボタンもアナログスティックも前回と同じ場合は、ディレイを更新して終了 */
 		macro_update_delayms( entry->current.command, entry->current.temp.rtc );
 		return;
@@ -567,30 +566,29 @@ static void macro_record( MfCallMode mode, SceCtrlData *pad, void *argp )
 			entry->current.command->action = MA_BUTTONS_CHANGE;
 			entry->current.command->data   = current_buttons;
 			entry->current.command->sub    = 0;
+			entry->current.command         = macromgrInsertAfter( entry->current.command );
 		} else if( press_buttons ){
 			entry->current.command->action = MA_BUTTONS_PRESS;
 			entry->current.command->data   = press_buttons;
 			entry->current.command->sub    = 0;
+			entry->current.command         = macromgrInsertAfter( entry->current.command );
 		} else if( release_buttons ){
 			entry->current.command->action = MA_BUTTONS_RELEASE;
 			entry->current.command->data   = release_buttons;
 			entry->current.command->sub    = 0;
+			entry->current.command         = macromgrInsertAfter( entry->current.command );
 		}
 		
+		/* コマンドの追加に失敗していれば終了 */
+		if( ! entry->current.command ) return;
+		
 		/* アナログスティックが動いていれば移動コマンドをセット */
-		if( current_analog_coord != entry->current.temp.analogCoord ){
-			if( press_buttons || release_buttons ){
-				entry->current.command = macromgrInsertAfter( entry->current.command );
-				/* コマンドの追加に失敗していれば終了 */
-				if( ! entry->current.command ) return;
-			}
+		if( analog_move ){
 			entry->current.command->action = MA_ANALOG_MOVE;
 			entry->current.command->data   = current_analog_coord;
 			entry->current.command->sub    = 0;
+			entry->current.command         = macromgrInsertAfter( entry->current.command );
 		}
-		
-		/* 次のコマンドの準備 */
-		entry->current.command = macromgrInsertAfter( entry->current.command );
 		
 		/* コマンドの追加に失敗していれば終了 */
 		if( ! entry->current.command ) return;
@@ -620,7 +618,7 @@ static void macro_trace( MfCallMode mode, SceCtrlData *pad, void *argp )
 		return;
 	}
 	
-	for( ; ; ){
+	for( ; ; entry->current.command = entry->current.command->next ){
 		/* 現在のコマンドがNULLの場合は、実行待ち */
 		if( ! entry->current.command ){
 			if( (entry->current.runLoop)-- ){
@@ -641,17 +639,18 @@ static void macro_trace( MfCallMode mode, SceCtrlData *pad, void *argp )
 				entry->current.temp.rtc = rtc;
 			} else if( ( rtc - entry->current.temp.rtc ) / 1000 > entry->current.command->data ){
 				entry->current.temp.rtc = 0;
-				entry->current.command = entry->current.command->next;
 				continue;
 			}
 		} else if( entry->current.command->action == MA_BUTTONS_PRESS ){
+			if( ! entry->current.command->data ) continue;
 			entry->current.temp.buttons |= entry->current.command->data;
 		} else if( entry->current.command->action == MA_BUTTONS_RELEASE ){
+			if( ! entry->current.command->data ) continue;
 			entry->current.temp.buttons ^= entry->current.command->data;
 		} else if( entry->current.command->action == MA_BUTTONS_CHANGE ){
+			if( ! entry->current.command->data ) continue;
 			entry->current.temp.buttons = entry->current.command->data;
 		} else if( entry->current.command->action == MA_ANALOG_MOVE ){
-			entry->current.temp.analogMove = true;
 			entry->current.temp.analogCoord = entry->current.command->data;
 		} else if( entry->current.command->action == MA_RAPIDFIRE_START ){
 			mfRapidfireSet(
@@ -660,18 +659,16 @@ static void macro_trace( MfCallMode mode, SceCtrlData *pad, void *argp )
 				MF_RAPIDFIRE_MODE_AUTORAPID,
 				MACROMGR_GET_RAPIDPDELAY( entry->current.command->sub ),
 				MACROMGR_GET_RAPIDRDELAY( entry->current.command->sub )
-			);		
+			);
 		} else if( entry->current.command->action == MA_RAPIDFIRE_STOP ){
 			mfRapidfireClear( entry->current.rfUid, (unsigned int)(entry->current.command->data) );
 		}
 		
 		mfRapidfire( entry->current.rfUid, mode, pad );
-	
+		
 		pad->Buttons |= entry->current.temp.buttons;
-		if( entry->current.temp.analogMove ){
-			pad->Lx = MACROMGR_GET_ANALOG_X( entry->current.temp.analogCoord );
-			pad->Ly = MACROMGR_GET_ANALOG_Y( entry->current.temp.analogCoord );
-		}
+		pad->Lx = MACROMGR_GET_ANALOG_X( entry->current.temp.analogCoord );
+		pad->Ly = MACROMGR_GET_ANALOG_Y( entry->current.temp.analogCoord );
 		
 		/* 次のコマンドへ */
 		if( entry->current.command->action != MA_DELAY ) entry->current.command = entry->current.command->next;

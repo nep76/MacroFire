@@ -5,6 +5,13 @@
 #ifndef HOOKTABLE_H
 #define HOOKTABLE_H
 
+#define MF_CTRL_PEEK_BUFFER_POSITIVE 0
+#define MF_CTRL_PEEK_BUFFER_NEGATIVE 1
+#define MF_CTRL_READ_BUFFER_POSITIVE 2
+#define MF_CTRL_READ_BUFFER_NEGATIVE 3
+#define MF_CTRL_PEEK_LATCH           4
+#define MF_CTRL_READ_LATCH           5
+
 typedef struct {
 	struct {
 		void *addr;

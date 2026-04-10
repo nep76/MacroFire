@@ -17,7 +17,7 @@ PRX_EXPORTS = exports.exp
 # 優先的にカーネルモードの方(psp***_driver)をリンクしようとするみたい。
 USE_KERNEL_LIBS = 1
 
-CLASSG_LIBS = libs
+CLASSG_LIBS = include
 
 INCDIR = $(CLASSG_LIBS)
 CFLAGS = -O2 -G0 -Wall -fno-strict-aliasing -fno-builtin-printf

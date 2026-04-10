@@ -63,7 +63,6 @@ enum macro_error_codes {
 
 struct macro_tempdata {
 	unsigned int buttons;
-	bool         analogMove;
 	uint64_t     analogCoord;
 	uint64_t     rtc;
 };
