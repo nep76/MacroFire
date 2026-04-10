@@ -22,9 +22,10 @@ static void mf_draw_base( void );
 /*-----------------------------------------------
 	ローカル変数
 -----------------------------------------------*/
-static bool          st_interrupt = true;
-static bool          st_menu_quit = false;
-static bool          st_dialog    = false;
+static bool          st_interrupt     = true;
+static bool          st_menu_quit     = false;
+static bool          st_dialog        = false;
+static bool          st_update_screen;
 static uint64_t      st_wait_micro_sec = 0;
 static SceUID        st_thids_first[MFM_MAX_NUMBER_OF_THREADS];
 static int           st_thnum_first;
@@ -98,8 +99,9 @@ void mfDebug( struct mf_buffers *buf )
 
 	
 	gbPrintf( gbOffsetChar( 1 ), gbOffsetLine( 0 ), MFM_TITLE_TEXT_COLOR, MFM_TRANSPARENT,
-		"%d",
-		mfRunEnv()
+		"%d %x",
+		mfRunEnv(),
+		st_pad_data.Buttons
 	);
 		
 	gbPrintf( gbOffsetChar( 1 ), gbOffsetLine( 2 ), MFM_TITLE_TEXT_COLOR, MFM_TRANSPARENT,
@@ -166,7 +168,7 @@ static bool mf_alloc_buffers( struct mf_buffers *buf, void *orig_buffer )
 			buf->frame.draw    = memsceMalloc( buf->frame.size );
 			if( ! buf->frame.draw ) return false;
 		} else{
-			return false;
+			buf->frame.display = orig_buffer;
 		}
 	}
 	return true;
@@ -196,7 +198,7 @@ static void mf_draw_base( void )
 {
 	gbFillRect( 0, 0, SCR_WIDTH, gbOffsetLine( 3 ), MFM_TITLE_BAR_COLOR );
 	gbFillRect( 0, SCR_HEIGHT - gbOffsetLine( 3 ), SCR_WIDTH, SCR_HEIGHT, MFM_INFO_BAR_COLOR );
-	gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 1 ), MFM_TITLE_TEXT_COLOR, MFM_TRANSPARENT, MFM_TOP_MESSAGE );
+	gbPrintf( gbOffsetChar( 3 ), gbOffsetLine( 1 ), MFM_TITLE_TEXT_COLOR, MFM_TRANSPARENT, MFM_TOP_MESSAGE, MF_VERSION );
 }
 
 void mfMenu( void )
@@ -233,10 +235,7 @@ void mfMenu( void )
 	mf_backup_fbstat( &fbstat );
 	
 	/* バッファを確保 */
-	if( ! mf_alloc_buffers( &buf, fbstat.frameBuffer ) ){
-		mf_emerg_menu();
-		goto QUIT;
-	}
+	mf_alloc_buffers( &buf, fbstat.frameBuffer );
 	
 	/* クリア用背景をVRAMの3枚目に保存 */
 	if( buf.frame.clearImage ){
@@ -274,6 +273,8 @@ void mfMenu( void )
 	ctrlpadInit( &st_cp_params );
 	ctrlpadSetRepeatButtons( &st_cp_params, PSP_CTRL_UP | PSP_CTRL_RIGHT | PSP_CTRL_DOWN | PSP_CTRL_LEFT );
 	
+	st_update_screen = true;
+	
 	mfMenuEnableInterrupt();
 	sceDisplayWaitVblankStart();
 	
@@ -281,25 +282,34 @@ void mfMenu( void )
 		/* 背景を描画 */
 		if( buf.frame.clearImage ){
 			sceDmacMemcpy( gbGetCurrentDrawBuf(), buf.frame.clearImage, buf.frame.size );
-		} else{
+		} else if( buf.frame.draw ){
 			memset( gbGetCurrentDrawBuf(), 0, buf.frame.size );
 			gbRmvOpt( GB_ALPHABLEND );
 			mf_draw_base();
 			gbAddOpt( GB_ALPHABLEND );
+		} else{
+			if( st_pad_data.Buttons || st_update_screen ){
+				gbWakeup();
+				st_update_screen = false;
+				memset( gbGetCurrentDrawBuf(), 0, buf.frame.size );
+				mf_draw_base();
+			} else{
+				gbSleep();
+			}
 		}
+		
+		st_pad_data.Buttons = ctrlpadGetData( &st_cp_params, &st_pad_data, CTRLPAD_IGNORE_ANALOG_DIRECTION ) & 0x0000FFFF;
+		
+		//mfDebug( &buf );
 		
 		/* インジケータを描画 */
 		mf_indicator();
-		
-		st_pad_data.Buttons = ctrlpadGetData( &st_cp_params, &st_pad_data, CTRLPAD_IGNORE_ANALOG_DIRECTION );
 		
 		if( ( st_interrupt && st_pad_data.Buttons & ( PSP_CTRL_START | PSP_CTRL_HOME ) ) || st_menu_quit ){
 			if( rc == MR_ENTER && (MfFuncTerm)MFM_GET_CB_ARG_BY_PTR( mf_menu.arg, 0 ) ) ( (MfFuncTerm)MFM_GET_CB_ARG_BY_PTR( mf_menu.arg, 0 ) )();
 			st_menu_quit = false;
 			break;
 		}
-		
-		//mfDebug( &buf );
 		
 		if( rc == MR_BACK ){
 			mfMenuQuit();
@@ -314,12 +324,14 @@ void mfMenu( void )
 		}
 		
 		/* 表示バッファと描画バッファを切り替える */
-		gbSwapBuffers();
 		sceDisplayWaitVblankStart();
+		gbSwapBuffers();
 		
 		if( st_wait_micro_sec ){
 			sceKernelDelayThread( st_wait_micro_sec );
 			st_wait_micro_sec = 0;
+			st_update_screen = true;
+			sceDisplayWaitVblankStart();
 		}
 	}
 	
@@ -676,18 +688,12 @@ MfMenuRc mfMenuGetNumberInit( const char *title, const char *unit, long *number,
 	
 	mfMenuDisableInterrupt();
 	
-	params = (CmndlgGetNumbersParams *)memsceMalloc( sizeof( CmndlgGetNumbersParams ) );
+	params = (CmndlgGetNumbersParams *)memsceMalloc( sizeof( CmndlgGetNumbersParams ) + sizeof( CmndlgGetNumbersData ) );
 	if( ! params ){
 		mfMenuEnableInterrupt();
 		return MR_BACK;
 	}
-	
-	params->data = (CmndlgGetNumbersData *)memsceMalloc( sizeof( CmndlgGetNumbersData ) );
-	if( ! params->data ){
-		memsceFree( params );
-		mfMenuEnableInterrupt();
-		return MR_BACK;
-	}
+	params->data = (CmndlgGetNumbersData *)( (unsigned int)params + sizeof( CmndlgGetNumbersParams ) );
 	
 	params->numberOfData        = 1;
 	params->selectDataNumber    = 0;
@@ -705,9 +711,10 @@ MfMenuRc mfMenuGetNumberInit( const char *title, const char *unit, long *number,
 	params->data->numDigits     = digits;
 	params->data->selectedPlace = 0;
 	
+	st_update_screen = true;
+	
 	if( cmndlgGetNumbersStart( params ) ){
 		cmndlgGetNumbersShutdownStart();
-		memsceFree( params->data );
 		memsceFree( params );
 		mfMenuEnableInterrupt();
 		return MR_BACK;
@@ -731,7 +738,6 @@ MfMenuRc mfMenuGetNumber( void )
 		
 		cmndlgGetNumbersShutdownStart();
 		
-		memsceFree( params->data );
 		memsceFree( params );
 		mfMenuKeyRepeatReset();
 		mfMenuEnableInterrupt();
@@ -756,18 +762,12 @@ MfMenuRc mfMenuGetButtonsInit( const char *title, unsigned int *buttons, unsigne
 	
 	mfMenuDisableInterrupt();
 	
-	params = (CmndlgGetButtonsParams *)memsceMalloc( sizeof( CmndlgGetButtonsParams ) );
+	params = (CmndlgGetButtonsParams *)memsceMalloc( sizeof( CmndlgGetButtonsParams ) + sizeof( CmndlgGetButtonsData ) );
 	if( ! params ){
 		mfMenuEnableInterrupt();
 		return MR_BACK;
 	}
-	
-	params->data = (CmndlgGetButtonsData *)memsceMalloc( sizeof( CmndlgGetButtonsData ) );
-	if( ! params->data ){
-		memsceFree( params );
-		mfMenuEnableInterrupt();
-		return MR_BACK;
-	}
+	params->data = (CmndlgGetButtonsData *)( (unsigned int)params + sizeof( CmndlgGetButtonsParams ) );
 	
 	params->numberOfData           = 1;
 	params->selectDataNumber       = 0;
@@ -783,9 +783,10 @@ MfMenuRc mfMenuGetButtonsInit( const char *title, unsigned int *buttons, unsigne
 	params->data->buttonsSave      = buttons;
 	params->data->buttonsAvailable = avail;
 	
+	st_update_screen = true;
+	
 	if( cmndlgGetButtonsStart( params ) ){
 		cmndlgGetButtonsShutdownStart();
-		memsceFree( params->data );
 		memsceFree( params );
 		mfMenuEnableInterrupt();
 		return MR_BACK;
@@ -809,7 +810,6 @@ MfMenuRc mfMenuGetButtons( void )
 		
 		cmndlgGetButtonsShutdownStart();
 		
-		memsceFree( params->data );
 		memsceFree( params );
 		mfMenuKeyRepeatReset();
 		mfMenuEnableInterrupt();
@@ -828,33 +828,20 @@ bool mfMenuGetFilenameIsReady( void )
 	}
 }
 
-MfMenuRc mfMenuGetFilenameInit( const char *title, unsigned int flags, const char *initpath )
+bool mfMenuGetFilenameInit( const char *title, unsigned int flags, const char *initpath, size_t namelen, size_t pathlen )
 {
 	CmndlgGetFilenameParams *params;
-	char *buf;
+	int  title_lenght    = strlen( title ) + 1;
+	int  initpath_lenght = strlen( initpath ) + 1;
 	
 	mfMenuDisableInterrupt();
 	
-	params = (CmndlgGetFilenameParams *)memsceMalloc( sizeof( CmndlgGetFilenameParams ) );
+	params = (CmndlgGetFilenameParams *)memsceMalloc( sizeof( CmndlgGetFilenameParams ) + sizeof( CmndlgGetFilenameData ) + title_lenght + initpath_lenght + namelen + pathlen );
 	if( ! params ){
-		//エラー
 		mfMenuEnableInterrupt();
-		return MR_BACK;
+		return false;
 	}
-	
-	params->data = (CmndlgGetFilenameData *)memsceMalloc( sizeof( CmndlgGetFilenameData ) );
-	if( ! params->data ){
-		memsceFree( params );
-		mfMenuEnableInterrupt();
-		return MR_BACK;
-	}
-	
-	buf = (char *)memsceMalloc( 256 );
-	if( ! buf ){
-		memsceFree( params->data );
-		memsceFree( params );
-		return MR_BACK;
-	}
+	params->data = (CmndlgGetFilenameData *)( (unsigned int)params + sizeof( CmndlgGetFilenameParams ) );
 	
 	params->numberOfData         = 1;
 	params->selectDataNumber     = 0;
@@ -869,65 +856,58 @@ MfMenuRc mfMenuGetFilenameInit( const char *title, unsigned int flags, const cha
 	params->ui.bgColor           = MFM_TRANSPARENT;
 	params->ui.borderColor       = MFM_TRANSPARENT;
 	params->extraUi.dirColor     = 0xffff0000;
-	params->data->title          = title;
+	params->data->title          = (char *)( (unsigned int)params->data + sizeof( CmndlgGetFilenameData ) );
 	params->data->flags          = flags;
-	params->data->initPath       = initpath;
-	params->data->path           = buf;
-	params->data->pathMax        = 128;
-	params->data->name           = buf + 128;
-	params->data->nameMax        = 128;
+	params->data->initPath       = (char *)( (unsigned int)params->data->title + title_lenght );
+	params->data->path           = (char *)( (unsigned int)params->data->initPath + initpath_lenght );
+	params->data->pathMax        = pathlen;
+	params->data->name           = (char *)( (unsigned int)params->data->path + params->data->pathMax );
+	params->data->nameMax        = namelen;
 	params->data->path[0]        = '\0';
 	params->data->name[0]        = '\0';
 	
+	strcpy( params->data->title, title );
+	strcpy( params->data->initPath, initpath );
+	
+	st_update_screen = true;
+	
 	if( cmndlgGetFilenameStart( params ) ){
 		cmndlgGetFilenameShutdownStart();
-		memsceFree( params->data->path );
-		memsceFree( params->data );
 		memsceFree( params );
 		mfMenuEnableInterrupt();
-		return MR_BACK;
+		return false;
 	}
 	
-	return MR_ENTER;
+	return true;
 }
 
-MfMenuRc mfMenuGetFilename( char **path, char **name )
+bool mfMenuGetFilename( void )
 {
-	CmndlgState state;
-	if( cmndlgGetFilenameUpdate() ){
-		//エラー
+	if( cmndlgGetFilenameUpdate() < 0 ){
+		gbPrintf( gbOffsetChar( 3 ), gbOffsetLine( 4 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Read timed out.\nMemoryStick is currently busy.\n\nPlease try again later." );
+		mfMenuWait( 3000000 );
 	}
-	state = cmndlgGetFilenameGetStatus();
-	if( state == CMNDLG_SHUTDOWN ){
-		CmndlgGetFilenameParams *params = cmndlgGetFilenameGetParams();
-		
-		mfMenuKeyRepeatReset();
-		mfMenuEnableInterrupt();
-		
-		if( params->rc == CMNDLG_ACCEPT ){
-			if( path ){
-				*path = params->data->path;
-			}
-			if( name ){
-				*name = params->data->name;
-			}
-			return MR_ENTER;
-		} else{
-			mfMenuGetFilenameFree();
-			return MR_BACK;
-		}
-	}
+	if( cmndlgGetFilenameGetStatus() == CMNDLG_SHUTDOWN ) return false;
 	
-	return MR_CONTINUE;
+	return true;
 }
 
-void mfMenuGetFilenameFree( void )
+bool mfMenuGetFilenameResult( char *path, size_t len, int *split )
 {
 	CmndlgGetFilenameParams *params = cmndlgGetFilenameGetParams();
+	bool rc = params->rc == CMNDLG_ACCEPT ? true : false;
 	
 	cmndlgGetFilenameShutdownStart();
 	
-	memsceFree( params->data->path );
-	memsceFree( params->data );
+	mfMenuKeyRepeatReset();
+	mfMenuEnableInterrupt();
+	
+	if( rc && path ){
+		snprintf( path, len, "%s%s", params->data->path, params->data->name );
+		if( split ) *split = strlen( params->data->path ) + 1;
+	}
+	
 	memsceFree( params );
+	
+	return rc;
 }

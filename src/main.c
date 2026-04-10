@@ -76,7 +76,13 @@ static int mf_read_pad_buffer( MfSceCtrlDataFunc func, SceCtrlData *pad, int cou
 		
 		やることやったら元の値に戻せるように、最初のpspSdkSetK1()の返り値を保存しておく。
 	*/
-	int ret = ( func )( pad, count );
+	
+	unsigned int k1 = pspSdkSetK1( 0 );
+	int ret;
+	
+	ret = ( func )( pad, count );
+	
+	pspSdkSetK1( k1 );
 	
 	analogtuneTune( pad, NULL );
 	mfRapidfire( 0, mode, pad );
@@ -127,11 +133,8 @@ int mfCtrlPeekLatch( SceCtrlLatch *latch )
 {
 	SceCtrlData pad;
 	int ret;
-	unsigned int k1 = pspSdkSetK1( 0 );
 	
 	ret = mf_read_pad_buffer( Hooktable[MF_CTRL_PEEK_BUFFER_POSITIVE].origfunc, &pad, 1, MF_CALL_LATCH );
-	
-	pspSdkSetK1( k1 );
 	
 	latch->uiMake    |= ( st_prev_pad_buttons ^ pad.Buttons ) & pad.Buttons;
 	latch->uiBreak   |= ( st_prev_pad_buttons ^ pad.Buttons ) & st_prev_pad_buttons;
@@ -147,11 +150,8 @@ int mfCtrlReadLatch( SceCtrlLatch *latch )
 {
 	SceCtrlData pad;
 	int ret;
-	unsigned int k1 = pspSdkSetK1( 0 );
 	
 	ret = mf_read_pad_buffer( Hooktable[MF_CTRL_PEEK_BUFFER_POSITIVE].origfunc, &pad, 1, MF_CALL_LATCH );
-	
-	pspSdkSetK1( k1 );
 	
 	latch->uiMake    = ( st_prev_pad_buttons ^ pad.Buttons ) & pad.Buttons;
 	latch->uiBreak   = ( st_prev_pad_buttons ^ pad.Buttons ) & st_prev_pad_buttons;
@@ -216,7 +216,7 @@ int main_thread( SceSize arglen, void *argp )
 		ini = inimgrNew();
 		if( ini > 0 ){
 			char buttons[128];
-			if( inimgrLoad( ini, MFM_INI_FILENAME ) != 0 ){
+			if( inimgrLoad( ini, MF_INI_FILENAME ) != 0 ){
 				inimgrSetBool( ini, "Main", "Startup", MF_INIDEF_MAIN_STARTUP );
 				inimgrSetString( ini, "Main", "MenuButtons",   MF_INIDEF_MAIN_MENUBUTTONS );
 				inimgrSetString( ini, "Main", "ToggleButtons", MF_INIDEF_MAIN_TOGGLEBUTTONS );
@@ -227,7 +227,7 @@ int main_thread( SceSize arglen, void *argp )
 					if( mftable[i].ciFunc ) ( mftable[i].ciFunc )( ini );
 				}
 				
-				inimgrSave( ini, MFM_INI_FILENAME );
+				inimgrSave( ini, MF_INI_FILENAME );
 			}
 			
 			gMfEngine = inimgrGetBool( ini, "Main", "Startup", false );
@@ -252,14 +252,15 @@ int main_thread( SceSize arglen, void *argp )
 		sceKernelDelayThread( 50000 );
 		
 		if( st_apihooked ){
-			unsigned int k1 = pspSdkSetK1( 0 );
 			mf_read_pad_buffer( Hooktable[MF_CTRL_PEEK_BUFFER_POSITIVE].origfunc, &st_pad_data, 1, MF_CALL_INTERNAL );
-			pspSdkSetK1( k1 );
 		} else{
 			sceCtrlPeekBufferPositive( &st_pad_data, 1 );
 			analogtuneTune( &st_pad_data, NULL );
 			st_pad_data.Buttons |= ctrlpadUtilGetAnalogDirection( st_pad_data.Lx, st_pad_data.Ly, 0 );
 		}
+		
+		st_pad_data.Buttons =  mfButtonsUmask( st_pad_data.Buttons, MF_UNUSED_BUTTONS );
+		st_pad_data.Buttons |= ctrlpadUtilGetAnalogDirection( st_pad_data.Lx, st_pad_data.Ly, 0 );
 		
 		if( gMfToggle ){
 			if( ( st_pad_data.Buttons & (~( ~0 ^ gMfToggle )) ) == gMfToggle ){
@@ -332,6 +333,17 @@ MfRunEnv mfRunEnv( void )
 {
 	return st_runenv;
 }
+
+unsigned int mfButtonsMask( unsigned int buttons, unsigned int mask )
+{
+	return buttons & mask;
+}
+
+unsigned int mfButtonsUmask( unsigned int buttons, unsigned int umask )
+{
+	return buttons & ( 0xFFFFFFFF ^ umask );
+}
+
 
 int module_start( SceSize arglen, void *argp )
 {

@@ -105,7 +105,6 @@ void macroIntr( const bool mfengine )
 void macroMain( MfCallMode mode, SceCtrlData *pad, void *argp )
 {
 	int i;
-	
 	if( ! pad || macro_in_webbrowser() ) return;
 	
 	for( i = 0; i < MACRO_MAX_SLOT; i++ ){
@@ -118,7 +117,7 @@ void macroMain( MfCallMode mode, SceCtrlData *pad, void *argp )
 		}
 		
 		if( st_macro[i].runButtons ){
-			bool trigger = ( ( ( pad->Buttons | ctrlpadUtilGetAnalogDirection( pad->Lx, pad->Ly, 0 ) ) & (~( ~0 ^ st_macro[i].runButtons )) ) == st_macro[i].runButtons ) ? true : false;
+			bool trigger = ( ( ( pad->Buttons | ctrlpadUtilGetAnalogDirection( pad->Lx, pad->Ly, 0 ) ) & st_macro[i].runButtons ) == st_macro[i].runButtons ) ? true : false;
 			
 			if( trigger && st_macro[i].current.hotkeyEnable ){
 				if( st_macro[i].current.runMode == MRM_NONE ){
@@ -159,8 +158,8 @@ MfMenuRc macroMenu( SceCtrlData *pad_data, void *arg )
 					case MACRO_ANALOG_OPTION: gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 25 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Recording the analog stick movement." ); break;
 					case MACRO_EDIT         : gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 25 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Editing currently macro." ); break;
 					case MACRO_CLEAR        : gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 25 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Clearing currently macro." ); break;
-					case MACRO_LOAD         : gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 25 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Loading a macro from MemoryStick.\n\nIMPORTANT CAUTION:\n  Verify that MemoryStick access indicator is not blinking.\n  Otherwise, will CRASH the currently running game!" ); break;
-					case MACRO_SAVE         : gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 25 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Saving currently macro to MemoryStick.\n\nIMPORTANT CAUTION:\n  Verify that MemoryStick access indicator is not blinking.\n  Otherwise, will CRASH the currently running game!" ); break;
+					case MACRO_LOAD         : gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 25 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Loading a macro from MemoryStick." ); break;
+					case MACRO_SAVE         : gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 25 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Saving currently macro to MemoryStick." ); break;
 				}
 				break;
 			case MR_ENTER:
@@ -349,52 +348,40 @@ static MfMenuRc macro_menu_load( SceCtrlData *pad_data, void *arg )
 	if( macro_is_busy_with_message( &(st_macro[st_slot]) ) ) return MR_BACK;
 	
 	if( ! mfMenuGetFilenameIsReady() ){
-		MfMenuRc rc = mfMenuGetFilenameInit(
-			"Open macro",
-			CGF_OPEN | CGF_FILEMUSTEXIST,
-			"ms0:/"
-		);
-		if( rc != MR_ENTER ) return MR_BACK;
-		
-		return MR_CONTINUE;
-	} else{
-		IniUID ini;
-		char *inipath, *path, *name;
-		MfMenuRc rc = mfMenuGetFilename( &path, &name );
-		
-		if( rc != MR_ENTER ) return rc;
-		
-		inipath = (char *)memsceMalloc( 256 );
-		if( ! inipath ){
-			mfMenuGetFilenameFree();
-			return MR_BACK;
+		if( mfMenuGetFilenameInit( "Open macro", CGF_OPEN | CGF_FILEMUSTEXIST, "ms0:/", 128, 128 ) ){
+			return MR_CONTINUE;
 		} else{
-			sprintf( inipath, "%s%s", path, name );
-			mfMenuGetFilenameFree();
+			return MR_BACK;
 		}
-		
-		ini = inimgrNew();
-		if( ini > 0 ){
-			unsigned int err;
-			inimgrSetCallback( ini, "CommandSequence", macro_read, NULL );
-			if( ( err = inimgrLoad( ini, inipath ) ) == 0 ){
-				int version = inimgrGetInt( ini, "default", MACRO_DATA_SIGNATURE, 0 );
-				if( version <= 1 ){
-					gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FCCOLOR, "Macro file is invalid or too lower version." );
-					mfMenuWait( MFM_DISPLAY_MICROSEC_ERROR );
-				} else{
-					gbPrintf( gbOffsetChar( 3 ), gbOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FGCOLOR, "Loaded from %s.", inipath );
-					mfMenuWait( MFM_DISPLAY_MICROSEC_INFO );
+	} else{
+		if( ! mfMenuGetFilename() ){
+			char inipath[128 + 128];
+			inipath[0] = '\0';
+			
+			if( mfMenuGetFilenameResult( inipath, sizeof( inipath ), NULL ) ){
+				IniUID ini = inimgrNew();
+				if( ini > 0 ){
+					unsigned int err;
+					inimgrSetCallback( ini, "CommandSequence", macro_read, NULL );
+					if( ( err = inimgrLoad( ini, inipath ) ) == 0 ){
+						int version = inimgrGetInt( ini, "default", MACRO_DATA_SIGNATURE, 0 );
+						if( version <= 1 ){
+							gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FCCOLOR, "Macro file is invalid or too lower version." );
+							mfMenuWait( MFM_DISPLAY_MICROSEC_ERROR );
+						} else{
+							gbPrintf( gbOffsetChar( 3 ), gbOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FGCOLOR, "Loaded from %s.", inipath );
+							mfMenuWait( MFM_DISPLAY_MICROSEC_INFO );
+						}
+					} else{
+						gbPrintf( gbOffsetChar( 3 ), gbOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FCCOLOR, "Failed to load from %s: 0x%X", inipath, err );
+						mfMenuWait( MFM_DISPLAY_MICROSEC_ERROR );
+					}
+					inimgrDestroy( ini );
 				}
-			} else{
-				gbPrintf( gbOffsetChar( 3 ), gbOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FCCOLOR, "Failed to load from %s: 0x%X", inipath, err );
-				mfMenuWait( MFM_DISPLAY_MICROSEC_ERROR );
 			}
-			inimgrDestroy( ini );
+			return MR_BACK;
 		}
-		memsceFree( inipath );
-		
-		return MR_BACK;
+		return MR_CONTINUE;
 	}
 }
 
@@ -403,48 +390,36 @@ static MfMenuRc macro_menu_save( SceCtrlData *pad_data, void *arg )
 	if( macro_is_busy_with_message( &(st_macro[st_slot]) ) || macro_is_unavail_with_message( &(st_macro[st_slot]) ) ) return MR_BACK;
 	
 	if( ! mfMenuGetFilenameIsReady() ){
-		MfMenuRc rc = mfMenuGetFilenameInit(
-			"Save macro",
-			CGF_SAVE | CGF_FILEMUSTEXIST,
-			"ms0:/"
-		);
-		if( rc != MR_ENTER ) return MR_BACK;
-		
-		return MR_CONTINUE;
-	} else{
-		IniUID ini;
-		char *inipath, *path, *name;
-		MfMenuRc rc = mfMenuGetFilename( &path, &name );
-		
-		if( rc != MR_ENTER ) return rc;
-		
-		inipath = (char *)memsceMalloc( 256 );
-		if( ! inipath ){
-			mfMenuGetFilenameFree();
-			return MR_BACK;
+		if( mfMenuGetFilenameInit( "Save macro", CGF_SAVE | CGF_FILEMUSTEXIST, "ms0:/", 128, 128 ) ){
+			return MR_CONTINUE;
 		} else{
-			sprintf( inipath, "%s%s", path, name );
-			mfMenuGetFilenameFree();
+			return MR_BACK;
 		}
-		
-		ini = inimgrNew();
-		if( ini > 0 ){
-			unsigned int err;
-			inimgrSetInt( ini, "default", MACRO_DATA_SIGNATURE, MACRO_DATA_VERSION );
-			inimgrAddSection(  ini, "CommandSequence" );
-			inimgrSetCallback( ini, "CommandSequence", NULL, macro_store );
-			if( ( err = inimgrSave( ini, inipath ) ) == 0 ){
-				gbPrintf( gbOffsetChar( 3 ), gbOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FGCOLOR, "Saved to %s.", inipath );
-				mfMenuWait( MFM_DISPLAY_MICROSEC_INFO );
-			} else{
-				gbPrintf( gbOffsetChar( 3 ), gbOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FCCOLOR, "Failed to save to %s: 0x%X", inipath, err );
-				mfMenuWait( MFM_DISPLAY_MICROSEC_ERROR );
+	} else{
+		if( ! mfMenuGetFilename() ){
+			char inipath[128 + 128];
+			inipath[0] = '\0';
+			
+			if( mfMenuGetFilenameResult( inipath, sizeof( inipath ), NULL ) ){
+				IniUID ini = inimgrNew();
+				if( ini > 0 ){
+					unsigned int err;
+					inimgrSetInt( ini, "default", MACRO_DATA_SIGNATURE, MACRO_DATA_VERSION );
+					inimgrAddSection(  ini, "CommandSequence" );
+					inimgrSetCallback( ini, "CommandSequence", NULL, macro_store );
+					if( ( err = inimgrSave( ini, inipath ) ) == 0 ){
+						gbPrintf( gbOffsetChar( 3 ), gbOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FGCOLOR, "Saved to %s.", inipath );
+						mfMenuWait( MFM_DISPLAY_MICROSEC_INFO );
+					} else{
+						gbPrintf( gbOffsetChar( 3 ), gbOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FCCOLOR, "Failed to save to %s: 0x%X", inipath, err );
+						mfMenuWait( MFM_DISPLAY_MICROSEC_ERROR );
+					}
+					inimgrDestroy( ini );
+				}
 			}
-			inimgrDestroy( ini );
+			return MR_BACK;
 		}
-		memsceFree( inipath );
-		
-		return MR_BACK;
+		return MR_CONTINUE;
 	}
 }
 
@@ -620,6 +595,7 @@ static void macro_record( MfCallMode mode, SceCtrlData *pad, void *argp )
 static void macro_trace( MfCallMode mode, SceCtrlData *pad, void *argp )
 {
 	MacroEntry *entry;
+	int coord;
 	
 	if( ! pad || ! argp ) return;
 	
@@ -679,8 +655,12 @@ static void macro_trace( MfCallMode mode, SceCtrlData *pad, void *argp )
 		mfRapidfire( entry->current.rfUid, mode, pad );
 		
 		pad->Buttons |= entry->current.temp.buttons;
-		pad->Lx = MACROMGR_GET_ANALOG_X( entry->current.temp.analogCoord );
-		pad->Ly = MACROMGR_GET_ANALOG_Y( entry->current.temp.analogCoord );
+		
+		coord = MACROMGR_GET_ANALOG_X( entry->current.temp.analogCoord );
+		if( abs( coord - MACROMGR_ANALOG_CENTER ) > abs( pad->Lx - MACROMGR_ANALOG_CENTER ) ) pad->Lx = coord;
+		
+		coord = MACROMGR_GET_ANALOG_Y( entry->current.temp.analogCoord );
+		if( abs( coord - MACROMGR_ANALOG_CENTER ) > abs( pad->Ly - MACROMGR_ANALOG_CENTER ) ) pad->Ly = coord;
 		
 		/* ŽŸ‚ÌƒRƒ}ƒ“ƒh‚Ö */
 		if( entry->current.command->action != MA_DELAY ){

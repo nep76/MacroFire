@@ -18,7 +18,7 @@
 extern "C" {
 #endif
 
-typedef unsigned int DirhUID;
+typedef int DirhUID;
 
 struct dirh_dirents {
 	int pos;
@@ -38,6 +38,22 @@ struct dirh_select_filename {
 	struct dirh_dirents entry;
 	int lError;
 	int sError;
+};
+
+enum dirh_childthread_stat {
+	DIRH_CHILDTHREAD_INIT = 0,
+	DIRH_CHILDTHREAD_READY,
+	DIRH_CHILDTHREAD_COUNT,
+	DIRH_CHILDTHREAD_READ,
+	DIRH_CHILDTHREAD_ABORT
+};
+
+struct dirh_dopen_params {
+	enum dirh_childthread_stat status;
+	int    lock;
+	SceUID fd;
+	char   *path;
+	struct dirh_select_filename *sf;
 };
 
 typedef enum {

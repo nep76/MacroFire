@@ -16,6 +16,8 @@
 #include "psp/ctrlpad.h"
 #include "utils/strutil.h"
 
+#define MFM_TOP_MESSAGE "MacroFire %s In-game menu [ClassG: http://classg.sytes.net]"
+
 #define MFM_DISPLAY_MICROSEC_INFO  1000000
 #define MFM_DISPLAY_MICROSEC_ERROR 3000000
 
@@ -230,9 +232,9 @@ MfMenuRc mfMenuGetButtonsInit( const char *title, unsigned int *buttons, unsigne
 MfMenuRc mfMenuGetButtons( void );
 
 bool mfMenuGetFilenameIsReady( void );
-MfMenuRc mfMenuGetFilenameInit( const char *title, unsigned int flags, const char *initpath );
-MfMenuRc mfMenuGetFilename( char **path, char **name );
-void mfMenuGetFilenameFree( void );
+bool mfMenuGetFilenameInit( const char *title, unsigned int flags, const char *initpath, size_t namelen, size_t pathlen );
+bool mfMenuGetFilename( void );
+bool mfMenuGetFilenameResult( char *path, size_t len, int *split );
 
 void mfMenuLabel( const char *format, ... );
 void mfMenuUsage( const char *format, ... );

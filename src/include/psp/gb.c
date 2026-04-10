@@ -29,6 +29,7 @@ static struct gb_font st_font[] = {
 };
 static GbFontId st_font_8bit = GB_FONT_CP432;
 static GbColorConverter st_cconv;
+static bool             st_draw = true;
 
 /*=============================================*/
 
@@ -249,6 +250,16 @@ void gbSync( void )
 	sceDisplaySetFrameBuf( st_gb.displayBuffer, st_gb.bufferWidth, (int)(st_gb.pixelFormat), PSP_DISPLAY_SETBUF_IMMEDIATE );
 }
 
+void gbSleep( void )
+{
+	st_draw = false;
+}
+
+void gbWakeup( void )
+{
+	st_draw = true;
+}
+
 void gbPrepare( void )
 {
 	if( st_gb.opt & GB_AUTOFLUSH ){
@@ -365,7 +376,7 @@ int gbPrint( unsigned int x, unsigned int y, uint32_t fgcolor, uint32_t bgcolor,
 	char_width  = gbOffsetChar( 1 );
 	line_height = gbOffsetLine( 1 );
 	
-	if( x + char_width > st_gb.width ) return 0;
+	if( ! st_draw || x + char_width > st_gb.width ) return 0;
 	
 	drawstart = (unsigned int)gb_calc_pos( x, y );
 	char_off  = 0;
@@ -433,7 +444,7 @@ void gbPoint( unsigned int x, unsigned int y, uint32_t color )
 	unsigned int drawpos;
 	uint32_t     drawcolor;
 	
-	if( color == GB_TRANSPARENT ) return;
+	if( ! st_draw || color == GB_TRANSPARENT ) return;
 	
 	drawpos   = (unsigned int)gb_calc_pos( x, y );
 	drawcolor = st_cconv ? ( st_cconv )( color, (void *)drawpos ) : color;
@@ -446,7 +457,7 @@ void gbLine( unsigned int sx, unsigned int sy, unsigned int ex, unsigned int ey,
 	unsigned int e, dx, dy;
 	uint32_t     drawcolor;
 	
-	if( color == GB_TRANSPARENT ) return;
+	if( ! st_draw || color == GB_TRANSPARENT ) return;
 	
 	if( sx > ex ) gb_swap( &sx, &ex );
 	if( sy > ey ) gb_swap( &sy, &ey );
@@ -484,7 +495,7 @@ void gbLine( unsigned int sx, unsigned int sy, unsigned int ex, unsigned int ey,
 
 void gbLineRect( unsigned int sx, unsigned int sy, unsigned int ex, unsigned int ey, uint32_t color )
 {
-	if( color == GB_TRANSPARENT ) return;
+	if( ! st_draw || color == GB_TRANSPARENT ) return;
 	
 	gbLine( sx, sy, ex, sy, color );
 	gbLine( ex, sy, ex, ey, color );
@@ -498,7 +509,7 @@ void gbFillRect( unsigned int sx, unsigned int sy, unsigned int ex, unsigned int
 	unsigned int w, h, x;
 	uint32_t     drawcolor;
 	
-	if( color == GB_TRANSPARENT ) return;
+	if( ! st_draw || color == GB_TRANSPARENT ) return;
 	
 	if( sx > ex ) gb_swap( &sx, &ex );
 	if( sy > ey ) gb_swap( &sy, &ey );

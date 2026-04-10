@@ -230,6 +230,22 @@ void gbPrepare( void );
 void gbSync( void );
 
 /*
+	gbSleep
+	
+	この状態になると画面に図形を転送する関数はなにもしなくなる。
+	gbSleep()中にgbSleep()を呼んでも何も起こらない。
+*/
+void gbSleep( void );
+
+/*
+	gbWakeup
+	
+	gbSleep()を解除する。
+	gbWakeup()後にgbWakeup()を呼んでも何も起こらない。
+*/
+void gbWakeup( void );
+
+/*
 	gbSetOpt
 	
 	オプション値をセットする。

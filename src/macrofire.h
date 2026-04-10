@@ -21,8 +21,11 @@
 /*-----------------------------------------------
 	定数
 -----------------------------------------------*/
-#define MFM_TOP_MESSAGE  "MacroFire 2.3.2 In-game menu [ClassG: http://classg.sytes.net]"
-#define MFM_INI_FILENAME "ms0:/seplugins/macrofire.ini"
+#define MF_VERSION      "2.3.3"
+#define MF_INI_FILENAME "ms0:/seplugins/macrofire.ini"
+
+#define MF_UNUSED_BUTTONS ( PSP_CTRL_WLAN_UP | PSP_CTRL_REMOTE | PSP_CTRL_DISC | PSP_CTRL_MS )
+#define MF_KERNEL_BUTTONS ( PSP_CTRL_NOTE | PSP_CTRL_SCREEN | PSP_CTRL_VOLUP | PSP_CTRL_VOLDOWN | MFM_UNUSED_BUTTONS )
 
 /*-----------------------------------------------
 	型宣言
@@ -122,6 +125,38 @@ bool mfIsDisabled ( void );
 		MF_RUNENV_POPS: POPS上で動作中。
 */
 MfRunEnv mfRunEnv( void );
+
+/*
+	mfButtonsMask
+	
+	ボタンデータから指定したボタン以外を取り除く。
+	
+	@param: unsigned int buttons
+		ボタンデータ。
+	
+	@param: unsigned int umask
+		取り除くボタンデータ。
+	
+	@return: unsigned int
+		処理されたボタン。
+*/
+unsigned int mfButtonsMask( unsigned int buttons, unsigned int mask );
+
+/*
+	mfButtonsMask
+	
+	ボタンデータから指定したボタンを取り除く。
+	
+	@param: unsigned int buttons
+		ボタンデータ。
+	
+	@param: unsigned int umask
+		取り除くボタンデータ。
+	
+	@return: unsigned int
+		処理されたボタン。
+*/
+unsigned int mfButtonsUmask( unsigned int buttons, unsigned int umask );
 
 /*-----------------------------------------------
 	グローバル変数

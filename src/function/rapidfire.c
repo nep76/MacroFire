@@ -102,144 +102,117 @@ static int rapidfire_string_to_mode( char *mode )
 static MfMenuRc rapidfire_load( void )
 {
 	if( ! mfMenuGetFilenameIsReady() ){
-		MfMenuRc rc = mfMenuGetFilenameInit(
-			"Open rapidfire preference",
-			CGF_OPEN | CGF_FILEMUSTEXIST,
-			"ms0:/"
-		);
-		if( rc != MR_ENTER ) return MR_BACK;
-		
-		return MR_CONTINUE;
-	} else{
-		IniUID ini;
-		char *inipath, *path, *name;
-		MfMenuRc rc = mfMenuGetFilename( &path, &name );
-		
-		if( rc != MR_ENTER ) return rc;
-		
-		inipath = (char *)memsceMalloc( 256 );
-		if( ! inipath ){
-			mfMenuGetFilenameFree();
-			return MR_BACK;
+		if( mfMenuGetFilenameInit( "Open rapidfire preference", CGF_OPEN | CGF_FILEMUSTEXIST, "ms0:/", 128, 128 ) ){
+			return MR_CONTINUE;
 		} else{
-			sprintf( inipath, "%s%s", path, name );
-			mfMenuGetFilenameFree();
+			return MR_BACK;
 		}
-		
-		ini = inimgrNew();
-		if( ini > 0 ){
-			unsigned int err;
-			if( ( err = inimgrLoad( ini, inipath ) ) == 0 ){
-				char mode[16];
-				int version = inimgrGetInt( ini, "default", RAPIDFIRE_DATA_SIGNATURE, 0 );
-				if( version <= 1 ){
-					gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FCCOLOR, "Initialization file is invalid or too lower version." );
-					mfMenuWait( MFM_DISPLAY_MICROSEC_ERROR );
-				} else{
-					inimgrGetString( ini, "Mode", RAPIDFIRE_DID_CIRCLE, RAPIDFIRE_DID_MODENORMAL, mode, sizeof( mode ) );
-					st_rfconf[RAPIDFIRE_BUTTON_CIRCLE].mode = rapidfire_string_to_mode( mode );
-					inimgrGetString( ini, "Mode", RAPIDFIRE_DID_CROSS, RAPIDFIRE_DID_MODENORMAL, mode, sizeof( mode ) );
-					st_rfconf[RAPIDFIRE_BUTTON_CROSS].mode = rapidfire_string_to_mode( mode );
-					inimgrGetString( ini, "Mode", RAPIDFIRE_DID_SQUARE, RAPIDFIRE_DID_MODENORMAL, mode, sizeof( mode ) );
-					st_rfconf[RAPIDFIRE_BUTTON_SQUARE].mode = rapidfire_string_to_mode( mode );
-					inimgrGetString( ini, "Mode", RAPIDFIRE_DID_TRIANGLE, RAPIDFIRE_DID_MODENORMAL, mode, sizeof( mode ) );
-					st_rfconf[RAPIDFIRE_BUTTON_TRIANGLE].mode = rapidfire_string_to_mode( mode );
-					inimgrGetString( ini, "Mode", RAPIDFIRE_DID_UP, RAPIDFIRE_DID_MODENORMAL, mode, sizeof( mode ) );
-					st_rfconf[RAPIDFIRE_BUTTON_UP].mode = rapidfire_string_to_mode( mode );
-					inimgrGetString( ini, "Mode", RAPIDFIRE_DID_RIGHT, RAPIDFIRE_DID_MODENORMAL, mode, sizeof( mode ) );
-					st_rfconf[RAPIDFIRE_BUTTON_RIGHT].mode = rapidfire_string_to_mode( mode );
-					inimgrGetString( ini, "Mode", RAPIDFIRE_DID_DOWN, RAPIDFIRE_DID_MODENORMAL, mode, sizeof( mode ) );
-					st_rfconf[RAPIDFIRE_BUTTON_DOWN].mode = rapidfire_string_to_mode( mode );
-					inimgrGetString( ini, "Mode", RAPIDFIRE_DID_LEFT, RAPIDFIRE_DID_MODENORMAL, mode, sizeof( mode ) );
-					st_rfconf[RAPIDFIRE_BUTTON_LEFT].mode = rapidfire_string_to_mode( mode );
-					inimgrGetString( ini, "Mode", RAPIDFIRE_DID_LTRIGGER, RAPIDFIRE_DID_MODENORMAL, mode, sizeof( mode ) );
-					st_rfconf[RAPIDFIRE_BUTTON_LTRIGGER].mode = rapidfire_string_to_mode( mode );
-					inimgrGetString( ini, "Mode", RAPIDFIRE_DID_RTRIGGER, RAPIDFIRE_DID_MODENORMAL, mode, sizeof( mode ) );
-					st_rfconf[RAPIDFIRE_BUTTON_RTRIGGER].mode = rapidfire_string_to_mode( mode );
-					inimgrGetString( ini, "Mode", RAPIDFIRE_DID_START, RAPIDFIRE_DID_MODENORMAL, mode, sizeof( mode ) );
-					st_rfconf[RAPIDFIRE_BUTTON_START].mode = rapidfire_string_to_mode( mode );
-					inimgrGetString( ini, "Mode", RAPIDFIRE_DID_SELECT, RAPIDFIRE_DID_MODENORMAL, mode, sizeof( mode ) );
-					st_rfconf[RAPIDFIRE_BUTTON_SELECT].mode = rapidfire_string_to_mode( mode );
-					
-					st_release_delay = inimgrGetInt( ini, "Delay", RAPIDFIRE_DID_RDELAY, RAPIDFIRE_DEFAULT_RELEASE_DELAY );
-					st_press_delay   = inimgrGetInt( ini, "Delay", RAPIDFIRE_DID_PDELAY, RAPIDFIRE_DEFAULT_PRESS_DELAY );
-					
-					gbPrintf( gbOffsetChar( 3 ), gbOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FGCOLOR, "Loaded from %s.", inipath );
-					mfMenuWait( MFM_DISPLAY_MICROSEC_INFO );
+	} else{
+		if( ! mfMenuGetFilename() ){
+			char inipath[128 + 128];
+			inipath[0] = '\0';
+			
+			if( mfMenuGetFilenameResult( inipath, sizeof( inipath ), NULL ) ){
+				IniUID ini = inimgrNew();
+				if( ini > 0 ){
+					unsigned int err;
+					if( ( err = inimgrLoad( ini, inipath ) ) == 0 ){
+						char mode[16];
+						int version = inimgrGetInt( ini, "default", RAPIDFIRE_DATA_SIGNATURE, 0 );
+						if( version <= 1 ){
+							gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FCCOLOR, "Initialization file is invalid or too lower version." );
+							mfMenuWait( MFM_DISPLAY_MICROSEC_ERROR );
+						} else{
+							inimgrGetString( ini, "Mode", RAPIDFIRE_DID_CIRCLE, RAPIDFIRE_DID_MODENORMAL, mode, sizeof( mode ) );
+							st_rfconf[RAPIDFIRE_BUTTON_CIRCLE].mode = rapidfire_string_to_mode( mode );
+							inimgrGetString( ini, "Mode", RAPIDFIRE_DID_CROSS, RAPIDFIRE_DID_MODENORMAL, mode, sizeof( mode ) );
+							st_rfconf[RAPIDFIRE_BUTTON_CROSS].mode = rapidfire_string_to_mode( mode );
+							inimgrGetString( ini, "Mode", RAPIDFIRE_DID_SQUARE, RAPIDFIRE_DID_MODENORMAL, mode, sizeof( mode ) );
+							st_rfconf[RAPIDFIRE_BUTTON_SQUARE].mode = rapidfire_string_to_mode( mode );
+							inimgrGetString( ini, "Mode", RAPIDFIRE_DID_TRIANGLE, RAPIDFIRE_DID_MODENORMAL, mode, sizeof( mode ) );
+							st_rfconf[RAPIDFIRE_BUTTON_TRIANGLE].mode = rapidfire_string_to_mode( mode );
+							inimgrGetString( ini, "Mode", RAPIDFIRE_DID_UP, RAPIDFIRE_DID_MODENORMAL, mode, sizeof( mode ) );
+							st_rfconf[RAPIDFIRE_BUTTON_UP].mode = rapidfire_string_to_mode( mode );
+							inimgrGetString( ini, "Mode", RAPIDFIRE_DID_RIGHT, RAPIDFIRE_DID_MODENORMAL, mode, sizeof( mode ) );
+							st_rfconf[RAPIDFIRE_BUTTON_RIGHT].mode = rapidfire_string_to_mode( mode );
+							inimgrGetString( ini, "Mode", RAPIDFIRE_DID_DOWN, RAPIDFIRE_DID_MODENORMAL, mode, sizeof( mode ) );
+							st_rfconf[RAPIDFIRE_BUTTON_DOWN].mode = rapidfire_string_to_mode( mode );
+							inimgrGetString( ini, "Mode", RAPIDFIRE_DID_LEFT, RAPIDFIRE_DID_MODENORMAL, mode, sizeof( mode ) );
+							st_rfconf[RAPIDFIRE_BUTTON_LEFT].mode = rapidfire_string_to_mode( mode );
+							inimgrGetString( ini, "Mode", RAPIDFIRE_DID_LTRIGGER, RAPIDFIRE_DID_MODENORMAL, mode, sizeof( mode ) );
+							st_rfconf[RAPIDFIRE_BUTTON_LTRIGGER].mode = rapidfire_string_to_mode( mode );
+							inimgrGetString( ini, "Mode", RAPIDFIRE_DID_RTRIGGER, RAPIDFIRE_DID_MODENORMAL, mode, sizeof( mode ) );
+							st_rfconf[RAPIDFIRE_BUTTON_RTRIGGER].mode = rapidfire_string_to_mode( mode );
+							inimgrGetString( ini, "Mode", RAPIDFIRE_DID_START, RAPIDFIRE_DID_MODENORMAL, mode, sizeof( mode ) );
+							st_rfconf[RAPIDFIRE_BUTTON_START].mode = rapidfire_string_to_mode( mode );
+							inimgrGetString( ini, "Mode", RAPIDFIRE_DID_SELECT, RAPIDFIRE_DID_MODENORMAL, mode, sizeof( mode ) );
+							st_rfconf[RAPIDFIRE_BUTTON_SELECT].mode = rapidfire_string_to_mode( mode );
+							
+							st_release_delay = inimgrGetInt( ini, "Delay", RAPIDFIRE_DID_RDELAY, RAPIDFIRE_DEFAULT_RELEASE_DELAY );
+							st_press_delay   = inimgrGetInt( ini, "Delay", RAPIDFIRE_DID_PDELAY, RAPIDFIRE_DEFAULT_PRESS_DELAY );
+							
+							gbPrintf( gbOffsetChar( 3 ), gbOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FGCOLOR, "Loaded from %s.", inipath );
+							mfMenuWait( MFM_DISPLAY_MICROSEC_INFO );
+						}
+					} else{
+						gbPrintf( gbOffsetChar( 3 ), gbOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FCCOLOR, "Failed to load from %s: 0x%X", inipath, err );
+						mfMenuWait( MFM_DISPLAY_MICROSEC_ERROR );
+					}
+					inimgrDestroy( ini );
 				}
-			} else{
-				gbPrintf( gbOffsetChar( 3 ), gbOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FCCOLOR, "Failed to load from %s: 0x%X", inipath, err );
-				mfMenuWait( MFM_DISPLAY_MICROSEC_ERROR );
 			}
-			inimgrDestroy( ini );
+			return MR_BACK;
 		}
-		
-		memsceFree( inipath );
-		
-		return MR_BACK;
+		return MR_CONTINUE;
 	}
 }
 
 static MfMenuRc rapidfire_save( void )
 {
 	if( ! mfMenuGetFilenameIsReady() ){
-		MfMenuRc rc = mfMenuGetFilenameInit(
-			"Save rapidfire preference",
-			CGF_SAVE | CGF_OVERWRITEPROMPT,
-			"ms0:/"
-		);
-		if( rc != MR_ENTER ) return MR_BACK;
-		
-		return MR_CONTINUE;
-	} else{
-		IniUID ini;
-		char *inipath, *path, *name;
-		MfMenuRc rc = mfMenuGetFilename( &path, &name );
-		
-		if( rc != MR_ENTER ) return rc;
-		
-		inipath = (char *)memsceMalloc( 256 );
-		if( ! inipath ){
-			mfMenuGetFilenameFree();
-			return MR_BACK;
+		if( mfMenuGetFilenameInit( "Save rapidfire preference", CGF_SAVE | CGF_OVERWRITEPROMPT, "ms0:/", 128, 128 ) ){
+			return MR_CONTINUE;
 		} else{
-			sprintf( inipath, "%s%s", path, name );
-			mfMenuGetFilenameFree();
+			return MR_BACK;
 		}
-		
-		ini = inimgrNew();
-		if( ini > 0 ){
-			unsigned int err;
-			inimgrSetInt( ini, "default", RAPIDFIRE_DATA_SIGNATURE, RAPIDFIRE_DATA_VERSION );
-			inimgrSetString( ini, "Mode",  RAPIDFIRE_DID_CIRCLE,   rapidire_mode_to_string( st_rfconf[RAPIDFIRE_BUTTON_CIRCLE].mode ) );
-			inimgrSetString( ini, "Mode",  RAPIDFIRE_DID_CROSS,    rapidire_mode_to_string( st_rfconf[RAPIDFIRE_BUTTON_CROSS].mode ) );
-			inimgrSetString( ini, "Mode",  RAPIDFIRE_DID_SQUARE,   rapidire_mode_to_string( st_rfconf[RAPIDFIRE_BUTTON_SQUARE].mode ) );
-			inimgrSetString( ini, "Mode",  RAPIDFIRE_DID_TRIANGLE, rapidire_mode_to_string( st_rfconf[RAPIDFIRE_BUTTON_TRIANGLE].mode ) );
-			inimgrSetString( ini, "Mode",  RAPIDFIRE_DID_UP,       rapidire_mode_to_string( st_rfconf[RAPIDFIRE_BUTTON_UP].mode ) );
-			inimgrSetString( ini, "Mode",  RAPIDFIRE_DID_RIGHT,    rapidire_mode_to_string( st_rfconf[RAPIDFIRE_BUTTON_RIGHT].mode ) );
-			inimgrSetString( ini, "Mode",  RAPIDFIRE_DID_DOWN,     rapidire_mode_to_string( st_rfconf[RAPIDFIRE_BUTTON_DOWN].mode ) );
-			inimgrSetString( ini, "Mode",  RAPIDFIRE_DID_LEFT,     rapidire_mode_to_string( st_rfconf[RAPIDFIRE_BUTTON_LEFT].mode ) );
-			inimgrSetString( ini, "Mode",  RAPIDFIRE_DID_LTRIGGER, rapidire_mode_to_string( st_rfconf[RAPIDFIRE_BUTTON_LTRIGGER].mode ) );
-			inimgrSetString( ini, "Mode",  RAPIDFIRE_DID_RTRIGGER, rapidire_mode_to_string( st_rfconf[RAPIDFIRE_BUTTON_RTRIGGER].mode ) );
-			inimgrSetString( ini, "Mode",  RAPIDFIRE_DID_START,    rapidire_mode_to_string( st_rfconf[RAPIDFIRE_BUTTON_START].mode ) );
-			inimgrSetString( ini, "Mode",  RAPIDFIRE_DID_SELECT,   rapidire_mode_to_string( st_rfconf[RAPIDFIRE_BUTTON_SELECT].mode ) );
-			inimgrSetInt( ini, "Delay", RAPIDFIRE_DID_RDELAY,   st_release_delay );
-			inimgrSetInt( ini, "Delay", RAPIDFIRE_DID_PDELAY,   st_press_delay );
+	} else{
+		if( ! mfMenuGetFilename() ){
+			char inipath[128 + 128];
+			inipath[0] = '\0';
 			
-			if( ( err = inimgrSave( ini, inipath ) ) == 0 ){
-				gbPrintf( gbOffsetChar( 3 ), gbOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FGCOLOR, "Saved to %s.", inipath );
-				mfMenuWait( MFM_DISPLAY_MICROSEC_INFO );
-			} else{
-				gbPrintf( gbOffsetChar( 3 ), gbOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FCCOLOR, "Failed to save to %s: 0x%X", inipath, err );
-				mfMenuWait( MFM_DISPLAY_MICROSEC_ERROR );
+			if( mfMenuGetFilenameResult( inipath, sizeof( inipath ), NULL ) ){
+				IniUID ini = inimgrNew();
+				if( ini > 0 ){
+					unsigned int err;
+					inimgrSetInt( ini, "default", RAPIDFIRE_DATA_SIGNATURE, RAPIDFIRE_DATA_VERSION );
+					inimgrSetString( ini, "Mode",  RAPIDFIRE_DID_CIRCLE,   rapidire_mode_to_string( st_rfconf[RAPIDFIRE_BUTTON_CIRCLE].mode ) );
+					inimgrSetString( ini, "Mode",  RAPIDFIRE_DID_CROSS,    rapidire_mode_to_string( st_rfconf[RAPIDFIRE_BUTTON_CROSS].mode ) );
+					inimgrSetString( ini, "Mode",  RAPIDFIRE_DID_SQUARE,   rapidire_mode_to_string( st_rfconf[RAPIDFIRE_BUTTON_SQUARE].mode ) );
+					inimgrSetString( ini, "Mode",  RAPIDFIRE_DID_TRIANGLE, rapidire_mode_to_string( st_rfconf[RAPIDFIRE_BUTTON_TRIANGLE].mode ) );
+					inimgrSetString( ini, "Mode",  RAPIDFIRE_DID_UP,       rapidire_mode_to_string( st_rfconf[RAPIDFIRE_BUTTON_UP].mode ) );
+					inimgrSetString( ini, "Mode",  RAPIDFIRE_DID_RIGHT,    rapidire_mode_to_string( st_rfconf[RAPIDFIRE_BUTTON_RIGHT].mode ) );
+					inimgrSetString( ini, "Mode",  RAPIDFIRE_DID_DOWN,     rapidire_mode_to_string( st_rfconf[RAPIDFIRE_BUTTON_DOWN].mode ) );
+					inimgrSetString( ini, "Mode",  RAPIDFIRE_DID_LEFT,     rapidire_mode_to_string( st_rfconf[RAPIDFIRE_BUTTON_LEFT].mode ) );
+					inimgrSetString( ini, "Mode",  RAPIDFIRE_DID_LTRIGGER, rapidire_mode_to_string( st_rfconf[RAPIDFIRE_BUTTON_LTRIGGER].mode ) );
+					inimgrSetString( ini, "Mode",  RAPIDFIRE_DID_RTRIGGER, rapidire_mode_to_string( st_rfconf[RAPIDFIRE_BUTTON_RTRIGGER].mode ) );
+					inimgrSetString( ini, "Mode",  RAPIDFIRE_DID_START,    rapidire_mode_to_string( st_rfconf[RAPIDFIRE_BUTTON_START].mode ) );
+					inimgrSetString( ini, "Mode",  RAPIDFIRE_DID_SELECT,   rapidire_mode_to_string( st_rfconf[RAPIDFIRE_BUTTON_SELECT].mode ) );
+					inimgrSetInt( ini, "Delay", RAPIDFIRE_DID_RDELAY,   st_release_delay );
+					inimgrSetInt( ini, "Delay", RAPIDFIRE_DID_PDELAY,   st_press_delay );
+					
+					if( ( err = inimgrSave( ini, inipath ) ) == 0 ){
+						gbPrintf( gbOffsetChar( 3 ), gbOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FGCOLOR, "Saved to %s.", inipath );
+						mfMenuWait( MFM_DISPLAY_MICROSEC_INFO );
+					} else{
+						gbPrintf( gbOffsetChar( 3 ), gbOffsetLine( 32 ), MFM_TEXT_BGCOLOR, MFM_TEXT_FCCOLOR, "Failed to save to %s: 0x%X", inipath, err );
+						mfMenuWait( MFM_DISPLAY_MICROSEC_ERROR );
+					}
+					inimgrDestroy( ini );
+				}
 			}
-			
-			inimgrDestroy( ini );
+			return MR_BACK;
 		}
-		
-		memsceFree( inipath );
-		
-		return MR_BACK;
+		return MR_CONTINUE;
 	}
 }
 
@@ -260,11 +233,6 @@ MfMenuRc rapidfireMenu( SceCtrlData *pad_data, void *argp )
 		gbPrint( gbOffsetChar( 33 ), gbOffsetLine( 24 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "AUTO-RAPID: Always rapidfire." );
 		gbPrint( gbOffsetChar( 33 ), gbOffsetLine( 25 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "HOLD      : Toggle the hold state." );
 		gbPrint( gbOffsetChar( 33 ), gbOffsetLine( 26 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "AUTO-HOLD : Always to hold." );
-		
-		/* 目立つように警告はSave/Loadにカーソルがのった時のみ表示 */
-		if( selected == RAPIDFIRE_LOAD || selected == RAPIDFIRE_SAVE ){
-			gbPrint( gbOffsetChar( 5 ), gbOffsetLine( 28 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "IMPORTANT CAUTION\n  Verify that MemoryStick access indicator is not blinking.\n  Otherwise, will CRASH the currently running game!" );
-		}
 		
 		switch( mfMenuUniDraw( gbOffsetChar( 5 ), gbOffsetLine( 6 ), st_menu_table, MF_ARRAY_NUM( st_menu_table ), &selected, 0 ) ){
 			case MR_CONTINUE:

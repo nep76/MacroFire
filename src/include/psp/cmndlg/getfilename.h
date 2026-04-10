@@ -48,9 +48,9 @@ typedef enum {
 } CmndlgGetFilenameFlags;
 
 typedef struct {
-	const char   *title;
+	char         *title;
 	unsigned int flags;
-	const char   *initPath;
+	char         *initPath;
 	char         *path;
 	size_t       pathMax;
 	char         *name;
