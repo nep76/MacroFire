@@ -210,8 +210,8 @@ void macroMain( MfHookAction action, SceCtrlData *pad, MfHprmKey *hk )
 					st_params.main.hotkeyAccept = true;
 				} else if( trigger && st_params.main.hotkeyAccept ){
 					st_params.main.hotkeyAccept = false;
-					macro_trace_stop( &(st_params.work) );
 					if( mfNotificationThreadId() ) mfNotificationPrintf( MF_STR_MACRO_OVMSG_HALT );
+					macro_trace_stop( &(st_params.work) );
 					break;
 				}
 			}
@@ -894,8 +894,48 @@ static void macro_record_prepare( struct macro_params_action *work, struct macro
 
 static void macro_record_stop( struct macro_params_action *work )
 {
+	PadutilButtons menu_buttons = padutilGetPad( mfGetMenuButtons() );
+	
 	if( work->actionType != MACRO_RECORD ) return;
 	
+	/* 記録されたマクロを逆行してメニュー起動ボタンの入力を削除する */
+	if( menu_buttons ){
+		MacromgrAction action;
+		MacromgrData data;
+		MacromgrData sub;
+		unsigned int check_buttons = menu_buttons;
+		unsigned char x, y;
+		
+		do {
+			macromgrGetCommand( work->temp->cmd, &action, &data, &sub );
+			
+			switch( action ){
+				case MACROMGR_BUTTONS_PRESS:
+				case MACROMGR_BUTTONS_RELEASE:
+				case MACROMGR_BUTTONS_CHANGE:
+					check_buttons ^= data & menu_buttons;
+					break;
+				case MACROMGR_ANALOG_MOVE:
+					x = MACROMGR_GET_ANALOG_X( data );
+					y = MACROMGR_GET_ANALOG_Y( data );
+					check_buttons ^= padutilGetAnalogStickDirection( x, y, 0 ) & menu_buttons;
+					break;
+				default:
+					break;
+			}
+			if( check_buttons == 0 ) break;
+		} while( ( work->temp->cmd = macromgrPrev( work->temp->cmd ) ) );
+		
+		if( check_buttons == 0 ){
+			work->temp->cmd = macromgrPrev( work->temp->cmd );
+			if( ! work->temp->cmd ){
+				macro_clear( work->actionData );
+			} else{
+				MacromgrCommand *cmd;
+				while( ( cmd = macromgrNext( work->temp->cmd ) ) ) macromgrRemove( work->actionData->macro, cmd );
+			}
+		}
+	}
 	work->actionType       = MACRO_NTD;
 	work->temp->cmd        = NULL;
 	work->temp->common.rtc = 0;
@@ -907,7 +947,6 @@ static void macro_record( struct macro_params_action *work, SceCtrlData *pad )
 	
 	unsigned int current_buttons = pad->Buttons & MF_TARGET_BUTTONS;
 	bool         analog_move     = false;
-	
 	
 	if( work->actionData->analogStickEnable && ( work->temp->common.analogX != pad->Lx || work->temp->common.analogY != pad->Ly ) ){
 		analog_move = true;
@@ -1067,7 +1106,10 @@ static bool macro_trace( struct macro_params_action *work, SceCtrlData *pad )
 		/* ボタンを更新 */
 		pad->Buttons |= work->temp->common.lastButtons;
 		
-		/* 最後にマクロで指定されたアナログスティックの座標が実座標よりも動いていれば上書き */
+		/*
+			最後にマクロで指定されたアナログスティックの座標が実座標よりも動いていれば上書き
+			(デッドゾーンから出ていなければ上書きの方がいい？)
+		*/
 		if( abs( work->temp->common.analogX - MACROMGR_ANALOG_CENTER ) > abs( pad->Lx - MACROMGR_ANALOG_CENTER ) )
 			pad->Lx = work->temp->common.analogX;
 		

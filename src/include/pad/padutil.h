@@ -186,10 +186,10 @@ extern "C" {
 /*=========================================================
 	Œ^éŒ¾
 =========================================================*/
-typedef uint64_t      PadutilButtons;
-typedef unsigned char PadutilCoord;
-typedef char          PadutilRelCoord;
-typedef float         PadutilSensitivity;
+typedef uint64_t       PadutilButtons;
+typedef unsigned char  PadutilCoord;
+typedef char           PadutilRelCoord;
+typedef unsigned short PadutilSensitivity;
 
 typedef struct {
 	PadutilCoord       originX;
@@ -345,7 +345,7 @@ void padutilRemap( PadutilRemap *remap, PadutilButtons src, SceCtrlData *pad, u3
 		æ‚èo‚³‚ê‚½’lB
 -----------------------------------------------*/
 #define padutilGetPad( btn )  ( (unsigned int)btn )
-#define padutilGetHprm( btn ) ( (u32)( (PadutilButtons)( btn ) >> 32 ) )
+#define padutilGetHprm( btn ) ( (unsigned int)( (PadutilButtons)( btn ) >> 32 ) )
 
 
 #ifdef __cplusplus

@@ -9,7 +9,7 @@ unsigned int padutilGetAnalogStickDirection( PadutilCoord x, PadutilCoord y, Pad
 	nx = abs( x - PADUTIL_CENTER_X );
 	ny = abs( y - PADUTIL_CENTER_Y );
 	
-	if( ( nx == 0 && ny == 0 ) || ( deadzone && PADUTIL_IN_DEADZONE( nx, ny, deadzone ) ) ) return 0;
+	if( nx == 0 && ny == 0 ) return 0;
 	
 	if( ny > (int)(sin( PADUTIL_DEGREE_TO_RADIAN( PADUTIL_INVALID_RIGHT_TRIANGLE_DEGREE ) ) * nx) ){
 		if( y > PADUTIL_CENTER_Y ){

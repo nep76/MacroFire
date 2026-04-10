@@ -68,6 +68,7 @@ CLASSG_LIBS = -lcdialog -lovmsg -linimgr -ldirh -lfiomgr -lpadctrl -lpadutil -lp
 
 OBJS = \
 	exports.o \
+	sceSYSCON_Driver.o \
 	sceDmac.o \
 	sceUtility.o \
 	sceUmd.o \

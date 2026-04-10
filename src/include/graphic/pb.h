@@ -99,6 +99,7 @@ typedef enum {
 	PB_NO_CACHE      = 0x00000001,
 	PB_BLEND         = 0x00000002,
 	PB_DOUBLE_BUFFER = 0x00000004,
+	PB_STEAL_DISPLAY = 0x00000008,
 	PB_NO_DRAW       = 0x80000000
 } PbOptions;
 
@@ -124,7 +125,8 @@ void pbEnable( unsigned int opt );
 void pbDisable( unsigned int opt );
 bool pbIsEnabled( unsigned int opt );
 int pbApply( void );
-int pbSync( int bufsync );
+int pbSyncDisplay( int bufsync );
+int pbReturnDisplay( int bufsync );
 void *pbSwapBuffers( int bufsync );
 int pbGetPixelDataSize( int format );
 int pbGetFrameBufferDataSize( int format, int width );

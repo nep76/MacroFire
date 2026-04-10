@@ -7,9 +7,9 @@ void padutilAdjustAnalogStick( const PadutilAnalogStick *analogstick, SceCtrlDat
 	if( PADUTIL_IN_DEADZONE( abs( pad->Lx - analogstick->originX ), abs( pad->Ly - analogstick->originY ), analogstick->deadzone ) ){
 		pad->Lx = PADUTIL_CENTER_X;
 		pad->Ly = PADUTIL_CENTER_Y;
-	} else if( analogstick->sensitivity != 1.0f ){
-		int x = analogstick->originX + ( ( pad->Lx - analogstick->originX ) * analogstick->sensitivity );
-		int y = analogstick->originY + ( ( pad->Ly - analogstick->originY ) * analogstick->sensitivity );
+	} else if( analogstick->sensitivity != 100 ){
+		int x = analogstick->originX + ( ( pad->Lx - analogstick->originX ) * analogstick->sensitivity ) / 100;
+		int y = analogstick->originY + ( ( pad->Ly - analogstick->originY ) * analogstick->sensitivity ) / 100;
 		
 		if( x > PADUTIL_MAX_COORD ){
 			x = PADUTIL_MAX_COORD;
@@ -27,7 +27,7 @@ void padutilAdjustAnalogStick( const PadutilAnalogStick *analogstick, SceCtrlDat
 		pad->Ly = y;
 	}
 	
-	if(
+	if( 
 		( analogstick->originX < PADUTIL_CENTER_X && pad->Lx > analogstick->originX && pad->Lx < PADUTIL_CENTER_X ) ||
 		( analogstick->originX > PADUTIL_CENTER_X && pad->Lx < analogstick->originX && pad->Lx > PADUTIL_CENTER_X )
 	){

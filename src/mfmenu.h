@@ -46,6 +46,7 @@ typedef enum {
 	プロトタイプ
 =========================================================*/
 bool mfMenuInit( void );
+bool mfMenuAddSysThreadId( SceUID thid );
 void mfMenuDestroy( void );
 void mfMenuMain( SceCtrlData *pad, MfHprmKey *hk );
 void mfMenuIniLoad( IniUID ini, char *buf, size_t len );

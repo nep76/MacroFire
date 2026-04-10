@@ -26,7 +26,7 @@
 	íËêî
 ==========================================================*/
 #define MF_TITLE        MF_STR_TITLE
-#define MF_VERSION      "3.1.0"
+#define MF_VERSION      "3.2.0"
 #define MF_AUTHOR       "ClassG (http://classg.sytes.net)"
 
 #define MF_INI_PATH_DEFAULT    "ms0:/seplugins/"
@@ -115,12 +115,9 @@ int mfDebugPrintf( const char *format, ... );
 #ifdef DEBUG_ENABLED
 #define dbgprintf( fmt, ... ) \
 	DEBUG_PRINTF( "(%s():%s:%d): ", __func__, __FILE__, __LINE__ );\
-	DEBUG_PRINTF( fmt, __VA_ARGS__ );\
+	DEBUG_PRINTF( fmt, ## __VA_ARGS__ );\
 	DEBUG_PRINTF( "\n" );
-#define dbgprint( str ) \
-	DEBUG_PRINTF( "(%s():%s:%d): ", __func__, __FILE__, __LINE__ );\
-	DEBUG_PRINTF( str );\
-	DEBUG_PRINTF( "\n" );
+#define dbgprint( str ) dbgprintf( str )
 #else
 #define dbgprintf( fmt, ... )
 #define dbgprint( str )
@@ -157,8 +154,6 @@ void mfNotificationShutdownStart( void );
 SceUID mfNotificationThreadId( void );
 void mfNotificationPrintTerm( void );
 bool mfNotificationPrintf( const char *format, ... );
-bool mfHookIncomplete( void );
-const PadutilAnalogStick *mfGetAnalogStickContext( void );
 
 #ifndef MFDIALOG_H
 #include "mfdialog.h"

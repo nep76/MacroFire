@@ -33,12 +33,11 @@
 	PSP_CTRL_LTRIGGER | PSP_CTRL_RTRIGGER | PSP_CTRL_SELECT | PSP_CTRL_START    | \
 	PADUTIL_CTRL_ANALOG_UP   | PADUTIL_CTRL_ANALOG_RIGHT | \
 	PADUTIL_CTRL_ANALOG_DOWN | PADUTIL_CTRL_ANALOG_LEFT  | \
-	PSP_CTRL_HOME \
+	PSP_CTRL_HOME | PSP_CTRL_NOTE | PSP_CTRL_SCREEN | PSP_CTRL_VOLUP | PSP_CTRL_VOLDOWN \
 )
 
 #define MF_HOTKEY_BUTTONS (\
-	padutilSetPad( MF_TARGET_BUTTONS | ( PSP_CTRL_NOTE | PSP_CTRL_SCREEN | PSP_CTRL_VOLUP | PSP_CTRL_VOLDOWN ) ) |\
-	padutilSetHprm( PADUTIL_HPRM_NORMAL_KEYS ) \
+	padutilSetPad( MF_TARGET_BUTTONS ) | padutilSetHprm( PADUTIL_HPRM_NORMAL_KEYS ) \
 )
 
 #define mfIsPressed( buttons, target )     ( ( ( buttons ) & ( target ) ) == ( target ) ? true : false )
@@ -76,9 +75,8 @@ typedef enum {
 	パッドデータの取得方法
 -----------------------------------------------*/
 typedef enum {
-	MF_INTERNAL = 0,
 	MF_KEEP,
-	MF_UPDATE,
+	MF_UPDATE
 } MfHookAction;
 
 /*-----------------------------------------------

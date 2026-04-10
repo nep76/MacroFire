@@ -10,6 +10,8 @@
 /*=========================================================
 	マクロ
 =========================================================*/
+#define MACROEDITOR_SIG_UPDATE_CMD MF_SM_1
+
 #define MACROEDITOR_TEMP_ANALOGMOVE_X 0
 #define MACROEDITOR_TEMP_ANALOGMOVE_Y 1
 
@@ -130,7 +132,7 @@ void macroeditorTerm( void )
 
 #define PRINT_CMD( xoff, yoff, color, str )       pbPrint( pbOffsetChar( 3 + xoff ), pbOffsetLine( 4 + yoff ), color, MF_COLOR_TEXT_BG, str )
 #define PRINTF_CMD( xoff, yoff, color, str, ... ) pbPrintf( pbOffsetChar( 3 + xoff ), pbOffsetLine( 4 + yoff ), color, MF_COLOR_TEXT_BG, str, __VA_ARGS__ )
-bool macroeditorMain( MfMessage message )
+bool macroeditorMain( MfMessage message ) /* メニューメッセージが来る */
 {
 	MacromgrCommand *cmd;
 	MacromgrAction  action;
@@ -142,7 +144,10 @@ bool macroeditorMain( MfMessage message )
 	
 	unsigned int text_color, guide_color;
 	
-	bool nowedit =  st_params->menu.tables || mfMenuMaskDialogMessage( message ) ? true : false;
+	bool nowedit = message & MF_MM_WAIT || st_params->menu.tables ? true : false;
+	
+	/* マクロコマンドの更新シグナルかメニュー復帰があれば更新 */
+	if( message & ( MF_MM_CONTINUE | MACROEDITOR_SIG_UPDATE_CMD ) ) macromgrSetCommand( st_params->selected.cmd, st_params->selected.action, st_params->selected.data, st_params->selected.sub );
 	
 	rest_lines  = mfMenuScroll( st_params->selectedPos, MACROEDITOR_LINES_PER_PAGE, st_params->numberOfCmd );
 	line_number = rest_lines + 1;
@@ -218,7 +223,6 @@ bool macroeditorMain( MfMessage message )
 		}
 	}
 	
-	
 	if( nowedit ){
 		if( st_params->menu.tables ){
 			if( mfMenuDrawTable( st_params->menu.tables, MF_MENU_NO_OPTIONS ) ){
@@ -227,10 +231,6 @@ bool macroeditorMain( MfMessage message )
 				mfMenuDestroyTables( st_params->menu.tables );
 				st_params->menu.tables = NULL;
 			}
-		} else if( message & MF_DM_FINISH ){
-			macromgrSetCommand( st_params->selected.cmd, st_params->selected.action, st_params->selected.data, st_params->selected.sub );
-		} else{
-			return true;
 		}
 	} else{
 		mfMenuSetInfoText( MF_MENU_INFOTEXT_COMMON_CTRL | MF_MENU_INFOTEXT_MOVABLEPAGE_CTRL | MF_MENU_INFOTEXT_SET_LOWER_LINE, "(%s)%s, (%s)%s, (%s)%s (L)%s, (R)%s", mfMenuAcceptSymbol(), MF_STR_MACROEDITOR_CTRL_EDIT, PB_SYM_PSP_TRIANGLE, MF_STR_MACROEDITOR_CTRL_CHANGE, PB_SYM_PSP_SQUARE, MF_STR_MACROEDITOR_CTRL_DELETE, MF_STR_MACROEDITOR_CTRL_INS_BEFORE, MF_STR_MACROEDITOR_CTRL_INS_AFTER );
@@ -335,34 +335,37 @@ bool macroeditorMain( MfMessage message )
 -----------------------------------------------*/
 static bool macroeditor_ctrl_edit_analog_x( MfMessage message, const char *label, void *var, void *pref, void *ex )
 {
-	if( message == MF_DM_FINISH ){
-		((struct macroeditor_command_data *)var)->data = MACROMGR_SET_ANALOG_XY( ((struct macroeditor_command_data *)var)->temp, MACROMGR_GET_ANALOG_Y( ((struct macroeditor_command_data *)var)->data ) );
-		return false;
-	} else if( message == MF_CM_INFO ){
+	if( message & MF_CM_INFO ){
 		mfMenuSetInfoText( MF_MENU_INFOTEXT_COMMON_CTRL | MF_MENU_INFOTEXT_SET_LOWER_LINE, "(%s)%s", mfMenuAcceptSymbol(), MF_STR_MACROEDITOR_CTRL_EDIT );
-	} else if( message == MF_CM_PROC ){
-		if( mfMenuIsPressed( mfMenuAcceptButton() ) ){
+	} else if( message & MF_CM_PROC ){
+		 if( mfMenuIsPressed( mfMenuAcceptButton() ) ){
 			MfCtrlDefGetNumberPref *numpref = pref;
 			((struct macroeditor_command_data *)var)->temp = MACROMGR_GET_ANALOG_X( ((struct macroeditor_command_data *)var)->data );
 			mfDialogNumedit( label, numpref->unit, &(((struct macroeditor_command_data *)var)->temp), numpref->max );
 		}
+	} else if( message & MF_CM_CONTINUE ){
+		dbgprintf( "%X: %d, %d", message, ((struct macroeditor_command_data *)var)->temp, MACROMGR_GET_ANALOG_Y( ((struct macroeditor_command_data *)var)->data ) );
+		((struct macroeditor_command_data *)var)->data = MACROMGR_SET_ANALOG_XY( ((struct macroeditor_command_data *)var)->temp, MACROMGR_GET_ANALOG_Y( ((struct macroeditor_command_data *)var)->data ) );
+		mfMenuSendSignal( MACROEDITOR_SIG_UPDATE_CMD );
+		return false;
 	}
 	return true;
 }
 
 static bool macroeditor_ctrl_edit_analog_y( MfMessage message, const char *label, void *var, void *pref, void *ex )
 {
-	if( message == MF_DM_FINISH ){
-		((struct macroeditor_command_data *)var)->data = MACROMGR_SET_ANALOG_XY( MACROMGR_GET_ANALOG_X( ((struct macroeditor_command_data *)var)->data ), ((struct macroeditor_command_data *)var)->temp );
-		return false;
-	} else if( message == MF_CM_INFO ){
+	if( message & MF_CM_INFO ){
 		mfMenuSetInfoText( MF_MENU_INFOTEXT_COMMON_CTRL | MF_MENU_INFOTEXT_SET_LOWER_LINE, "(%s)%s", mfMenuAcceptSymbol(), MF_STR_MACROEDITOR_CTRL_EDIT );
-	} else if( message == MF_CM_PROC ){
-		if( mfMenuIsPressed( mfMenuAcceptButton() ) ){
+	} else if( message & MF_CM_PROC ){
+		 if( mfMenuIsPressed( mfMenuAcceptButton() ) ){
 			MfCtrlDefGetNumberPref *numpref = pref;
 			((struct macroeditor_command_data *)var)->temp = MACROMGR_GET_ANALOG_Y( ((struct macroeditor_command_data *)var)->data );
 			mfDialogNumedit( label, numpref->unit, &(((struct macroeditor_command_data *)var)->temp), numpref->max );
 		}
+	} else if( message & MF_CM_CONTINUE ){
+		((struct macroeditor_command_data *)var)->data = MACROMGR_SET_ANALOG_XY( MACROMGR_GET_ANALOG_X( ((struct macroeditor_command_data *)var)->data ), ((struct macroeditor_command_data *)var)->temp );
+		mfMenuSendSignal( MACROEDITOR_SIG_UPDATE_CMD );
+		return false;
 	}
 	return true;
 }
@@ -370,17 +373,18 @@ static bool macroeditor_ctrl_edit_analog_y( MfMessage message, const char *label
 
 static bool macroeditor_ctrl_edit_rapid_pd( MfMessage message, const char *label, void *var, void *pref, void *ex )
 {
-	if( message == MF_DM_FINISH ){
-		((struct macroeditor_command_data *)var)->sub = MACROMGR_SET_RAPIDDELAY( ((struct macroeditor_command_data *)var)->temp, MACROMGR_GET_RAPIDRDELAY( ((struct macroeditor_command_data *)var)->sub ) );
-		return false;
-	} else if( message == MF_CM_INFO ){
+	if( message & MF_CM_INFO ){
 		mfMenuSetInfoText( MF_MENU_INFOTEXT_COMMON_CTRL | MF_MENU_INFOTEXT_SET_LOWER_LINE, "(%s)%s", mfMenuAcceptSymbol(), MF_STR_MACROEDITOR_CTRL_EDIT );
-	} else if( message == MF_CM_PROC ){
+	} else if( message & MF_CM_PROC ){
 		if( mfMenuIsPressed( mfMenuAcceptButton() ) ){
 			MfCtrlDefGetNumberPref *numpref = pref;
 			((struct macroeditor_command_data *)var)->temp = MACROMGR_GET_RAPIDPDELAY( ((struct macroeditor_command_data *)var)->sub );
 			mfDialogNumedit( label, numpref->unit, &(((struct macroeditor_command_data *)var)->temp), numpref->max );
 		}
+	} else if( message & MF_CM_CONTINUE ){
+		((struct macroeditor_command_data *)var)->sub = MACROMGR_SET_RAPIDDELAY( ((struct macroeditor_command_data *)var)->temp, MACROMGR_GET_RAPIDRDELAY( ((struct macroeditor_command_data *)var)->sub ) );
+		mfMenuSendSignal( MACROEDITOR_SIG_UPDATE_CMD );
+		return false;
 	}
 	return true;
 }
@@ -388,24 +392,26 @@ static bool macroeditor_ctrl_edit_rapid_pd( MfMessage message, const char *label
 
 static bool macroeditor_ctrl_edit_rapid_rd( MfMessage message, const char *label, void *var, void *pref, void *ex )
 {
-	if( message == MF_DM_FINISH ){
-		((struct macroeditor_command_data *)var)->sub = MACROMGR_SET_RAPIDDELAY( MACROMGR_GET_RAPIDPDELAY( ((struct macroeditor_command_data *)var)->sub ), ((struct macroeditor_command_data *)var)->temp );
-		return false;
-	} else if( message == MF_CM_INFO ){
+	if( message & MF_CM_INFO ){
 		mfMenuSetInfoText( MF_MENU_INFOTEXT_COMMON_CTRL | MF_MENU_INFOTEXT_SET_LOWER_LINE, "(%s)%s", mfMenuAcceptSymbol(), MF_STR_MACROEDITOR_CTRL_EDIT );
-	} else if( message == MF_CM_PROC ){
+	} else if( message & MF_CM_PROC ){
 		if( mfMenuIsPressed( mfMenuAcceptButton() ) ){
 			MfCtrlDefGetNumberPref *numpref = pref;
 			((struct macroeditor_command_data *)var)->temp = MACROMGR_GET_RAPIDRDELAY( ((struct macroeditor_command_data *)var)->sub );
 			mfDialogNumedit( label, numpref->unit, &(((struct macroeditor_command_data *)var)->temp), numpref->max );
 		}
+	} else if( message & MF_CM_CONTINUE ){
+		((struct macroeditor_command_data *)var)->sub = MACROMGR_SET_RAPIDDELAY( MACROMGR_GET_RAPIDPDELAY( ((struct macroeditor_command_data *)var)->sub ), ((struct macroeditor_command_data *)var)->temp );
+		mfMenuSendSignal( MACROEDITOR_SIG_UPDATE_CMD );
+		return false;
 	}
 	return true;
 }
 
 static bool macroeditor_ctrl_set_buttons( MfMessage message, const char *label, void *var, void *pref, void *ex )
 {
-	if( message == MF_DM_FINISH ){
+	if( message & MF_CM_CONTINUE ){
+		mfMenuSendSignal( MACROEDITOR_SIG_UPDATE_CMD );
 		return false;
 	} else{
 		return mfCtrlDefGetButtons( message, label, var, pref, ex );
@@ -414,9 +420,9 @@ static bool macroeditor_ctrl_set_buttons( MfMessage message, const char *label, 
 
 static bool macroeditor_ctrl_set_type( MfMessage message, const char *label, void *var, void *pref, void *ex )
 {
-	if( message == MF_CM_INFO ){
+	if( message & MF_CM_INFO ){
 		mfMenuSetInfoText( MF_MENU_INFOTEXT_COMMON_CTRL | MF_MENU_INFOTEXT_SET_LOWER_LINE, "(%s)%s", mfMenuAcceptSymbol(), MF_STR_MACROEDITOR_CTRL_CHANGE );
-	} else if( message == MF_CM_PROC ){
+	} else if( message & MF_CM_PROC ){
 		if( mfMenuIsPressed( mfMenuAcceptButton() ) ){
 			if( ((struct macroeditor_command_data *)var)->action != (MacromgrAction)pref ){
 				((struct macroeditor_command_data *)var)->action = (MacromgrAction)pref;
@@ -429,6 +435,7 @@ static bool macroeditor_ctrl_set_type( MfMessage message, const char *label, voi
 						((struct macroeditor_command_data *)var)->data = 0;
 						((struct macroeditor_command_data *)var)->sub  = 0;
 				}
+				mfMenuSendSignal( MACROEDITOR_SIG_UPDATE_CMD );
 			}
 			return false;
 		}

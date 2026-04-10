@@ -1,4 +1,4 @@
-MacroFire 3.1.0
+MacroFire 3.2.0
 
 
 Macro settings
@@ -115,6 +115,26 @@ Edit macro
 
   エディットではこれらコマンドの値の変更と、
   これらコマンドそのものを挿入/削除を行うことができます。
+
+  Delay以外の全てのコマンドは、1フレームに一つの実行されます。
+  例えば、
+      Buttons press: ○ ×
+  は、完全に同時にボタンが押されますが、
+      Buttons press: ○
+      Buttons press: ×
+  は、1フレームずれてボタンが順番に入力されます。
+  従って、
+      Buttons press: ○
+      Buttons release: ○
+  というマクロを無限に繰り返すと○ボタンの連射のような動作になります。
+
+  ただしDelayだけは別で
+      Delay: 500ms
+  と
+      Delay: 200ms
+      Delay: 300ms
+  はどちらも全く同じ意味で、同じ時間だけ待ちます。
+
 
   また、マクロを全てDeleteで削除しようとしても、完全には消せません。
   具体的には必ず Delay 0 ms が残ります。

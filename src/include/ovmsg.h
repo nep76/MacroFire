@@ -15,25 +15,30 @@
 /*=========================================================
 	É}ÉNÉç
 =========================================================*/
-#define OVMSG_LENGTH 128
+#define OVMSG_MESSAGE_MAX_LENGTH 128
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /*=========================================================
+	å^êÈåæ
+=========================================================*/
+typedef intptr_t OvmsgUID;
+
+/*=========================================================
 	ä÷êî
 =========================================================*/
-int ovmsgInit( void );
-SceUID ovmsgGetThreadId( void );
-int ovmsgThreadMain( SceSize arglen, void *argp );
-void ovmsgPrintIntrStart( void );
-bool ovmsgPrintf( const char *format, ... );
-bool ovmsgVprintf( const char *format, va_list ap );
-void ovmsgWaitForInit( void );
-bool ovmsgIsRunning( void );
-void ovmsgWaitForReady( void );
-void ovmsgShutdownStart( void );
+OvmsgUID ovmsgInit( void );
+SceUID ovmsgGetThreadId( OvmsgUID uid );
+void ovmsgSetColor( OvmsgUID uid, unsigned int fg, unsigned int bg );
+void ovmsgSetPosition( OvmsgUID uid, unsigned short x, unsigned short y );
+int ovmsgMain( SceSize arglen, void *argp );
+int ovmsgVprintf( OvmsgUID uid, const char *format, va_list ap );
+int ovmsgPrintf( OvmsgUID uid, const char *format, ... );
+void ovmsgSuspend( OvmsgUID uid );
+void ovmsgShutdown( OvmsgUID uid );
+void ovmsgDestroy( OvmsgUID uid );
 
 #ifdef __cplusplus
 }

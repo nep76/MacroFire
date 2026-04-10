@@ -240,13 +240,10 @@ static bool remap_add( struct remap_params *params )
 	PadutilRemap *last = NULL;
 	
 	if( ! params->remapList ){
-		dbgprint( "New entry" );
 		params->dmem      = dmemNew( 512, PSP_SMEM_Low );
 		params->remapList = dmemAlloc( params->dmem, sizeof( PadutilRemap ) );
 		new_entry         = params->remapList;
 	} else{
-		dbgprint( "Add entry" );
-		
 		/* ––”ö‚Ü‚ÅˆÚ“® */
 		for( last = params->remapList; last->next; last = last->next );
 		
@@ -255,7 +252,6 @@ static bool remap_add( struct remap_params *params )
 	}
 	
 	if( new_entry ){
-		dbgprintf( "Init entry: %p", new_entry );
 		new_entry->realButtons  = 0;
 		new_entry->remapButtons = 0;
 		new_entry->prev         = last;
@@ -359,8 +355,6 @@ static int remap_inicb_load( InimgrCallbackMode mode, InimgrCallbackParams *cbp,
 	struct remap_params *params = (struct remap_params *)arg;
 	char *name, *value;
 	bool update = false;
-	
-	dbgprint( "Remap loader called." );
 	
 	if( ! mfConvertButtonReady() ){
 		return MF_CTRL_INI_ERROR_NOT_ENOUGH_MEMORY;

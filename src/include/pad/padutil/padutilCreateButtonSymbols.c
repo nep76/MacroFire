@@ -1,6 +1,7 @@
 /* padutilCreateButtonSymbols.c */
 
 #include "padutil_types.h"
+#include "graphic/pb.h"
 
 static PadutilButtonName *st_symbols;
 static unsigned short    st_symbols_refcount;
@@ -12,7 +13,7 @@ PadutilButtonName *padutilCreateButtonSymbols( void )
 		return st_symbols;
 	}
 	
-	st_symbols = (PadutilButtonName *)memoryAllocEx( "PadutilButtonSymbols", MEMORY_USER, 0, sizeof( PadutilButtonName ) * 33, PSP_SMEM_High, NULL );
+	st_symbols = (PadutilButtonName *)memoryExalloc( "PadutilButtonSymbols", MEMORY_USER, 0, sizeof( PadutilButtonName ) * 33, PSP_SMEM_High, NULL );
 	if( ! st_symbols ) return NULL;
 	
 	st_symbols[0].button = padutilSetPad( PSP_CTRL_SELECT );

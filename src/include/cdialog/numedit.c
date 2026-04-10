@@ -357,16 +357,19 @@ void cdialog_numedit_rotate( enum cdialog_numedit_rotate_direction rotate, struc
 	if( work->numbers[0] >= max_str[offset] ){
 		unsigned short i;
 		for( i = 0; i <= work->maxdigits; i++ ){
-			if( work->pos == i ){
-				if( work->numbers[i] > max_str[offset + i] ){
+			if(
+				( i == 0 && work->numbers[i] > max_str[offset + i] ) ||
+				( work->numbers[i - 1] >= max_str[offset + i - 1] && work->numbers[i] > max_str[offset + i] )
+			){
+				if( work->pos == i ){
 					if( rotate == CDIALOG_NUMEDIT_ROTATE_UP ){
 						work->numbers[i] = '0';
 					} else if( rotate == CDIALOG_NUMEDIT_ROTATE_DOWN ){
 						work->numbers[i] = max_str[offset + i];
 					}
+				} else{
+					work->numbers[i] = max_str[offset + i];
 				}
-			} else{
-				if( work->numbers[i] > max_str[offset + i] ) work->numbers[i] = max_str[offset + i];
 			}
 		}
 	}

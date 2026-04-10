@@ -11,7 +11,7 @@
 #include <pspumd.h>
 #include <psputils.h>
 
-PSP_MODULE_INFO( "MacroFire", PSP_MODULE_KERNEL, 3, 0 );
+PSP_MODULE_INFO( "MacroFire", PSP_MODULE_KERNEL, 3, 2 );
 
 /*=========================================================
 	定数
@@ -23,7 +23,7 @@ PSP_MODULE_INFO( "MacroFire", PSP_MODULE_KERNEL, 3, 0 );
 /*=========================================================
 	ローカル関数
 =========================================================*/
-static void mf_init( void );
+static bool mf_init( void );
 static void mf_shutdown( void );
 static void mf_get_gameid( SceUID fd, char *gameid, unsigned char *buf );
 static void mf_get_gameid_from_sha1hash( SceUID fd, char *gameid );
@@ -34,8 +34,20 @@ static void mf_sending_toggle_message( bool engine );
 const char *mf_ini_find_loaded_section( IniUID ini, MfWorldId world, const char *game_id );
 static void mf_ini_load( IniUID ini );
 static void mf_ini_save( IniUID ini );
-static int mf_get_ctrl_buffer( MfHookAction action, unsigned int api, SceCtrlData *pad, MfHprmKey *hk );
-static void mf_ctrl_data_copy( SceCtrlData *padarr, int count );
+static int mf_get_current_ctrl( SceCtrlData *pad, MfHprmKey *hk );
+static unsigned int mf_syscon_peek_dword( uint8_t *addr );
+static void mf_syscon_poke_dword( uint8_t *addr, unsigned int data );
+static unsigned char mf_syscon_make_rx_checksum( SceSysconPacket *packet );
+static void mf_syscon_handler_handler1( SceSysconPacket *packet );
+static void mf_syscon_handler_transmit( SceSysconPacket *packet );
+static void mf_syscon_handler_recieve( SceSysconPacket *packet );
+static void mf_syscon_handler_handler4( SceSysconPacket *packet );
+#ifdef DEBUG
+static void mf_syscom_dump_paket( SceSysconPacket *packet );
+#endif
+static unsigned int mf_conv_buttons_syscon_to_psp( unsigned int sysconbuttons );
+static unsigned int mf_conv_buttons_psp_to_syscon( unsigned int buttons );
+static void mf_call_functions( MfHookAction action, SceCtrlData *pad, MfHprmKey *hk );
 
 /*=========================================================
 	ローカル変数
@@ -43,12 +55,9 @@ static void mf_ctrl_data_copy( SceCtrlData *padarr, int count );
 static char st_game_id[10];
 static const char *st_ini_loaded_section;
 
+static bool         st_hooked       = false;
 static MfWorldId    st_world        = 0;
-static unsigned int st_prev_buttons = 0;
 static u32          st_prev_hprmkey = 0;
-
-static bool           st_hooked          = false;
-static bool           st_hook_incomplete = false;
 
 static bool           st_is_enabled          = MF_INI_STARTUP;
 static PadutilButtons st_menu_buttons        = MF_INI_MENU_BUTTONS;
@@ -57,13 +66,28 @@ static bool           st_status_notification = MF_INI_STATUS_NOTIFICATION;
 
 static PadutilButtonName *st_cvbtn;
 
-static SceCtrlData st_pad;
-static MfHprmKey   st_hk;
+static SceCtrlData st_pad, st_raw_pad;
+static MfHprmKey   st_hk,  st_raw_hk;
+
+static OvmsgUID st_ovmsg;
+
+static MfHookEntry            st_syscon_hook = { { NULL }, "sceSYSCON_Driver", "sceSyscon_driver", 0x5EE92F3C, mfSysconSetDebugHandlers };
+static SceSysconDebugHandlers *st_syscon_chain_handlers = NULL;
+static SceSysconDebugHandlers st_syscon_handlers = {
+	mf_syscon_handler_handler1,
+	mf_syscon_handler_transmit,
+	mf_syscon_handler_recieve,
+	mf_syscon_handler_handler4
+};
+
+#ifdef DEBUG
+int gDebug[10];
+#endif
 
 /*-----------------------------------------------
 	MacroFireの初期化と終了
 -----------------------------------------------*/
-static void mf_init( void )
+static bool mf_init( void )
 {
 	int i;
 	MfFuncInit initfunc;
@@ -71,14 +95,23 @@ static void mf_init( void )
 	const char *executable = sceKernelInitFileName();
 	
 	/* 最初に行う */
-	dbgprint( "Initializing menu" );
+	dbgprintf( "Initializing menu");
 	if( ! mfMenuInit() ) gRunning = false;
 	
-	/* 実行環境取得 */
+		/* 実行環境取得 */
 	switch( sceKernelInitKeyConfig() ){
-		case PSP_INIT_KEYCONFIG_VSH:  st_world = MF_WORLD_VSH;  break;
-		case PSP_INIT_KEYCONFIG_POPS: st_world = MF_WORLD_POPS; break;
-		case PSP_INIT_KEYCONFIG_GAME: st_world = MF_WORLD_GAME; break;
+		case PSP_INIT_KEYCONFIG_VSH:  
+			st_world = MF_WORLD_VSH;
+			strutilCopy( st_game_id, MF_INI_SECTION_VSH, sizeof( st_game_id ) );
+			break;
+		case PSP_INIT_KEYCONFIG_POPS: 
+			st_world = MF_WORLD_POPS;
+			strutilCopy( st_game_id, MF_INI_SECTION_POPS, sizeof( st_game_id ) );
+			break;
+		case PSP_INIT_KEYCONFIG_GAME: 
+			st_world = MF_WORLD_GAME;
+			strutilCopy( st_game_id, MF_INI_SECTION_GAME, sizeof( st_game_id ) );
+			break;
 	}
 	
 	/* ゲームIDを取得 */
@@ -121,8 +154,7 @@ static void mf_init( void )
 	/* ファンクションの初期化 */
 	dbgprint( "Sending message MF_MS_INIT to all functions..." );
 	
-	initfunc = mfAnalogStickProc( MF_MS_INIT );
-	if( initfunc ) initfunc();
+	mfAnalogStickInit();
 	
 	for( i = 0; i < gMftabEntryCount; i++ ){
 		if( gMftab[i].proc ){
@@ -130,6 +162,8 @@ static void mf_init( void )
 			if( initfunc ) initfunc();
 		}
 	}
+	
+	return true;
 }
 
 static void mf_shutdown( void )
@@ -150,6 +184,8 @@ static void mf_shutdown( void )
 	if( mfNotificationThreadId() ) mfNotificationShutdownStart();
 	
 	mfMenuDestroy();
+	
+	if( st_syscon_chain_handlers ) sceSysconSetDebugHandlers( st_syscon_chain_handlers );
 }
 
 static void mf_get_gameid_from_sha1hash( SceUID fd, char *gameid )
@@ -182,6 +218,254 @@ static void mf_get_gameid( SceUID fd, char *gameid, unsigned char *buf )
 }
 
 /*-----------------------------------------------
+	Sysconデータコントロール
+-----------------------------------------------*/
+static unsigned int mf_syscon_peek_dword( uint8_t *addr )
+{
+	return addr[0] | addr[1] << 8 | addr[2] << 16 | addr[3] << 24;
+}
+
+static void mf_syscon_poke_dword( uint8_t *addr, unsigned int data )
+{
+	addr[0] = (uint8_t)( data );
+	addr[1] = (uint8_t)( data >> 8 );
+	addr[2] = (uint8_t)( data >> 16 );
+	addr[3] = (uint8_t)( data >> 24 );
+}
+
+static unsigned char mf_syscon_make_rx_checksum( SceSysconPacket *packet )
+{
+	/* チェックサムらしき値を計算してセットしないとスリープに入れない模様? */
+	unsigned char checksum = 0xFF - packet->rx_sts - packet->rx_len - packet->rx_response;
+	unsigned char offset  = packet->rx_len - 2 - 1 /* 後ろ二つの0xFFは一体? */;
+	
+	while( offset-- ) checksum -= packet->rx_data[offset];
+	
+	return checksum;
+}
+
+/*-----------------------------------------------
+	Sysconハンドラ
+-----------------------------------------------*/
+static void mf_syscon_handler_handler1( SceSysconPacket *packet )
+{
+	/* 他からのデバッグハンドラが登録されていれば、それを呼ぶ */
+	if( st_syscon_chain_handlers && st_syscon_chain_handlers->handler1 ) ( st_syscon_chain_handlers->handler1 )( packet );
+}
+
+static void mf_syscon_handler_transmit( SceSysconPacket *packet )
+{
+	/* 他からのデバッグハンドラが登録されていれば、それを呼ぶ */
+	if( st_syscon_chain_handlers && st_syscon_chain_handlers->before_tx ) ( st_syscon_chain_handlers->before_tx )( packet );
+}
+
+/*
+	デバッグハンドラのスタックサイズはどうなっておるのか?
+	今のところ何も考えずに関数をコールしているが問題無い模様。
+*/
+static void mf_syscon_handler_recieve( SceSysconPacket *packet )
+{
+	//覚え書: syscon_pad.TimeStamp = mf_syscom_peek_dword( packet->unk38 );
+	
+	SceCtrlData syscon_pad;
+	MfHprmKey   syscon_hk;
+	
+	/* Sysconパケットがコントローラデータ取得かどうか調べる */
+	if(
+		( packet->tx_cmd != SCE_SYSCON_CMD_GET_CONTROLLER_DIGITAL && packet->tx_cmd != SCE_SYSCON_CMD_GET_CONTROLLER_ANALOG ) ||
+		packet->tx_cmd != packet->rx_response
+	) return;
+	
+	syscon_pad.Buttons = mf_conv_buttons_syscon_to_psp( mf_syscon_peek_dword( packet->rx_data ) );
+	if( packet->rx_response == 0x08 ){
+		syscon_pad.Lx      = packet->rx_data[4];
+		syscon_pad.Ly      = packet->rx_data[5];
+	} else{
+		syscon_pad.Lx      = PADUTIL_CENTER_X;
+		syscon_pad.Ly      = PADUTIL_CENTER_Y;
+	}
+	
+	sceHprmPeekCurrentKey( &syscon_hk );
+	
+	st_raw_pad = syscon_pad;
+	st_raw_hk  = syscon_hk;
+	
+	if( ! st_hooked ) goto NEXT_HANDLER;
+	
+	/*
+		mfAnalogStickAdjustが内部でコールするpadutilAdjustAnalogStickで
+		float型の演算をするとなぜか落ちる。
+	*/
+	mf_call_functions( MF_UPDATE, &syscon_pad, &syscon_hk );
+	
+	mf_syscon_poke_dword( packet->rx_data, mf_conv_buttons_psp_to_syscon( syscon_pad.Buttons ) | ( mf_syscon_peek_dword( packet->rx_data ) & SCE_SYSCON_CTRL_UNK_BUTTONS ) );
+	if( packet->rx_response == 0x08 ){
+		packet->rx_data[4] = syscon_pad.Lx;
+		packet->rx_data[5] = syscon_pad.Ly;
+		packet->rx_data[6] = mf_syscon_make_rx_checksum( packet );
+	} else{
+		packet->rx_data[4] = mf_syscon_make_rx_checksum( packet );
+	}
+	
+	goto NEXT_HANDLER;
+	
+	NEXT_HANDLER:
+		/* 他からのデバッグハンドラが登録されていれば、それを呼ぶ */
+		if( st_syscon_chain_handlers && st_syscon_chain_handlers->after_rx ) ( st_syscon_chain_handlers->after_rx )( packet );
+}
+
+static void mf_syscon_handler_handler4( SceSysconPacket *packet )
+{
+	/* 他からのデバッグハンドラが登録されていれば、それを呼ぶ */
+	if( st_syscon_chain_handlers && st_syscon_chain_handlers->handler4 ) ( st_syscon_chain_handlers->handler4 )( packet );
+}
+
+#ifdef DEBUG
+static void mf_syscom_dump_paket( SceSysconPacket *packet ){
+	/* 
+		呼ぶ前にどこかで
+			pbInit();
+			pbSetDisplayBuffer( PSP_DISPLAY_PIXEL_FORMAT_8888, (void*)0x44000000, 512 );
+			pbApply();
+		をしておく
+	*/
+	
+	unsigned short y = 1;
+	pbPrintf( 10, pbOffsetLine( y++ ), 0xffffffff, 0xff000000, "?1: unk00  = %02X, %02X, %02X, %02X", packet->unk00[0], packet->unk00[1], packet->unk00[2], packet->unk00[3] );
+	pbPrintf( 10, pbOffsetLine( y++ ), 0xffffffff, 0xff000000, "?1: unk04  = %02X, %02X", packet->unk04[0], packet->unk04[1] );
+	pbPrintf( 10, pbOffsetLine( y++ ), 0xffffffff, 0xff000000, "?1: status = %02X", packet->status );
+	pbPrintf( 10, pbOffsetLine( y++ ), 0xffffffff, 0xff000000, "?1: unk07  = %02X", packet->unk07 );
+	pbPrintf( 10, pbOffsetLine( y++ ), 0xffffffff, 0xff000000, "?1: unk08  = %02X, %02X, %02X, %02X", packet->unk08[0], packet->unk08[1], packet->unk08[2], packet->unk08[3] );
+
+	pbPrintf( 10, pbOffsetLine( y++ ), 0xffffffff, 0xff000000, "T : CMD  = %02X", packet->tx_cmd );
+	pbPrintf( 10, pbOffsetLine( y++ ), 0xffffffff, 0xff000000, "T : LEN  = %02X", packet->tx_len );
+	pbPrintf( 10, pbOffsetLine( y++ ), 0xffffffff, 0xff000000, "T : DATA = %02X, %02X, %02X, %02X, %02X, %02X, %02X, %02X, %02X, %02X, %02X, %02X, %02X, %02X", packet->tx_data[0], packet->tx_data[1], packet->tx_data[2], packet->tx_data[3], packet->tx_data[4], packet->tx_data[5], packet->tx_data[6], packet->tx_data[7], packet->tx_data[8], packet->tx_data[9], packet->tx_data[10], packet->tx_data[11], packet->tx_data[12], packet->tx_data[13] );
+
+	pbPrintf( 10, pbOffsetLine( y++ ), 0xffffffff, 0xff000000, "R : STS  = %02X", packet->rx_sts );
+	pbPrintf( 10, pbOffsetLine( y++ ), 0xffffffff, 0xff000000, "R : LEN  = %02X", packet->rx_len );
+	pbPrintf( 10, pbOffsetLine( y++ ), 0xffffffff, 0xff000000, "R : RESPONSE = %02X", packet->rx_response );
+	pbPrintf( 10, pbOffsetLine( y++ ), 0xffffffff, 0xff000000, "R : DATA = %02X, %02X, %02X, %02X, %02X, %02X, %02X, %02X, %02X", packet->rx_data[0], packet->rx_data[1], packet->rx_data[2], packet->rx_data[3], packet->rx_data[4], packet->rx_data[5], packet->rx_data[6], packet->rx_data[7], packet->rx_data[8] );
+
+	pbPrintf( 10, pbOffsetLine( y++ ), 0xffffffff, 0xff000000, "?2: UNK28 = %08X", packet->unk28 );
+
+	pbPrintf( 10, pbOffsetLine( y++ ), 0xffffffff, 0xff000000, "CB: ADDR = %08X", packet->callback );
+	pbPrintf( 10, pbOffsetLine( y++ ), 0xffffffff, 0xff000000, "CB: R28  = %08X", packet->callback_r28 );
+	pbPrintf( 10, pbOffsetLine( y++ ), 0xffffffff, 0xff000000, "CB: ARG2 = %08X", packet->callback_arg2 );
+
+	pbPrintf( 10, pbOffsetLine( y++ ), 0xffffffff, 0xff000000, "?3: unk38 = %02X, %02X, %02X, %02X, %02X, %02X, %02X, %02X, %02X, %02X, %02X, %02X, %02X", packet->unk38[0], packet->unk38[1], packet->unk38[2], packet->unk38[3], packet->unk38[4], packet->unk38[5], packet->unk38[6], packet->unk38[7], packet->unk38[8], packet->unk38[9], packet->unk38[10], packet->unk38[11], packet->unk38[12] );
+	pbPrintf( 10, pbOffsetLine( y++ ), 0xffffffff, 0xff000000, "?3: OLDSTS  = %02X", packet->old_sts );
+	pbPrintf( 10, pbOffsetLine( y++ ), 0xffffffff, 0xff000000, "?3: CURSTS  = %02X", packet->cur_sts );
+	pbPrintf( 10, pbOffsetLine( y++ ), 0xffffffff, 0xff000000, "?3: UNK47 =" );
+	pbPrintf( 20, pbOffsetLine( y++ ), 0xffffffff, 0xff000000, "%02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X",
+		packet->unk47[0],
+		packet->unk47[1],
+		packet->unk47[2],
+		packet->unk47[3],
+		packet->unk47[4],
+		packet->unk47[5],
+		packet->unk47[6],
+		packet->unk47[7],
+		packet->unk47[8],
+		packet->unk47[9],
+		packet->unk47[10],
+		packet->unk47[11],
+		packet->unk47[12],
+		packet->unk47[13],
+		packet->unk47[14],
+		packet->unk47[15]
+	);
+	pbPrintf( 20, pbOffsetLine( y++ ), 0xffffffff, 0xff000000, "%02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X",
+		packet->unk47[16],
+		packet->unk47[17],
+		packet->unk47[18],
+		packet->unk47[19],
+		packet->unk47[20],
+		packet->unk47[21],
+		packet->unk47[22],
+		packet->unk47[23],
+		packet->unk47[24],
+		packet->unk47[25],
+		packet->unk47[26],
+		packet->unk47[27],
+		packet->unk47[28],
+		packet->unk47[29],
+		packet->unk47[30],
+		packet->unk47[31]
+	);
+	pbPrintf( 20, pbOffsetLine( y++ ), 0xffffffff, 0xff000000, "%02X", packet->unk47[32] );
+}
+#endif
+
+/*-----------------------------------------------
+	SysconボタンとPspボタンのコードの変換
+-----------------------------------------------*/
+static unsigned int mf_conv_buttons_syscon_to_psp( unsigned int sysconbuttons )
+{
+	unsigned int buttons = 0;
+	
+	/* ビット反転 */
+	sysconbuttons = ~sysconbuttons;
+	
+	/* EJECT系のフラグを反転させる */
+	sysconbuttons ^= SCE_SYSCON_CTRL_REMOTE_EJECT | SCE_SYSCON_CTRL_DISC_EJECT | SCE_SYSCON_CTRL_MS_EJECT;
+	
+	/* ボタンを変換 */
+	buttons |= ( sysconbuttons & ( SCE_SYSCON_CTRL_SELECT   | SCE_SYSCON_CTRL_START ) ) >> 8;
+	buttons |= ( sysconbuttons & ( SCE_SYSCON_CTRL_LTRIGGER | SCE_SYSCON_CTRL_RTRIGGER ) ) >> 1;
+	buttons |= ( sysconbuttons & ( SCE_SYSCON_CTRL_TRIANGLE | SCE_SYSCON_CTRL_CIRCLE | SCE_SYSCON_CTRL_CROSS | SCE_SYSCON_CTRL_SQUARE ) ) << 8;
+	buttons |= ( sysconbuttons & (
+		SCE_SYSCON_CTRL_UP           |
+		SCE_SYSCON_CTRL_DOWN         |
+		SCE_SYSCON_CTRL_RIGHT        |
+		SCE_SYSCON_CTRL_LEFT         |
+		SCE_SYSCON_CTRL_HOME         |
+		SCE_SYSCON_CTRL_HOLD         |
+		SCE_SYSCON_CTRL_WLAN_UP      |
+		SCE_SYSCON_CTRL_VOLUP        |
+		SCE_SYSCON_CTRL_VOLDOWN      |
+		SCE_SYSCON_CTRL_SCREEN       |
+		SCE_SYSCON_CTRL_NOTE         |
+		SCE_SYSCON_CTRL_REMOTE_EJECT |
+		SCE_SYSCON_CTRL_DISC_EJECT   |
+		SCE_SYSCON_CTRL_MS_EJECT
+	) ) << 4;
+	
+	return buttons;
+}
+
+static unsigned int mf_conv_buttons_psp_to_syscon( unsigned int buttons )
+{
+	unsigned int sysconbuttons = 0;
+	
+	/* EJECT系のフラグを反転させる */
+	buttons ^= PSP_CTRL_REMOTE | PSP_CTRL_DISC | PSP_CTRL_MS;
+	
+	/* ボタンを変換 */
+	sysconbuttons |= ( buttons & ( PSP_CTRL_SELECT   | PSP_CTRL_START ) ) << 8;
+	sysconbuttons |= ( buttons & ( PSP_CTRL_LTRIGGER | PSP_CTRL_RTRIGGER ) ) << 1;
+	sysconbuttons |= ( buttons & ( PSP_CTRL_TRIANGLE | PSP_CTRL_CIRCLE | PSP_CTRL_CROSS | PSP_CTRL_SQUARE ) ) >> 8;
+	sysconbuttons |= ( buttons & (
+		PSP_CTRL_UP      |
+		PSP_CTRL_DOWN    |
+		PSP_CTRL_RIGHT   |
+		PSP_CTRL_LEFT    |
+		PSP_CTRL_HOME    |
+		PSP_CTRL_HOLD    |
+		PSP_CTRL_WLAN_UP |
+		PSP_CTRL_VOLUP   |
+		PSP_CTRL_VOLDOWN |
+		PSP_CTRL_SCREEN  |
+		PSP_CTRL_NOTE    |
+		PSP_CTRL_REMOTE  |
+		PSP_CTRL_DISC    |
+		PSP_CTRL_MS
+	) ) >> 4;
+	
+	/* ビット反転 */
+	return ~sysconbuttons;
+}
+
+/*-----------------------------------------------
 	メインスレッド開始時に最初に呼ばれる。
 -----------------------------------------------*/
 static void mf_ready( void )
@@ -199,21 +483,16 @@ static void mf_find_hook_address( void )
 {
 	/* フックアドレスを取得 */
 	unsigned int i;
+	void *syscall;
 	
 	dbgprint( "Find hook address..." );
 	for( i = 0; i < hooktableEntryCount; i++ ){
-		hooktable[i].restore.addr = hookFindSyscallAddr( hookFindExportAddr( hooktable[i].module, hooktable[i].library, hooktable[i].nid ) );
+		dbgprintf( "Module: %s, Library: %s, NID: 0x%X", hooktable[i].module, hooktable[i].library, hooktable[i].nid );
+		hooktable[i].restore.addr = hookFindExportAddr( hooktable[i].module, hooktable[i].library, hooktable[i].nid );
+		if( ( syscall = hookFindSyscallAddr( hooktable[i].restore.addr ) ) ) hooktable[i].restore.addr = syscall;
+		
 		dbgprintf( "\tNID:0x%08x Addr:%p Orig:%p Hook:%p", hooktable[i].nid, hooktable[i].restore.addr, hooktable[i].restore.addr ? *(hooktable[i].restore.addr): NULL, hooktable[i].hook );
-		if( hooktable[i].restore.addr ){
-			hooktable[i].restore.api = *(hooktable[i].restore.addr);
-		} else if( st_world == MF_WORLD_VSH ){
-			if( i == MF_VSHCTRL_READ_BUFFER_POSITIVE ) st_hook_incomplete = true;
-		} else if( 
-			i == MF_CTRL_PEEK_BUFFER_POSITIVE || i == MF_CTRL_PEEK_BUFFER_NEGATIVE ||
-			i == MF_CTRL_READ_BUFFER_POSITIVE || i == MF_CTRL_READ_BUFFER_NEGATIVE
-		){
-			st_hook_incomplete = true;
-		}
+		if( hooktable[i].restore.addr ) hooktable[i].restore.api = *(hooktable[i].restore.addr);
 	}
 }
 
@@ -332,71 +611,35 @@ static void mf_ini_save( IniUID ini )
 	}
 }
 
-/*-----------------------------------------------
-	指定されたAPIでパッドデータを取得し、そのデータをファンクションへ渡す。
-	
-	K1レジスタのメモ
-		この関数は第2引数に指定された本来のAPIを実行する。
-		しかし本来のコードは、ファームウェア内部のOSカーネル専用領域に存在する。
-		ここにアクセスするには、特権モードに移行しなければならない。
-		
-		普通のAPIはシステムコール例外の例外ハンドラとして動いているようで、
-		APIをコールするとSYSCALL命令が発行され、例外ハンドラを実行する際に
-		特権モードへ移行するという仕掛けを使って実行できるようになっているっぽい？
-		
-		pspSdkSetK1( 0 )を実行すると特権モードに移行させられるようだ。
-		これを行ったあとならばファームウェア内のコードを直接実行できる。
-		
-		やることやったら元の値に戻せるように、最初のpspSdkSetK1()の返り値を保存しておく。
------------------------------------------------*/
-static int mf_get_ctrl_buffer( MfHookAction action, unsigned int api, SceCtrlData *pad, MfHprmKey *hk )
+static int mf_get_current_ctrl( SceCtrlData *pad, MfHprmKey *hk )
 {
-	int ret;
-	MfFuncHook hookfunc;
-	
-	if( hooktable[api].restore.api ){
-		unsigned int k1_register = pspSdkSetK1( 0 );
-		ret = ( ( int (*)( SceCtrlData*, int ) )hooktable[api].restore.api )( pad, 1 );
-		if( hooktable[MF_HPRM_PEEK_CURRENT_KEY].restore.api ) ( ( int (*)( u32* ) )hooktable[MF_HPRM_PEEK_CURRENT_KEY].restore.api )( hk );
-		pspSdkSetK1( k1_register );
+	if( st_syscon_chain_handlers || st_hooked ){
+		unsigned int intc = pspSdkDisableInterrupts();
+		*pad = st_raw_pad;
+		*hk  = st_raw_hk;
+		pspSdkEnableInterrupts( intc );
 	} else{
-		switch( api ){
-			case MF_CTRL_PEEK_BUFFER_POSITIVE:    ret = sceCtrlPeekBufferPositive( pad, 1 ); break;
-			case MF_CTRL_PEEK_BUFFER_NEGATIVE:    ret = sceCtrlPeekBufferNegative( pad, 1 ); break;
-			case MF_CTRL_READ_BUFFER_POSITIVE:    ret = sceCtrlReadBufferPositive( pad, 1 ); break;
-			case MF_CTRL_READ_BUFFER_NEGATIVE:    ret = sceCtrlReadBufferNegative( pad, 1 ); break;
-			case MF_VSHCTRL_READ_BUFFER_POSITIVE: ret = sceCtrlReadBufferPositive( pad, 1 ); break;
-			default: return CG_ERROR_INVALID_ARGUMENT;
-		}
-		*hk = 0;
+		sceCtrlPeekBufferPositive( pad, 1 );
+		sceHprmPeekCurrentKey( hk );
 	}
+	return 0;
+}
+
+static void mf_call_functions( MfHookAction action, SceCtrlData *pad, MfHprmKey *hk )
+{
+	MfFuncHook hookfunc;
+	int i;
 	
 	/* アナログスティック調整 */
-	hookfunc = mfAnalogStickProc( MF_MS_HOOK );
-	if( hookfunc ) hookfunc( action, pad, hk );
+	mfAnalogStickAdjust( pad );
 	
 	mfRapidfireReset();
 	
-	if( action != MF_INTERNAL ){
-		int i;
-		for( i = 0; i < gMftabEntryCount; i++ ){
-			if( gMftab[i].proc ){
-				hookfunc = ( gMftab[i].proc )( MF_MS_HOOK );
-				if( hookfunc ) hookfunc( action, pad, hk );
-			}
+	for( i = 0; i < gMftabEntryCount; i++ ){
+		if( gMftab[i].proc ){
+			hookfunc = ( gMftab[i].proc )( MF_MS_HOOK );
+			if( hookfunc ) hookfunc( action, pad, hk );
 		}
-		pad->Buttons &= MF_TARGET_BUTTONS;
-	}
-	
-	return ret;
-}
-
-static void mf_ctrl_data_copy( SceCtrlData *padarr, int count )
-{
-	int i;
-	
-	for( i = 1; i < count; i++ ){
-		padarr[i] = padarr[0];
 	}
 }
 
@@ -427,6 +670,7 @@ static void mf_sending_toggle_message( bool engine )
 static int mf_main( SceSize arglen, void *argp )
 {
 	bool wait_toggle_buttons_release = false;
+	PadutilButtons buttons;
 	
 	mf_ready();
 	
@@ -438,11 +682,30 @@ static int mf_main( SceSize arglen, void *argp )
 	while( gRunning ){
 		sceKernelDelayThread( 50000 );
 		
-		mf_get_ctrl_buffer( MF_INTERNAL, MF_CTRL_PEEK_BUFFER_POSITIVE, &st_pad, &st_hk );
+#ifdef DEBUG
+	if( gDebug[0] ){
+		dbgprintf( "0:%X 1:%X 2:%X 3:%X 4:%X 5:%X 6:%X 7:%X 8:%X 9:%X",
+			gDebug[0],
+			gDebug[1],
+			gDebug[2],
+			gDebug[3],
+			gDebug[4],
+			gDebug[5],
+			gDebug[6],
+			gDebug[7],
+			gDebug[8],
+			gDebug[9]
+		);
+	}
+#endif
+		
+		mf_get_current_ctrl( &st_pad, &st_hk );
 		st_pad.Buttons |= padutilGetAnalogStickDirection( st_pad.Lx, st_pad.Ly, 0 );
 		
+		buttons = padutilSetPad( st_pad.Buttons ) | padutilSetHprm( st_hk );
+		
 		if( st_toggle_buttons ){
-			if( ( st_pad.Buttons & st_toggle_buttons ) == st_toggle_buttons ){
+			if( ( buttons & st_toggle_buttons ) == st_toggle_buttons ){
 				if( ! wait_toggle_buttons_release ){
 					st_is_enabled = ( st_is_enabled ? false : true );
 					wait_toggle_buttons_release = true;
@@ -461,7 +724,7 @@ static int mf_main( SceSize arglen, void *argp )
 			mf_sending_toggle_message( st_is_enabled );
 		}
 		
-		if( ( ( padutilSetPad( st_pad.Buttons ) | padutilSetHprm( st_hk ) ) & st_menu_buttons ) == st_menu_buttons ){
+		if( ( buttons & st_menu_buttons ) == st_menu_buttons ){
 			dbgprint( "Launching menu" );
 			mfMenuMain( &st_pad, &st_hk );
 		}
@@ -488,12 +751,14 @@ void mfHook( void )
 	
 	dbgprint( "Hooking API" );
 	
-	st_prev_buttons = 0;
 	
 	for( i = 0; i < hooktableEntryCount; i++ ){
 		dbgprintf( "Hooking %p -> %p", hooktable[i].restore.addr, hooktable[i].hook );
 		hookFunc( hooktable[i].restore.addr, hooktable[i].hook );
 	}
+	
+	dbgprint( "Set syscon debug handlers" );
+	if( ! st_syscon_chain_handlers ) sceSysconSetDebugHandlers( &st_syscon_handlers );
 	
 	st_hooked = true;
 }
@@ -511,6 +776,9 @@ void mfUnhook( void )
 	
 	dbgprint( "Unhooking API" );
 	
+	dbgprint( "Clear syscon debug handlers" );
+	if( ! st_syscon_chain_handlers ) sceSysconSetDebugHandlers( NULL );
+	
 	for( i = 0; i < hooktableEntryCount; i++ ){
 		dbgprintf( "Unhooking %p -> %p", hooktable[i].hook, hooktable[i].restore.addr );
 		hookFunc( hooktable[i].restore.addr, hooktable[i].restore.api );
@@ -522,113 +790,14 @@ void mfUnhook( void )
 /*-----------------------------------------------
 	フック関数
 -----------------------------------------------*/
-int mfVshctrlReadBufferPositive( SceCtrlData *pad, int count )
-{
-	int ret;
-	MfHprmKey hk;
-	
-	ret = mf_get_ctrl_buffer( MF_UPDATE, MF_VSHCTRL_READ_BUFFER_POSITIVE, pad, &hk );
-	if( count > 1 ) mf_ctrl_data_copy( pad, count );
-	
-	return ret;
-}
-
-int mfCtrlReadBufferPositive( SceCtrlData *pad, int count )
-{
-	int ret;
-	MfHprmKey hk;
-	
-	ret = mf_get_ctrl_buffer( MF_UPDATE, MF_CTRL_READ_BUFFER_POSITIVE, pad, &hk );
-	if( count > 1 ) mf_ctrl_data_copy( pad, count );
-	
-	return ret;
-}
-
-int mfCtrlReadBufferNegative( SceCtrlData *pad, int count )
-{
-	int ret;
-	MfHprmKey hk;
-	
-	ret = mf_get_ctrl_buffer( MF_UPDATE, MF_CTRL_READ_BUFFER_POSITIVE, pad, &hk );
-	pad->Buttons = ~pad->Buttons;
-	if( count > 1 ) mf_ctrl_data_copy( pad, count );
-	
-	return ret;
-}
-
-int mfCtrlPeekBufferPositive( SceCtrlData *pad, int count )
-{
-	int ret;
-	MfHprmKey hk;
-	
-	ret = mf_get_ctrl_buffer( MF_UPDATE, MF_CTRL_PEEK_BUFFER_POSITIVE, pad, &hk );
-	if( count > 1 ) mf_ctrl_data_copy( pad, count );
-	
-	return ret;
-}
-
-int mfCtrlPeekBufferNegative( SceCtrlData *pad, int count )
-{
-	int ret;
-	MfHprmKey hk;
-	
-	ret = mf_get_ctrl_buffer( MF_UPDATE, MF_CTRL_PEEK_BUFFER_POSITIVE, pad, &hk );
-	pad->Buttons = ~pad->Buttons;
-	if( count > 1 ) mf_ctrl_data_copy( pad, count );
-	
-	return ret;
-}
-
-int mfCtrlPeekLatch( SceCtrlLatch *latch )
-{
-	SceCtrlData pad;
-	MfHprmKey hk;
-	int ret;
-	unsigned int intc;
-	
-	intc = pspSdkDisableInterrupts();
-	
-	ret = mf_get_ctrl_buffer( MF_KEEP, MF_CTRL_PEEK_BUFFER_POSITIVE, &pad, &hk );
-	
-	latch->uiMake    |= ( st_prev_buttons ^ pad.Buttons ) & pad.Buttons;
-	latch->uiBreak   |= ( st_prev_buttons ^ pad.Buttons ) & st_prev_buttons;
-	latch->uiPress   |= pad.Buttons;
-	latch->uiRelease = ~0;
-	
-	st_prev_buttons = pad.Buttons;
-	
-	pspSdkEnableInterrupts( intc );
-	
-	return ret;
-}
-
-int mfCtrlReadLatch( SceCtrlLatch *latch )
-{
-	SceCtrlData pad;
-	MfHprmKey hk;
-	int ret;
-	unsigned int intc;
-	
-	intc = pspSdkDisableInterrupts();
-	
-	ret = mf_get_ctrl_buffer( MF_KEEP, MF_CTRL_PEEK_BUFFER_POSITIVE, &pad, &hk );
-	
-	latch->uiMake    = ( st_prev_buttons ^ pad.Buttons ) & pad.Buttons;
-	latch->uiBreak   = ( st_prev_buttons ^ pad.Buttons ) & st_prev_buttons;
-	latch->uiPress   = pad.Buttons;
-	latch->uiRelease = ~pad.Buttons;
-	
-	st_prev_buttons = pad.Buttons;
-	
-	pspSdkEnableInterrupts( intc );
-	
-	return ret;
-}
-
 int mfHprmPeekCurrentKey( u32 *key )
 {
 	SceCtrlData pad;
-	return mf_get_ctrl_buffer( MF_UPDATE, MF_CTRL_PEEK_BUFFER_POSITIVE, &pad, key );
+	
+	int ret = mf_get_current_ctrl( &pad, key );
+	mf_call_functions( MF_UPDATE, &pad, key );
+	
+	return ret;
 }
 
 int mfHprmPeekLatch( u32 *latch )
@@ -636,16 +805,12 @@ int mfHprmPeekLatch( u32 *latch )
 	SceCtrlData pad;
 	MfHprmKey hk;
 	int ret;
-	unsigned int intc;
 	
-	intc = pspSdkDisableInterrupts();
-	
-	ret = mf_get_ctrl_buffer( MF_KEEP, MF_CTRL_PEEK_BUFFER_POSITIVE, &pad, &hk );
+	ret = mf_get_current_ctrl( &pad, &hk );
+	mf_call_functions( MF_KEEP, &pad, &hk );
 	
 	*latch |= ( st_prev_hprmkey ^ hk ) & hk;
 	st_prev_hprmkey = hk;
-	
-	pspSdkEnableInterrupts( intc );
 	
 	return ret;
 }
@@ -656,8 +821,22 @@ int mfHprmReadLatch( u32 *latch )
 	return mfHprmPeekLatch( latch );
 }
 
+void mfSysconSetDebugHandlers( SceSysconDebugHandlers *handlers )
+{
+	/* 他からのデバッグハンドラを記録 */
+	st_syscon_chain_handlers = handlers;
+	
+	if( handlers ){
+		/* ハンドラがあれば、それを呼び出す自分のデバッグハンドラを登録 */
+		sceSysconSetDebugHandlers( &st_syscon_handlers );
+	} else if( ! st_hooked ){
+		sceSysconSetDebugHandlers( NULL );
+	}
+	return;
+}
+
 /*-----------------------------------------------
-	メインAPI
+	MacroFireAPI
 -----------------------------------------------*/
 void mfEnable( void )
 {
@@ -755,12 +934,12 @@ int mfNotificationStart( void )
 {
 	SceUID msg_thid;
 	
-	ovmsgInit();
+	st_ovmsg = ovmsgInit();
+	if( st_ovmsg < 0 ) return st_ovmsg;
 	
-	msg_thid = sceKernelCreateThread( "MacroFireNotification", ovmsgThreadMain, 16, 0x300, 0, 0 );
+	msg_thid = sceKernelCreateThread( "MacroFireNotification", ovmsgMain, 16, 0x300, 0, 0 );
 	if( msg_thid > 0 ){
-		sceKernelStartThread( msg_thid, 0, NULL );
-		ovmsgWaitForReady();
+		sceKernelStartThread( msg_thid, sizeof( OvmsgUID* ), &st_ovmsg );
 		return 0;
 	} else{
 		return msg_thid;
@@ -769,46 +948,31 @@ int mfNotificationStart( void )
 
 void mfNotificationShutdownStart( void )
 {
-	ovmsgShutdownStart();
+	ovmsgShutdown( st_ovmsg );
+	ovmsgDestroy( st_ovmsg );
+	st_ovmsg = 0;
 }
 
 SceUID mfNotificationThreadId( void )
 {
-	return ovmsgGetThreadId();
+	return st_ovmsg ? ovmsgGetThreadId( st_ovmsg ) : 0;
 }
 
 void mfNotificationPrintTerm( void )
 {
-	ovmsgPrintIntrStart();
-	ovmsgWaitForReady();
+	ovmsgSuspend( st_ovmsg );
 }
 
 bool mfNotificationPrintf( const char *format, ... )
 {
 	va_list ap;
 	bool ret;
-	unsigned int k1;
 	
 	va_start( ap, format );
-	
-	k1 = pspSdkSetK1( 0 );
-	mfNotificationPrintTerm();
-	ret = ovmsgVprintf( format, ap );
-	pspSdkSetK1( k1 );
-	
+	ret = ovmsgVprintf( st_ovmsg, format, ap );
 	va_end( ap );
 	
 	return ret;
-}
-
-bool mfHookIncomplete( void )
-{
-	return st_hook_incomplete;
-}
-
-const PadutilAnalogStick *mfGetAnalogStickContext( void )
-{
-	return mfAnalogStickGetContext();
 }
 
 /*-----------------------------------------------
@@ -908,8 +1072,40 @@ int module_start( SceSize arglen, void *argp )
 	dbgprint( "Checking ini" );
 	mf_ini( (const char *)argp );
 	
+	/*
+		MacroFireが起動される前に設定されているデバッグハンドラを外す。
+		vsh.txt/game.txt/pops.txtで後から起動されたプラグインの機能が生きた方がわかりやすいでしょう?
+	*/
+	sceSysconSetDebugHandlers( NULL );
+	
+	/*
+		APIの元のアドレスも記録して、戻せるようにしておく。
+		module_stop()は呼ばれていないので、戻せるようにする必要は無いと思われるが、
+		今後どうなるかわからないので、一応module_stop()が呼ばれると仮定にする。
+	*/
+	st_syscon_hook.restore.addr = hookFindExportAddr( st_syscon_hook.module, st_syscon_hook.library, st_syscon_hook.nid );
+	if( ! st_syscon_hook.restore.addr ) return 0;
+	
+	/*
+		sceSysconSetDebugHandlersをフックして、他からのデバッグハンドラ登録を監視する。
+		
+		mfSysconSetDebugHandlersは、他からデバッグハンドラの登録があれば、
+		そのハンドラを記録して、MacroFireのデバッグハンドラを登録する。
+		MacroFireのデバッグハンドラは、記録された他からのデバッグハンドラを呼び出す。
+		
+		他からのデバッグハンドラを覚えておける数は1つだけ。
+		2つ以上覚えておくようにもできるが、解除に問題がある。
+		このAPIは、解除に必要な引数がNULLを渡すだけで、どのデバッグハンドラを解除しようとしているのかを特定できない。
+	*/
+	
+	st_syscon_hook.restore.api = *(st_syscon_hook.restore.addr);
+	hookFunc( st_syscon_hook.restore.addr, mfSysconSetDebugHandlers );
+	
 	thid = sceKernelCreateThread( "MacroFire", mf_main, 32, 0x900, 0, 0 );
-	if( thid > 0 ) sceKernelStartThread( thid, arglen, argp );
+	if( thid > 0 ){
+		mfMenuAddSysThreadId( thid );
+		sceKernelStartThread( thid, arglen, argp );
+	}
 	
 	return 0;
 }

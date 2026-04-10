@@ -219,7 +219,7 @@ static void mf_debug( void )
 	メニューの初期化。
 	
 	メニューを呼び出した際に他スレッドを停止させる為に使用するスレッドリストを取得。
-	このスレッドリストに入っているスレッドは、メニュー起動時に停止しない。
+	このスレッドリストに入っているスレッドIDは、メニュー起動時に停止しない。
 -----------------------------------------------*/
 bool mfMenuInit( void )
 {
@@ -233,6 +233,13 @@ bool mfMenuInit( void )
 	st_pref.LowMemoryMode = false;
 	st_pref.Remap         = NULL;
 	
+	return true;
+}
+
+bool mfMenuAddSysThreadId( SceUID thid )
+{
+	if( st_systhread.Count >= MF_MENU_MAX_NUMBER_OF_THREADS ) return false;
+	st_systhread.List[st_systhread.Count++] = thid;
 	return true;
 }
 
@@ -990,13 +997,12 @@ static void mf_root_menu( MfMenuMessage message )
 				void *menuproc;
 				MfCtrlDefGetButtonsPref *hotkey_pref = mfMemoryHeapCalloc( pheap, sizeof( MfCtrlDefGetButtonsPref ) );;
 				main_pref = mfMemoryHeapCalloc( pheap, sizeof( struct MfMenuMainPref ) );
-				dbgprintf( "%d", sceKernelHeapTotalFreeSize( pheap ) );
-				dbgprintf( "%p %p", main_pref, hotkey_pref );
-				
 				main_pref->engine             = mfIsEnabled();
 				main_pref->menu               = mfGetMenuButtons();
 				main_pref->toggle             = mfGetToggleButtons();
 				main_pref->statusNotification = mfNotificationThreadId() ? true : false;
+				
+				dbgprintf( "NTHID: %X", mfNotificationThreadId() );
 				
 				hotkey_pref->availButtons = MF_HOTKEY_BUTTONS;
 				
@@ -1008,7 +1014,7 @@ static void mf_root_menu( MfMenuMessage message )
 				mfMenuSetTableEntry( menu, 2, 1, 1, MF_STR_HOME_SET_MENU_BUTTON, mfCtrlDefGetButtons, &(main_pref->menu), hotkey_pref );
 				mfMenuSetTableEntry( menu, 2, 2, 1, MF_STR_HOME_SET_TOGGLE_BUTTON, mfCtrlDefGetButtons, &(main_pref->toggle), hotkey_pref );
 				mfMenuSetTableEntry( menu, 2, 3, 1, MF_STR_HOME_STAT_NOTIFICATION, mfCtrlDefBool, &(main_pref->statusNotification), NULL );
-				mfMenuSetTableEntry( menu, 2, 4, 1, MF_STR_HOME_ANALOG_STICK_ADJUSTMENT, mfCtrlDefCallback, mfAnalogStickProc( MF_MS_MENU ), NULL );
+				mfMenuSetTableEntry( menu, 2, 4, 1, MF_STR_HOME_ANALOG_STICK_ADJUSTMENT, mfCtrlDefCallback, mfAnalogStickMenu, NULL );
 				
 				mfMenuSetTablePosition( menu, 3, pbOffsetChar( 5 ), pbOffsetLine( 12 ) + 2 );
 				mfMenuSetTableLabel( menu, 3, MF_STR_HOME_FUNCTION );
@@ -1111,7 +1117,7 @@ static bool mf_menu_init_graphics( void )
 	if( sceDisplayGetFrameBuf( &(st_params->FrameBuffer.OrigAddr), &(st_params->FrameBuffer.Width), &(st_params->FrameBuffer.PixelFormat), PSP_DISPLAY_SETBUF_IMMEDIATE ) != 0 || ! st_params->FrameBuffer.OrigAddr || ! st_params->FrameBuffer.Width ) return false;
 	
 	pbInit();
-	pbEnable( PB_NO_CACHE | PB_BLEND );
+	pbEnable( PB_NO_CACHE | PB_BLEND | PB_STEAL_DISPLAY );
 	
 	/* フレームバッファとして使用するメモリを確保 */
 	dbgprint( "Allocating memory for frame buffers..." );
@@ -1120,14 +1126,12 @@ static bool mf_menu_init_graphics( void )
 	
 	/* クリア用背景作成 */
 	if( st_params->FrameBuffer.Clear ){
+		/* 現在表示されている画面をクリア用背景にコピー */
+		sceDmacMemcpy( st_params->FrameBuffer.Clear, st_params->FrameBuffer.OrigAddr, st_params->FrameBuffer.Size );
+		
 		/* 描画準備 */
 		pbSetDisplayBuffer( st_params->FrameBuffer.PixelFormat, st_params->FrameBuffer.Clear, st_params->FrameBuffer.Width );
 		pbApply();
-		
-		/* 現在表示されている画面をクリア用背景にコピー */
-		sceDisplayWaitVblankStart();
-		sceDmacMemcpy( st_params->FrameBuffer.Clear, st_params->FrameBuffer.OrigAddr, st_params->FrameBuffer.Size );
-		
 		pbFillRect( 0, 0, SCR_WIDTH, SCR_HEIGHT, MF_COLOR_BG );
 		mf_draw_frame( false );
 	}
@@ -1182,7 +1186,7 @@ void mfMenuMain( SceCtrlData *pad, MfHprmKey *hk )
 	/* 設定したフレームバッファで描画準備 */
 	sceDisplayWaitVblankStart();
 	pbApply();
-	pbSync( PB_BUFSYNC_NEXTFRAME );
+	pbSyncDisplay( PB_BUFSYNC_NEXTFRAME );
 	
 	dbgprint( "Starting menu-loop" );
 	while( gRunning ){
@@ -1196,8 +1200,8 @@ void mfMenuMain( SceCtrlData *pad, MfHprmKey *hk )
 			mf_menu_indicator();
 		} else{
 			SceCtrlData dupe_pad = *(st_params->Ctrl.Pad);
-			padutilAdjustAnalogStick( mfGetAnalogStickContext(), &dupe_pad );
-			if( ( ( dupe_pad.Buttons | padutilGetAnalogStickDirection( dupe_pad.Lx,  dupe_pad.Ly, 0 ) ) & MF_HOTKEY_BUTTONS ) || ( st_params->Flags & MF_MENU_SCREEN_UPDATE ) ){
+			mfAnalogStickAdjust( &dupe_pad );
+			if( ( ( padutilSetPad( dupe_pad.Buttons | padutilGetAnalogStickDirection( dupe_pad.Lx,  dupe_pad.Ly, 0 ) )  ) & MF_HOTKEY_BUTTONS ) || ( st_params->Flags & MF_MENU_SCREEN_UPDATE ) ){
 				pbDisable( PB_NO_DRAW );
 				mfMenuDisable( MF_MENU_SCREEN_UPDATE );
 				memset( pbGetCurrentDrawBufferAddr(), 0, st_params->FrameBuffer.Size );
@@ -1209,7 +1213,8 @@ void mfMenuMain( SceCtrlData *pad, MfHprmKey *hk )
 		}
 		
 		padctrlPeekBuffer( st_params->Ctrl.Uid, st_params->Ctrl.Pad, 1 );
-		padutilRemap( st_pref.Remap, padutilSetPad( mfMenuGetCurrentButtons() ) | padutilSetHprm( mfMenuGetCurrentHprmKey() ), st_params->Ctrl.Pad, st_params->Ctrl.HprmKey, true );
+		//sceHprmPeekCurrentKey( st_params->Ctrl.HprmKey ); キーリピートが必要
+		padutilRemap( st_pref.Remap, padutilSetPad( mfMenuGetCurrentButtons() ), st_params->Ctrl.Pad, st_params->Ctrl.HprmKey, true );
 		
 #ifdef DEBUG_ENABLED
 		mf_debug();
@@ -1238,11 +1243,13 @@ void mfMenuMain( SceCtrlData *pad, MfHprmKey *hk )
 		if( dialog ){
 			if( st_params->LastDialogType != dialog ){
 				st_params->CurrentMessage.Sub |= MF_DM_START;
+				mfMenuEnable( MF_MENU_SCREEN_UPDATE );
 			} else{
 				st_params->CurrentMessage.Sub |= MF_DM_UPDATE;
 			}
 		} else if( st_params->LastDialogType ){
 			st_params->CurrentMessage.Sub |= MF_DM_FINISH;
+			mfMenuEnable( MF_MENU_SCREEN_UPDATE );
 		}
 		st_params->LastDialogType = dialog;
 		
@@ -1563,7 +1570,6 @@ static bool mf_menu_stack( struct MfMenuStack *stack, enum MfMenuStackAction ctr
 static bool mf_menu_get_target_threads( SceUID *thread_id_list, int *thread_id_count )
 {
 	int i, j;
-	SceUID selfid = sceKernelGetThreadId();
 	
 	if( sceKernelGetThreadmanIdList( SCE_KERNEL_TMID_Thread, thread_id_list, MF_MENU_MAX_NUMBER_OF_THREADS, thread_id_count ) < 0 ){
 		dbgprint( "Failed to get a thread-id list" );
@@ -1572,10 +1578,7 @@ static bool mf_menu_get_target_threads( SceUID *thread_id_list, int *thread_id_c
 	
 	for( i = 0; i < *thread_id_count; i++ ){
 		for( j = 0; j < st_systhread.Count; j++ ){
-			if(
-				( thread_id_list[i] == st_systhread.List[j] ) ||
-				( thread_id_list[i] == selfid )
-			 ) thread_id_list[i] = 0;
+			if( thread_id_list[i] == st_systhread.List[j] ) thread_id_list[i] = 0;
 		}
 	}
 	
@@ -1646,7 +1649,7 @@ static bool mf_alloc_buffers( struct MfMenuFrameBuffer *fb, bool graphics_mem )
 static void mf_free_buffers( struct MfMenuFrameBuffer *fb )
 {
 	sceDisplayWaitVblankStart();
-	sceDisplaySetFrameBuf( fb->OrigAddr, fb->Width, fb->PixelFormat, PSP_DISPLAY_SETBUF_IMMEDIATE );
+	pbReturnDisplay( PB_BUFSYNC_NEXTFRAME );
 	
 	if( fb->Vram ){
 		dbgprint( "Restore vram buffer" );
@@ -1674,14 +1677,12 @@ static void mf_draw_frame( bool lowmem )
 	pbPrintf( pbOffsetChar( 3 ), pbOffsetLine( 1 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, MF_TITLE, MF_VERSION );
 	pbPrint( pbOffsetChar( 47 ), SCR_HEIGHT - pbOffsetLine( 1 ), ( MF_COLOR_TEXT_FG & 0x00ffffff ) | 0x33000000, MF_COLOR_TEXT_BG, MF_AUTHOR );
 	
-	pbPrintf( pbOffsetChar( 34 ), pbOffsetLine( 1 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, "[ID: %s", targid );
+	pbPrintf( pbOffsetChar( 33 ), pbOffsetLine( 1 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, "[ID: %s", targid );
 	if( targid == loadid ){
-		pbPrint( pbOffsetChar( 34 + 5 + strlen( targid ) ), pbOffsetLine( 1 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, "]" );
+		pbPrint( pbOffsetChar( 33 + 5 + strlen( targid ) ), pbOffsetLine( 1 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, "]" );
 	} else{
-		pbPrintf( pbOffsetChar( 34 + 5 + strlen( targid ) ), pbOffsetLine( 1 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, " / %s: %s]", MF_STR_HOME_LOADED, loadid );
+		pbPrintf( pbOffsetChar( 33 + 5 + strlen( targid ) ), pbOffsetLine( 1 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, " / %s: %s]", MF_STR_HOME_LOADED, loadid );
 	}
-	
-	if( mfHookIncomplete() ) pbPrint( pbOffsetChar( 44 ), pbOffsetLine( 2 ) + ( pbOffsetLine( 1 ) >> 1 ), MF_COLOR_EX4, MF_COLOR_TEXT_BG, MF_STR_HOME_NOT_PERFECT_WORK );
 	
 	if( lowmem ) pbPrintf( 0, 0, MF_COLOR_EX4, MF_COLOR_TEXT_BG, "<%s>", MF_STR_HOME_LOW_MEMORY_MODE );
 	

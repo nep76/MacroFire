@@ -12,7 +12,7 @@ PadutilButtonName *padutilCreateButtonNames( void )
 		return st_names;
 	}
 	
-	st_names = (PadutilButtonName *)memoryAllocEx( "PadutilButtonNames", MEMORY_USER, 0, sizeof( PadutilButtonName ) * 33, PSP_SMEM_High, NULL );
+	st_names = (PadutilButtonName *)memoryExalloc( "PadutilButtonNames", MEMORY_USER, 0, sizeof( PadutilButtonName ) * 33, PSP_SMEM_High, NULL );
 	if( ! st_names ) return NULL;
 	
 	st_names[0].button = padutilSetPad( PSP_CTRL_SELECT );

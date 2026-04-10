@@ -8,7 +8,7 @@ void *pbSwapBuffers( int bufsync )
 		struct pb_frame_buffer *swap = __pb_internal_params.display;
 		__pb_internal_params.display = __pb_internal_params.draw;
 		__pb_internal_params.draw = swap;
-		sceDisplaySetFrameBuf( __pb_internal_params.display->addr, __pb_internal_params.display->width, __pb_internal_params.display->format, bufsync );
+		pbSyncDisplay( bufsync );
 	}
 	return __pb_internal_params.draw->addr;
 }

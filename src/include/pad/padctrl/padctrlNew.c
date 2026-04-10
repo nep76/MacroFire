@@ -4,7 +4,7 @@
 
 PadctrlUID padctrlNew( void )
 {
-	struct padctrl_params *params = memoryAllocEx( "PadctrlParams", MEMORY_USER, 0, sizeof( struct padctrl_params ), PSP_SMEM_High, NULL );
+	struct padctrl_params *params = memoryExalloc( "PadctrlParams", MEMORY_USER, 0, sizeof( struct padctrl_params ), PSP_SMEM_High, NULL );
 	if( ! params ) return 0;
 	
 	sceCtrlSetSamplingMode( PSP_CTRL_MODE_ANALOG );
