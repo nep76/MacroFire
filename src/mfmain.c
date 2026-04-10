@@ -16,16 +16,14 @@ PSP_MODULE_INFO( "MacroFire", PSP_MODULE_KERNEL, 3, 2 );
 /*=========================================================
 	íËêî
 =========================================================*/
-#define MF_EBOOTPBP_OFFSET_TO_PARAMSFO 8
-#define MF_PARAMSFO_OFFSET_TO_DATA     12
-#define MF_DATA_OFFSET_TO_GAMEID       8
+
 
 /*=========================================================
 	ÉçÅ[ÉJÉãä÷êî
 =========================================================*/
 static bool mf_init( void );
 static void mf_shutdown( void );
-static void mf_get_gameid( SceUID fd, char *gameid, unsigned char *buf );
+static void mf_get_gameid( SceUID fd, char *gameid );
 static void mf_get_gameid_from_sha1hash( SceUID fd, char *gameid );
 static void mf_ini( const char *path );
 static void mf_ready( const char *cwd );
@@ -90,7 +88,6 @@ SceUID st_thid;
 -----------------------------------------------*/
 static bool mf_init( void )
 {
-	unsigned char buf[] ={ 0, 0, 0, 0 };
 	const char *executable = sceKernelInitFileName();
 	
 	st_ini_sections[2] = MF_INI_SECTION_DEFAULT;
@@ -123,11 +120,11 @@ static bool mf_init( void )
 		sceUmdActivate( 1, "disc0:" );
 		
 		/* èâä˙âªèIóπÇë“Ç¬ */
-		sceUmdWaitDriveStat( UMD_WAITFORINIT );
+		sceUmdWaitDriveStat( PSP_UMD_READY );
 		
 		sfo = sceIoOpen( "disc0:/PSP_GAME/PARAM.SFO", PSP_O_RDONLY, 0777 ); 
 		if( CG_IS_VALID_UID( sfo ) ){
-			mf_get_gameid( sfo, st_game_id, buf );
+			mf_get_gameid( sfo, st_game_id );
 			sceIoClose( sfo );
 		}
 		
@@ -136,10 +133,12 @@ static bool mf_init( void )
 	} else if( st_world == MF_WORLD_POPS ){
 		SceUID pbp = sceIoOpen( executable, PSP_O_RDONLY, 0777 ); 
 		if( CG_IS_VALID_UID( pbp ) ){
-			sceIoLseek( pbp, MF_EBOOTPBP_OFFSET_TO_PARAMSFO, PSP_SEEK_SET );
-			sceIoRead( pbp, buf, 4 );
-			sceIoLseek( pbp, *((unsigned int *)buf), PSP_SEEK_SET );
-			mf_get_gameid( pbp, st_game_id, buf );
+			struct MfPbpHeader pbp_header;
+			sceIoRead( pbp, &pbp_header, sizeof( pbp_header ) );
+			if( memcmp( pbp_header.Signature, "\0PBP", 4 ) == 0 ){
+				sceIoLseek( pbp, pbp_header.Offset[PARAM_SFO], PSP_SEEK_SET );
+				mf_get_gameid( pbp, st_game_id );
+			}
 			sceIoClose( pbp );
 		}
 	} else if( st_world != MF_WORLD_VSH && executable ){
@@ -199,12 +198,28 @@ static void mf_get_gameid_from_sha1hash( SceUID fd, char *gameid )
 	snprintf( gameid, 10, "%08X", (digest[3]) | (digest[2]) << 8 | (digest[1]) << 16 | (digest[0]) << 24 ); 
 }
 
-static void mf_get_gameid( SceUID fd, char *gameid, unsigned char *buf )
+static void mf_get_gameid( SceUID fd, char *gameid )
 {
-	sceIoLseek( fd, MF_PARAMSFO_OFFSET_TO_DATA, PSP_SEEK_CUR );
-	sceIoRead( fd, buf, 4 );
-	sceIoLseek( fd, *((unsigned int *)buf) - ( MF_PARAMSFO_OFFSET_TO_DATA + 4 ) + MF_DATA_OFFSET_TO_GAMEID, PSP_SEEK_CUR );
-	sceIoRead( fd, gameid, 10 );
+	struct MfPsfHeader  psf_header;
+	struct MfPsfSection psf_section;
+	SceOff save_section_offset = 0;
+	char key[7];
+	
+	sceIoRead( fd, &psf_header, sizeof( psf_header ) );
+	save_section_offset = sceIoLseek( fd, 0, PSP_SEEK_CUR );
+	
+	while( psf_header.KeysCount-- ){
+		save_section_offset = sceIoLseek( fd, save_section_offset, PSP_SEEK_SET ) + sizeof( psf_section );
+		sceIoRead( fd, &psf_section, sizeof( psf_section ) );
+		
+		sceIoLseek( fd, psf_header.KeyTableOffset + psf_section.KeyOffset, PSP_SEEK_SET );
+		sceIoRead( fd, key, sizeof( key ) );
+		if( strncmp( key, "DISC_ID", 7 ) == 0 ){
+			sceIoLseek( fd, psf_header.ValueTableOffset + psf_section.ValueOffset, PSP_SEEK_SET );
+			sceIoRead( fd, gameid, 10 );
+			gameid[9] = '\0';
+		}
+	}
 	
 	if( gameid[0] == '\0' ) mf_get_gameid_from_sha1hash( fd, gameid );
 }
@@ -486,7 +501,21 @@ static void mf_ready( const char *cwd )
 #ifdef DEBUG
 		if( sceKernelFindModuleByName( "PSPLINK" ) == NULL )
 #endif
+		int stat;
+		
 		sceKernelDelayThread( 12000000 );
+		
+		stat = sceUmdGetDriveStat();
+		if( stat != PSP_UMD_NOT_PRESENT ){
+			SceUID sfo;
+			if( stat != PSP_UMD_READY ) sceUmdWaitDriveStat( PSP_UMD_READY );
+			
+			sfo = sceIoOpen( "disc0:/PSP_GAME/PARAM.SFO", PSP_O_RDONLY, 0777 ); 
+			if( CG_IS_VALID_UID( sfo ) ){
+				mf_get_gameid( sfo, st_game_id );
+				sceIoClose( sfo );
+			}
+		}
 	}
 	
 	dbgprint( "Checking ini..." );
