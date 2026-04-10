@@ -84,6 +84,9 @@ void mfRapidfire( MfRapidfireUID uid, MfCallMode caller, SceCtrlData *pad_data )
 	int i;
 	unsigned int delayms;
 	uint64_t curms;
+	
+	if( sceKernelFindModuleByName( "sceHVNetfront_Module" ) != NULL ) return;
+	
 	sceRtcGetCurrentTick( &curms );
 	
 	curms /= 1000;

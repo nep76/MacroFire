@@ -229,8 +229,8 @@ static MfMenuRc macroeditor_edit_analog( SceCtrlData *pad_data, MacroData *macro
 	MfMenuRc rc = MR_CONTINUE;
 	
 	if( ! st_submenu.func ){
-		gbFillRectRel( MACROEDITOR_EDIT_TYPE_POS_X, MACROEDITOR_EDIT_TYPE_POS_Y, gbOffsetChar( 25 ), gbOffsetLine( 9 ), MFM_BG_COLOR );
-		gbLineRectRel( MACROEDITOR_EDIT_TYPE_POS_X, MACROEDITOR_EDIT_TYPE_POS_Y, gbOffsetChar( 25 ), gbOffsetLine( 9 ), MFM_TRANSPARENT );
+		gbFillRectRel( MACROEDITOR_EDIT_TYPE_POS_X, MACROEDITOR_EDIT_TYPE_POS_Y, gbOffsetChar( 23 ), gbOffsetLine( 4 + MF_ARRAY_NUM( st_edit_analog ) ), MFM_BG_COLOR );
+		gbLineRectRel( MACROEDITOR_EDIT_TYPE_POS_X, MACROEDITOR_EDIT_TYPE_POS_Y, gbOffsetChar( 23 ), gbOffsetLine( 4 + MF_ARRAY_NUM( st_edit_analog ) ), MFM_TRANSPARENT );
 		gbPrint( MACROEDITOR_EDIT_TYPE_POS_X + gbOffsetChar( 1 ), MACROEDITOR_EDIT_TYPE_POS_Y + gbOffsetLine( 1 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Choose a edit value" );
 		switch( mfMenuUniDraw( MACROEDITOR_EDIT_TYPE_POS_X + gbOffsetChar( 3 ), MACROEDITOR_EDIT_TYPE_POS_Y + gbOffsetLine( 3 ), st_edit_analog, MF_ARRAY_NUM( st_edit_analog ), &selected, 0 ) ){
 			case MR_CONTINUE:
@@ -276,8 +276,8 @@ static MfMenuRc macroeditor_edit_rapid( SceCtrlData *pad_data, MacroData *macro 
 	pdelay = MACROMGR_GET_RAPIDPDELAY( macro->sub );
 	
 	if( ! st_submenu.func ){
-		gbFillRectRel( MACROEDITOR_EDIT_TYPE_POS_X, MACROEDITOR_EDIT_TYPE_POS_Y, gbOffsetChar( 25 ), gbOffsetLine( 9 ), MFM_BG_COLOR );
-		gbLineRectRel( MACROEDITOR_EDIT_TYPE_POS_X, MACROEDITOR_EDIT_TYPE_POS_Y, gbOffsetChar( 25 ), gbOffsetLine( 9 ), MFM_TRANSPARENT );
+		gbFillRectRel( MACROEDITOR_EDIT_TYPE_POS_X, MACROEDITOR_EDIT_TYPE_POS_Y, gbOffsetChar( 27 ), gbOffsetLine( 4 + MF_ARRAY_NUM( st_edit_rapid ) ), MFM_BG_COLOR );
+		gbLineRectRel( MACROEDITOR_EDIT_TYPE_POS_X, MACROEDITOR_EDIT_TYPE_POS_Y, gbOffsetChar( 27 ), gbOffsetLine( 4 + MF_ARRAY_NUM( st_edit_rapid ) ), MFM_TRANSPARENT );
 		gbPrint( MACROEDITOR_EDIT_TYPE_POS_X + gbOffsetChar( 1 ), MACROEDITOR_EDIT_TYPE_POS_Y + gbOffsetLine( 1 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Choose a edit value" );
 		switch( mfMenuUniDraw( MACROEDITOR_EDIT_TYPE_POS_X + gbOffsetChar( 3 ), MACROEDITOR_EDIT_TYPE_POS_Y + gbOffsetLine( 3 ), st_edit_rapid, MF_ARRAY_NUM( st_edit_rapid ), &selected, 0 ) ){
 			case MR_CONTINUE: break;
@@ -329,8 +329,8 @@ static MfMenuRc macroeditor_ch_type( SceCtrlData *pad_data, MacroData *macro )
 {
 	static int selected = 0;
 	
-	gbFillRectRel( MACROEDITOR_EDIT_TYPE_POS_X, MACROEDITOR_EDIT_TYPE_POS_Y, gbOffsetChar( 25 ), gbOffsetLine( 9 ), MFM_BG_COLOR );
-	gbLineRectRel( MACROEDITOR_EDIT_TYPE_POS_X, MACROEDITOR_EDIT_TYPE_POS_Y, gbOffsetChar( 25 ), gbOffsetLine( 9 ), MFM_TRANSPARENT );
+	gbFillRectRel( MACROEDITOR_EDIT_TYPE_POS_X, MACROEDITOR_EDIT_TYPE_POS_Y, gbOffsetChar( 25 ), gbOffsetLine( 4 + MF_ARRAY_NUM( st_edit_chtype ) ), MFM_BG_COLOR );
+	gbLineRectRel( MACROEDITOR_EDIT_TYPE_POS_X, MACROEDITOR_EDIT_TYPE_POS_Y, gbOffsetChar( 25 ), gbOffsetLine( 4 + MF_ARRAY_NUM( st_edit_chtype ) ), MFM_TRANSPARENT );
 	gbPrint( MACROEDITOR_EDIT_TYPE_POS_X + gbOffsetChar( 1 ), MACROEDITOR_EDIT_TYPE_POS_Y + gbOffsetLine( 1 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Choose a new action" );
 	
 	switch( mfMenuUniDraw( MACROEDITOR_EDIT_TYPE_POS_X + gbOffsetChar( 3 ), MACROEDITOR_EDIT_TYPE_POS_Y + gbOffsetLine( 3 ), st_edit_chtype, MF_ARRAY_NUM( st_edit_chtype ), &selected, 0 ) ){

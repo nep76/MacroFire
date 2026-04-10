@@ -37,6 +37,7 @@ static void macro_read( IniUID ini, FilehUID fuid, char *buf, size_t max );
 static void macro_store( FilehUID fuid, char *buf, size_t max );
 
 /* エラーチェック */
+static bool macro_in_webbrowser( void );
 static bool macro_is_busy( MacroEntry *entry );
 static bool macro_is_unavail( MacroEntry *entry );
 static bool macro_is_disable_engine( void );
@@ -105,10 +106,16 @@ void macroMain( MfCallMode mode, SceCtrlData *pad, void *argp )
 {
 	int i;
 	
-	if( ! pad ) return;
+	if( ! pad || macro_in_webbrowser() ) return;
 	
 	for( i = 0; i < MACRO_MAX_SLOT; i++ ){
 		if( ! st_macro[i].current.macro ) continue;
+		
+		if( st_macro[i].current.runMode == MRM_TRACE ){
+			macro_trace( mode, pad, &(st_macro[i]) );
+		} else if( st_macro[i].current.runMode == MRM_RECORD ){
+			macro_record( mode, pad, &(st_macro[i]) );
+		}
 		
 		if( st_macro[i].runButtons ){
 			bool trigger = ( ( ( pad->Buttons | ctrlpadUtilGetAnalogDirection( pad->Lx, pad->Ly, 0 ) ) & (~( ~0 ^ st_macro[i].runButtons )) ) == st_macro[i].runButtons ) ? true : false;
@@ -124,23 +131,18 @@ void macroMain( MfCallMode mode, SceCtrlData *pad, void *argp )
 				st_macro[i].current.hotkeyEnable = true;
 			}
 		}
-		
-		switch( st_macro[i].current.runMode ){
-			case MRM_NONE:
-				break;
-			case MRM_TRACE:
-				macro_trace( mode, pad, &(st_macro[i]) );
-				break;
-			case MRM_RECORD:
-				macro_record( mode, pad, &(st_macro[i]) );
-				break;
-		}
 	}
 }
 
 MfMenuRc macroMenu( SceCtrlData *pad_data, void *arg )
 {
 	static int selected = 0;
+	
+	if( macro_in_webbrowser() ){
+		gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 4 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Cannot use this function on the web-browser." );
+		mfMenuWait( 1000000 );
+		return MR_BACK;
+	}
 	
 	if( ! st_callback.func ){
 		switch( mfMenuUniDraw( gbOffsetChar( 5 ), gbOffsetLine( 6 ), st_menu_table, MF_ARRAY_NUM( st_menu_table ), &selected, 0 ) ){
@@ -172,6 +174,15 @@ MfMenuRc macroMenu( SceCtrlData *pad_data, void *arg )
 		}
 	}
 	return MR_CONTINUE;
+}
+
+static bool macro_in_webbrowser( void )
+{
+	if( sceKernelFindModuleByName( "sceHVNetfront_Module" ) != NULL ){
+		return true;
+	} else{
+		return false;
+	}
 }
 
 static bool macro_lock( void )
@@ -211,6 +222,7 @@ static bool macro_run( MacroEntry *entry, unsigned int loop )
 	
 	/* 最後のボタン情報をリセット */
 	macro_init_tempdata( &(entry->current.temp) );
+	sceRtcGetCurrentTick( &(entry->current.temp.rtc) );
 	
 	macro_lock();
 	
@@ -635,9 +647,7 @@ static void macro_trace( MfCallMode mode, SceCtrlData *pad, void *argp )
 			uint64_t rtc;
 			sceRtcGetCurrentTick( &rtc );
 			
-			if( ! entry->current.temp.rtc ){
-				entry->current.temp.rtc = rtc;
-			} else if( ( rtc - entry->current.temp.rtc ) / 1000 > entry->current.command->data ){
+			if( ( rtc - entry->current.temp.rtc ) / 1000 >= entry->current.command->data ){
 				entry->current.temp.rtc = 0;
 				continue;
 			}
@@ -653,6 +663,7 @@ static void macro_trace( MfCallMode mode, SceCtrlData *pad, void *argp )
 		} else if( entry->current.command->action == MA_ANALOG_MOVE ){
 			entry->current.temp.analogCoord = entry->current.command->data;
 		} else if( entry->current.command->action == MA_RAPIDFIRE_START ){
+			if( ! entry->current.command->data ) continue;
 			mfRapidfireSet(
 				entry->current.rfUid,
 				(unsigned int)(entry->current.command->data),
@@ -661,6 +672,7 @@ static void macro_trace( MfCallMode mode, SceCtrlData *pad, void *argp )
 				MACROMGR_GET_RAPIDRDELAY( entry->current.command->sub )
 			);
 		} else if( entry->current.command->action == MA_RAPIDFIRE_STOP ){
+			if( ! entry->current.command->data ) continue;
 			mfRapidfireClear( entry->current.rfUid, (unsigned int)(entry->current.command->data) );
 		}
 		
@@ -671,7 +683,10 @@ static void macro_trace( MfCallMode mode, SceCtrlData *pad, void *argp )
 		pad->Ly = MACROMGR_GET_ANALOG_Y( entry->current.temp.analogCoord );
 		
 		/* 次のコマンドへ */
-		if( entry->current.command->action != MA_DELAY ) entry->current.command = entry->current.command->next;
+		if( entry->current.command->action != MA_DELAY ){
+			entry->current.command = entry->current.command->next;
+			sceRtcGetCurrentTick( &(entry->current.temp.rtc) );
+		}
 		
 		/* コマンドを一つ実行完了により抜ける */
 		break;

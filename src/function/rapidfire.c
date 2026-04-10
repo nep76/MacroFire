@@ -247,6 +247,12 @@ MfMenuRc rapidfireMenu( SceCtrlData *pad_data, void *argp )
 {
 	static int selected    = 0;
 	
+	if( sceKernelFindModuleByName( "sceHVNetfront_Module" ) != NULL ){
+		gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 4 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Cannot use this function on the web-browser." );
+		mfMenuWait( 1000000 );
+		return MR_BACK;
+	}
+		
 	if( ! st_callback.func ){
 		gbPrint( gbOffsetChar(  3 ), gbOffsetLine(  4 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "Please choose a rapidfire mode per buttons." );
 		gbPrint( gbOffsetChar( 33 ), gbOffsetLine( 22 ), MFM_TEXT_FGCOLOR, MFM_TEXT_BGCOLOR, "NORMAL    : Standard control mode." );

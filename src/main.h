@@ -11,11 +11,12 @@
 #include <unistd.h>
 #include <string.h>
 
+#include <systemctrl.h>
+
 #define GLOBAL_VARIABLES_DEFINE
 #include "macrofire.h"
 #undef GLOBAL_VARIABLE_DEFINE
 
-#include "hook.h"
 #define MFTABLE_DEFINE
 #include "mftable.h"
 #undef MFTABLE_DEFINE
@@ -23,6 +24,12 @@
 /*-----------------------------------------------
 	íËêî
 -----------------------------------------------*/
+#define MF_INIDEF_MAIN_STARTUP        false
+#define MF_INIDEF_MAIN_MENUBUTTONS    "VOLUP + VOLDOWN"
+#define MF_INIDEF_MAIN_TOGGLEBUTTONS  ""
+#define MF_INIDEF_ANALOGTUNE_ORIGINX  128
+#define MF_INIDEF_ANALOGTUNE_ORIGINY  128
+#define MF_INIDEF_ANALOGTUNE_DEADZONE 40
 
 /*-----------------------------------------------
 	å^êÈåæ
@@ -39,6 +46,7 @@ int mfCtrlReadBufferPositive( SceCtrlData *pad, int count );
 int mfCtrlReadBufferNegative( SceCtrlData *pad, int count );
 int mfCtrlPeekLatch( SceCtrlLatch *latch );
 int mfCtrlReadLatch( SceCtrlLatch *latch );
+int mfVshCtrlReadBufferPositive( SceCtrlData *pad, int count );
 
 int main_thread( SceSize arglen, void *argp );
 int module_start( SceSize arglen, void *argp );

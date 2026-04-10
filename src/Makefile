@@ -17,26 +17,25 @@ PRX_EXPORTS = exports.exp
 # 優先的にカーネルモードの方(psp***_driver)をリンクしようとするみたい。
 USE_KERNEL_LIBS = 1
 
-CLASSG_LIBS = include
+CLASSG_LIBS = ./include
+M33SDK      = ./m33
 
-INCDIR = $(CLASSG_LIBS)
-CFLAGS = -O2 -G0 -Wall -fno-strict-aliasing -fno-builtin-printf
+INCDIR   = $(M33SDK)/include $(CLASSG_LIBS)
+CFLAGS   = -O2 -G0 -Wall -fno-strict-aliasing -fno-builtin-printf
 CXXFLAGS = $(CFLAGS) -fno-exceptions -fno-rtti
-ASFLAGS = $(CFLAGS)
-
-LIBDIR =
-LDFLAGS =
+ASFLAGS  = $(CFLAGS)
+LIBDIR   = $(M33SDK)/lib
+LDFLAGS  =
 
 # newlibを使う場合、libpspuserをリンクしないとsceKernelFreeMemSizeのリンクに失敗する。
 # libpspuserより先にlibpspkernelをリンクしないと、システムコントロール系のシンボルに
 # ユーザモードの方をリンクしてしまい、カーネルモードスレッドを生成できない模様？
-LIBS = -lpsppower_driver -lpspge -lpsprtc -lpspkernel -lc -lm -lpspuser
+LIBS = -lpspsystemctrl_kernel -lpsppower_driver -lpspge -lpsprtc -lpspkernel -lc -lm -lpspuser
 
 OBJS = exports.o \
        sceDmac.o \
        main.o \
        menu.o \
-       hook.o \
        analogtune.o \
        rapidfire.o \
        function/rapidfire.o \

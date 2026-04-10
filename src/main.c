@@ -1,8 +1,6 @@
 /*
-	MacroFire
+	main.c
 */
-
-/* フックはM33SDKのsctrlHENFindFunction(),sctrlHENPatchSyscall()を使ったほうがいいのだろうか？ */
 
 #include "main.h"
 
@@ -19,22 +17,37 @@ static int  mf_read_pad_buffer( MfSceCtrlDataFunc func, SceCtrlData *pad, int co
 	ローカル変数
 -----------------------------------------------*/
 static bool         st_apihooked = false;
+static MfRunEnv     st_runenv    = false;
 static SceCtrlData  st_pad_data;
 static unsigned int st_prev_pad_buttons;
 
 /*=============================================*/
+
+static void mf_detect_runenv( void )
+{
+	/* 実行環境をチェック */
+	int i;
+	
+	st_runenv = MF_RUNENV_GAME;
+	
+	for( i = 0; i < 5; i++ ){
+		if( sceKernelFindModuleByName( "sceVshBridge_Driver" ) != NULL ){
+			st_runenv = MF_RUNENV_VSH;
+			break;
+		} else if( sceKernelFindModuleByName( "scePops_Manager" ) != NULL ){
+			st_runenv = MF_RUNENV_POPS;
+			break;
+		}
+		sceKernelDelayThread( 200000 );
+	}
+}
 
 static void mf_find_hookaddr( void )
 {
 	int i;
 	
 	for( i = 0; i < MF_ARRAY_NUM( Hooktable ); i++ ){
-		Hooktable[i].exported.entrypoint = hookFindExportedAddr(
-			Hooktable[i].modname,
-			Hooktable[i].library,
-			Hooktable[i].nid
-		);
-		Hooktable[i].exported.addr = hookFindSyscallAddr( Hooktable[i].exported.entrypoint );
+		Hooktable[i].origfunc = (void *)sctrlHENFindFunction( Hooktable[i].modname, Hooktable[i].library, Hooktable[i].nid );
 	}
 }
 
@@ -77,14 +90,19 @@ static int mf_read_pad_buffer( MfSceCtrlDataFunc func, SceCtrlData *pad, int cou
 	return ret;
 }
 
+int mfVshCtrlReadBufferPositive( SceCtrlData *pad, int count )
+{
+	return mf_read_pad_buffer( Hooktable[MF_VSHCTRL_READ_BUFFER_POSITIVE].origfunc, pad, count, MF_CALL_READ );
+}
+
 int mfCtrlPeekBufferPositive( SceCtrlData *pad, int count )
 {
-	return mf_read_pad_buffer( Hooktable[MF_CTRL_PEEK_BUFFER_POSITIVE].exported.entrypoint, pad, count, MF_CALL_READ );
+	return mf_read_pad_buffer( Hooktable[MF_CTRL_PEEK_BUFFER_POSITIVE].origfunc, pad, count, MF_CALL_READ );
 }
 
 int mfCtrlPeekBufferNegative( SceCtrlData *pad, int count )
 {
-	int ret = mf_read_pad_buffer( Hooktable[MF_CTRL_PEEK_BUFFER_POSITIVE].exported.entrypoint, pad, count, MF_CALL_READ );
+	int ret = mf_read_pad_buffer( Hooktable[MF_CTRL_PEEK_BUFFER_POSITIVE].origfunc, pad, count, MF_CALL_READ );
 	
 	pad->Buttons = ~pad->Buttons;
 	
@@ -93,12 +111,12 @@ int mfCtrlPeekBufferNegative( SceCtrlData *pad, int count )
 
 int mfCtrlReadBufferPositive( SceCtrlData *pad, int count )
 {
-	return mf_read_pad_buffer( Hooktable[MF_CTRL_READ_BUFFER_POSITIVE].exported.entrypoint, pad, count, MF_CALL_READ );
+	return mf_read_pad_buffer( Hooktable[MF_CTRL_READ_BUFFER_POSITIVE].origfunc, pad, count, MF_CALL_READ );
 }
 
 int mfCtrlReadBufferNegative( SceCtrlData *pad, int count )
 {
-	int ret = mf_read_pad_buffer( Hooktable[MF_CTRL_READ_BUFFER_POSITIVE].exported.entrypoint, pad, count, MF_CALL_READ );
+	int ret = mf_read_pad_buffer( Hooktable[MF_CTRL_READ_BUFFER_POSITIVE].origfunc, pad, count, MF_CALL_READ );
 	
 	pad->Buttons = ~pad->Buttons;
 	
@@ -111,7 +129,7 @@ int mfCtrlPeekLatch( SceCtrlLatch *latch )
 	int ret;
 	unsigned int k1 = pspSdkSetK1( 0 );
 	
-	ret = mf_read_pad_buffer( Hooktable[MF_CTRL_PEEK_BUFFER_POSITIVE].exported.entrypoint, &pad, 1, MF_CALL_LATCH );
+	ret = mf_read_pad_buffer( Hooktable[MF_CTRL_PEEK_BUFFER_POSITIVE].origfunc, &pad, 1, MF_CALL_LATCH );
 	
 	pspSdkSetK1( k1 );
 	
@@ -131,7 +149,7 @@ int mfCtrlReadLatch( SceCtrlLatch *latch )
 	int ret;
 	unsigned int k1 = pspSdkSetK1( 0 );
 	
-	ret = mf_read_pad_buffer( Hooktable[MF_CTRL_PEEK_BUFFER_POSITIVE].exported.entrypoint, &pad, 1, MF_CALL_LATCH );
+	ret = mf_read_pad_buffer( Hooktable[MF_CTRL_PEEK_BUFFER_POSITIVE].origfunc, &pad, 1, MF_CALL_LATCH );
 	
 	pspSdkSetK1( k1 );
 	
@@ -152,8 +170,8 @@ void mfHookApi( void )
 	if( st_apihooked ) return;
 	
 	for( i = 0; i < MF_ARRAY_NUM( Hooktable ); i++ ){
-		if( ! Hooktable[i].exported.addr || ! Hooktable[i].hookfunc ) continue;
-		hookUpdateExportedAddr( Hooktable[i].exported.addr, Hooktable[i].hookfunc );
+		if( ! Hooktable[i].origfunc || ! Hooktable[i].hookfunc ) continue;
+		sctrlHENPatchSyscall( (u32)Hooktable[i].origfunc, Hooktable[i].hookfunc );
 	}
 	
 	st_apihooked = true;
@@ -166,8 +184,8 @@ void mfRestoreApi( void )
 	if( ! st_apihooked ) return;
 	
 	for( i = 0; i < MF_ARRAY_NUM( Hooktable ); i++ ){
-		if( ! Hooktable[i].exported.addr || ! Hooktable[i].exported.entrypoint ) continue;
-		hookUpdateExportedAddr( Hooktable[i].exported.addr, Hooktable[i].exported.entrypoint );
+		if( ! Hooktable[i].origfunc || ! Hooktable[i].hookfunc ) continue;
+		sctrlHENPatchSyscall( (u32)Hooktable[i].hookfunc, Hooktable[i].origfunc );
 	}
 	
 	st_apihooked = false;
@@ -179,6 +197,9 @@ int main_thread( SceSize arglen, void *argp )
 	
 	/* メニューを初期化 */
 	mfMenuInit();
+	
+	/* 実行環境を取得 */
+	mf_detect_runenv();
 	
 	/* フックアドレスを取得 */
 	mf_find_hookaddr();
@@ -232,7 +253,7 @@ int main_thread( SceSize arglen, void *argp )
 		
 		if( st_apihooked ){
 			unsigned int k1 = pspSdkSetK1( 0 );
-			mf_read_pad_buffer( Hooktable[MF_CTRL_PEEK_BUFFER_POSITIVE].exported.entrypoint, &st_pad_data, 1, MF_CALL_INTERNAL );
+			mf_read_pad_buffer( Hooktable[MF_CTRL_PEEK_BUFFER_POSITIVE].origfunc, &st_pad_data, 1, MF_CALL_INTERNAL );
 			pspSdkSetK1( k1 );
 		} else{
 			sceCtrlPeekBufferPositive( &st_pad_data, 1 );
@@ -305,6 +326,11 @@ bool mfIsEnabled( void )
 bool mfIsDisabled( void )
 {
 	return ( ! gMfEngine );
+}
+
+MfRunEnv mfRunEnv( void )
+{
+	return st_runenv;
 }
 
 int module_start( SceSize arglen, void *argp )

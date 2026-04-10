@@ -8,16 +8,16 @@
 /*-----------------------------------------------
 	ローカル関数
 -----------------------------------------------*/
-static void     mf_indicator( void );
-static void     mf_threads_stat_change( enum mf_thread_chstat stat, SceUID thlist[], int thnum );
-static void     mf_emerg_menu( void );
-static void     mf_menu_create_home_menu( MfMenuItem *menu, int menu_num, MfMenuCallback *mf_menu );
-static void     mf_backup_fbstat( struct mf_fbstat *fbstat );
-static void     mf_restore_fbstat( struct mf_fbstat *fbstat );
-static bool     mf_alloc_buffers( struct mf_buffers *buf, void *orig_buffer );
-static void     mf_free_buffers( struct mf_buffers *buf );
-static void     mf_ready_to_draw( void );
-static void     mf_draw_base( void );
+static void mf_indicator( void );
+static void mf_threads_stat_change( enum mf_thread_chstat stat, SceUID thlist[], int thnum );
+static void mf_emerg_menu( void );
+static void mf_menu_create_home_menu( MfMenuItem *menu, int menu_num, MfMenuCallback *mf_menu );
+static void mf_backup_fbstat( struct mf_fbstat *fbstat );
+static void mf_restore_fbstat( struct mf_fbstat *fbstat );
+static bool mf_alloc_buffers( struct mf_buffers *buf, void *orig_buffer );
+static void mf_free_buffers( struct mf_buffers *buf );
+static void mf_ready_to_draw( void );
+static void mf_draw_base( void );
 
 /*-----------------------------------------------
 	ローカル変数
@@ -98,13 +98,8 @@ void mfDebug( struct mf_buffers *buf )
 
 	
 	gbPrintf( gbOffsetChar( 1 ), gbOffsetLine( 0 ), MFM_TITLE_TEXT_COLOR, MFM_TRANSPARENT,
-		"%p %p %p %p %d %d",
-		gbGetCurrentDisplayBuf(),
-		buf->frame.display,
-		buf->frame.draw,
-		buf->frame.clearImage,
-		buf->frame.size,
-		buf->useVolatileMem
+		"%d",
+		mfRunEnv()
 	);
 		
 	gbPrintf( gbOffsetChar( 1 ), gbOffsetLine( 2 ), MFM_TITLE_TEXT_COLOR, MFM_TRANSPARENT,
