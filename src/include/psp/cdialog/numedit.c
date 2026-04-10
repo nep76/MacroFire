@@ -88,7 +88,7 @@ int cdialogNumeditStartNoLock( unsigned short x, unsigned short y )
 	int ret;
 	unsigned short width;
 	
-	//st_params->base.status = CDIALOG_INIT;
+	st_params->base.status = CDIALOG_INIT;
 	
 	st_params->showMessage = false;
 	
@@ -105,13 +105,13 @@ int cdialogNumeditStartNoLock( unsigned short x, unsigned short y )
 	
 	width = st_params->work.maxdigits + strlen( st_params->data.unit ) + 1;
 	
-	st_params->base.x      = gbOffsetChar( x );
-	st_params->base.y      = gbOffsetLine( y );
+	st_params->base.x      = pbOffsetChar( x );
+	st_params->base.y      = pbOffsetLine( y );
 	st_params->base.width  = strlen( st_params->data.title );
 	if( st_params->base.width < width ) st_params->base.width = width;
 	if( st_params->base.width < 10    ) st_params->base.width = 10;
-	st_params->base.width  = gbOffsetChar( st_params->base.width + 2 );
-	st_params->base.height = gbOffsetLine( 7 );
+	st_params->base.width  = pbOffsetChar( st_params->base.width + 2 );
+	st_params->base.height = pbOffsetLine( 7 );
 	
 	ret = cdialogDevPrepareToStart( &(st_params->base), st_params->data.options );
 	if( ret != CG_ERROR_OK ) return ret;
@@ -174,8 +174,8 @@ int cdialogNumeditUpdate( void )
 	} else if( pad.Buttons & PSP_CTRL_HOME ){
 		if( cdialogMessageInit( NULL ) == 0 ){
 			CdialogMessageData *data = cdialogMessageGetData();
-			strutilCopy( data->title,   "Help",   CDIALOG_MESSAGE_TITLE_LENGTH );
-			strutilCopy( data->message, "\x83\x81 = Move\n\x80\x82 = Change value\n\n\x85 = Accept\n\x86 = Cancel", CDIALOG_MESSAGE_LENGTH );
+			strutilCopy( data->title,   CDIALOG_STR_HELP_LABEL,   CDIALOG_MESSAGE_TITLE_LENGTH );
+			strutilCopy( data->message, CDIALOG_STR_NUMEDIT_HELP, CDIALOG_MESSAGE_LENGTH );
 			data->options = CDIALOG_DISPLAY_CENTER;
 			if( cdialogMessageStartNoLock( 0, 0 ) < 0 ){
 				cdialogMessageShutdownStartNoLock();
@@ -219,7 +219,7 @@ void cdialog_numedit_draw( struct cdialog_dev_base_params *base, CdialogNumeditD
 {
 	unsigned short i;
 	unsigned short avail_offset;
-	unsigned short display_x_start = base->width - gbOffsetChar( work->maxdigits + strlen( data->unit ) + 2 );
+	unsigned short display_x_start = base->width - pbOffsetChar( work->maxdigits + strlen( data->unit ) + 2 );
 	
 	{
 		char *digits = strutilCounterPbrk( work->numbers, "0" );
@@ -232,61 +232,63 @@ void cdialog_numedit_draw( struct cdialog_dev_base_params *base, CdialogNumeditD
 	}
 	
 	/* ˜g‚ð•`‰æ */
-	gbFillRectRel( base->x, base->y, base->width, base->height, base->color->bg );
-	gbLineRectRel( base->x, base->y, base->width, base->height, base->color->border );
+	pbFillRectRel( base->x, base->y, base->width, base->height, base->color->bg );
+	pbLineRectRel( base->x, base->y, base->width, base->height, base->color->border );
 	
 	/* ƒ^ƒCƒgƒ‹•`‰æ */
-	gbPrint(
-		base->x + ( base->width >> 1 ) - gbOffsetChar( strlen( data->title ) >> 1 ),
-		base->y + gbOffsetLine( 1 ),
+	pbPrint(
+		base->x + ( base->width >> 1 ) -  ( pbMeasureString( data->title ) >> 1 ),
+		base->y + pbOffsetLine( 1 ),
 		base->color->title,
-		GB_TRANSPARENT,
+		PB_TRANSPARENT,
 		data->title
 	);
 	
-	gbPrint(
-		base->x + gbOffsetChar( 1 ),
-		base->y + gbOffsetLine( 5 ),
+	pbPrintf(
+		base->x + pbOffsetChar( 1 ),
+		base->y + pbOffsetLine( 5 ),
 		base->color->help,
-		GB_TRANSPARENT,
-		"HOME: Help"
+		PB_TRANSPARENT,
+		"HOME: %s",
+		CDIALOG_STR_HELP_LABEL
 	);
 	
 	for( i = 0; i < work->maxdigits; i++ ){
 		if( work->pos == i ){
-			char num_current[] = { '\x80', '\n', work->numbers[i], '\n', '\x82', '\0' };
-			gbPrint(
-				base->x + display_x_start + gbOffsetChar( i ),
-				base->y + gbOffsetLine( 2 ),
+			char num_current[16];
+			snprintf( num_current, sizeof( num_current ), "%s\n%c\n%s",PB_SYM_PSP_UP, work->numbers[i], PB_SYM_PSP_DOWN );
+			pbPrint(
+				base->x + display_x_start + pbOffsetChar( i ),
+				base->y + pbOffsetLine( 2 ),
 				base->color->fcfg,
-				GB_TRANSPARENT,
+				PB_TRANSPARENT,
 				num_current
 			);
 		} else if( i >= avail_offset ){
-			gbPutChar(
-				base->x + display_x_start + gbOffsetChar( i ),
-				base->y + gbOffsetLine( 3 ),
+			pbPutChar(
+				base->x + display_x_start + pbOffsetChar( i ),
+				base->y + pbOffsetLine( 3 ),
 				base->color->fg,
-				GB_TRANSPARENT,
+				PB_TRANSPARENT,
 				work->numbers[i]
 			);
 		} else{
-			gbPutChar(
-				base->x + display_x_start + gbOffsetChar( i ),
-				base->y + gbOffsetLine( 3 ),
+			pbPutChar(
+				base->x + display_x_start + pbOffsetChar( i ),
+				base->y + pbOffsetLine( 3 ),
 				( base->color->fg & 0x00ffffff ) | 0x55000000,
-				GB_TRANSPARENT,
+				PB_TRANSPARENT,
 				'0'
 			);
 		}
 	}
 	
 	/* ’PˆÊ•\Ž¦ */
-	gbPrintf(
-		base->x + display_x_start + gbOffsetChar( i + 1 ),
-		base->y + gbOffsetLine( 3 ),
+	pbPrintf(
+		base->x + display_x_start + pbOffsetChar( i + 1 ),
+		base->y + pbOffsetLine( 3 ),
 		base->color->fg,
-		GB_TRANSPARENT,
+		PB_TRANSPARENT,
 		"%s",
 		data->unit
 	);

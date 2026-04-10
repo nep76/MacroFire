@@ -114,14 +114,14 @@ void mfAnalogStickMenu( MfMenuMessage message )
 				
 				sensitivity = st_analogstick.sensitivity * 100;
 				
-				mfMenuSetTablePosition( menu, 1, gbOffsetChar( 5 ), gbOffsetLine( 6 ) );
-				mfMenuSetTableEntry( menu, 1, 1, 1, "Analog stick movement", mfCtrlDefBool, &st_enable_movement, NULL );
+				mfMenuSetTablePosition( menu, 1, pbOffsetChar( 5 ), pbOffsetLine( 6 ) );
+				mfMenuSetTableEntry( menu, 1, 1, 1, MF_STR_ASA_MOVEMENT, mfCtrlDefBool, &st_enable_movement, NULL );
 				mfMenuSetTableEntry( menu, 1, 2, 1, "", NULL, NULL, NULL );
-				mfMenuSetTableEntry( menu, 1, 3, 1, "Deadzone radius", mfCtrlDefGetNumber, &(st_analogstick.deadzone), pref_deadzone );
-				mfMenuSetTableEntry( menu, 1, 4, 1, "Sensitivity    ", mfCtrlDefGetNumber, &sensitivity, pref_sensitivity );
+				mfMenuSetTableEntry( menu, 1, 3, 1, MF_STR_ASA_DEADZONE, mfCtrlDefGetNumber, &(st_analogstick.deadzone), pref_deadzone );
+				mfMenuSetTableEntry( menu, 1, 4, 1, MF_STR_ASA_SENSITIVITY, mfCtrlDefGetNumber, &sensitivity, pref_sensitivity );
 				mfMenuSetTableEntry( menu, 1, 5, 1, "", NULL, NULL, NULL );
-				mfMenuSetTableEntry( menu, 1, 6, 1, "Origin X-coordinate", mfCtrlDefGetNumber, &(st_analogstick.originX), pref_origin );
-				mfMenuSetTableEntry( menu, 1, 7, 1, "Origin Y-coordinate", mfCtrlDefGetNumber, &(st_analogstick.originY), pref_origin );
+				mfMenuSetTableEntry( menu, 1, 6, 1, MF_STR_ASA_ORIGIN_X, mfCtrlDefGetNumber, &(st_analogstick.originX), pref_origin );
+				mfMenuSetTableEntry( menu, 1, 7, 1, MF_STR_ASA_ORIGIN_Y, mfCtrlDefGetNumber, &(st_analogstick.originY), pref_origin );
 			}
 			mfMenuInitTable( menu );
 			break;
@@ -135,54 +135,54 @@ void mfAnalogStickMenu( MfMenuMessage message )
 			pad_dupe = *pad;
 			mfAnalogStickAdjust( MF_INTERNAL, &pad_dupe );
 			
-			gbPrint( gbOffsetChar( 3 ), gbOffsetLine(  4 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, "Analog stick sensitivity adjustment." );
+			pbPrint( pbOffsetChar( 3 ), pbOffsetLine(  4 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, MF_STR_ASA_DESC );
 			
-			gbLineRectRel( gbOffsetChar( 60 ) - ( 128 >> 1 ) - 1, gbOffsetLine( 18 ) - ( 128 >> 1 ) - 1, ( 256 >> 1 ) + 2, ( 256 >> 1 ) + 2, MF_COLOR_TEXT_FG );
-			gbLineCircle( gbOffsetChar( 60 ) + ( ( st_analogstick.originX - PADUTIL_CENTER_X ) >> 1 ), gbOffsetLine( 18 ) + ( ( st_analogstick.originY - PADUTIL_CENTER_Y ) >> 1 ), st_analogstick.deadzone >> 1, MF_COLOR_TEXT_FC );
+			pbLineRectRel( pbOffsetChar( 60 ) - ( 128 >> 1 ) - 1, pbOffsetLine( 18 ) - ( 128 >> 1 ) - 1, ( 256 >> 1 ) + 2, ( 256 >> 1 ) + 2, MF_COLOR_TEXT_FG );
+			pbLineCircle( pbOffsetChar( 60 ) + ( ( st_analogstick.originX - PADUTIL_CENTER_X ) >> 1 ), pbOffsetLine( 18 ) + ( ( st_analogstick.originY - PADUTIL_CENTER_Y ) >> 1 ), st_analogstick.deadzone >> 1, MF_COLOR_TEXT_FC );
 			
 			/* 調整前座標の位置を示す */
-			gbLine(
-				gbOffsetChar( 60 ) + ( ( pad->Lx - PADUTIL_CENTER_X  ) >> 1 ),
-				gbOffsetLine( 18 ) - ( 127 >> 1 ) - 1,
-				gbOffsetChar( 60 ) + ( ( pad->Lx - PADUTIL_CENTER_X  ) >> 1 ),
-				gbOffsetLine( 18 ) + ( 127 >> 1 ) + 1,
+			pbLine(
+				pbOffsetChar( 60 ) + ( ( pad->Lx - PADUTIL_CENTER_X  ) >> 1 ),
+				pbOffsetLine( 18 ) - ( 127 >> 1 ) - 1,
+				pbOffsetChar( 60 ) + ( ( pad->Lx - PADUTIL_CENTER_X  ) >> 1 ),
+				pbOffsetLine( 18 ) + ( 127 >> 1 ) + 1,
 				( MF_COLOR_TEXT_FC & 0x00ffffff ) | 0x66000000
 			);
-			gbLine(
-				gbOffsetChar( 60 ) - ( 127 >> 1 ) - 1,
-				gbOffsetLine( 18 ) + ( ( pad->Ly - PADUTIL_CENTER_Y ) >> 1 ),
-				gbOffsetChar( 60 ) + ( 127 >> 1 ) + 1,
-				gbOffsetLine( 18 ) + ( ( pad->Ly - PADUTIL_CENTER_Y ) >> 1 ),
+			pbLine(
+				pbOffsetChar( 60 ) - ( 127 >> 1 ) - 1,
+				pbOffsetLine( 18 ) + ( ( pad->Ly - PADUTIL_CENTER_Y ) >> 1 ),
+				pbOffsetChar( 60 ) + ( 127 >> 1 ) + 1,
+				pbOffsetLine( 18 ) + ( ( pad->Ly - PADUTIL_CENTER_Y ) >> 1 ),
 				( MF_COLOR_TEXT_FC & 0x00ffffff ) | 0x66000000
 			);
-			gbPoint( gbOffsetChar( 60 ) + ( ( pad->Lx - PADUTIL_CENTER_X  ) >> 1 ), gbOffsetLine( 18 ) + ( ( pad->Ly - PADUTIL_CENTER_Y ) >> 1 ), MF_COLOR_TEXT_FC );
+			pbPoint( pbOffsetChar( 60 ) + ( ( pad->Lx - PADUTIL_CENTER_X  ) >> 1 ), pbOffsetLine( 18 ) + ( ( pad->Ly - PADUTIL_CENTER_Y ) >> 1 ), MF_COLOR_TEXT_FC );
 			
 			/* 調整後座標の位置を示す */
-			gbLine(
-				gbOffsetChar( 60 ) + ( ( pad_dupe.Lx - PADUTIL_CENTER_X  ) >> 1 ),
-				gbOffsetLine( 18 ) - ( 127 >> 1 ) - 1,
-				gbOffsetChar( 60 ) + ( ( pad_dupe.Lx - PADUTIL_CENTER_X  ) >> 1 ),
-				gbOffsetLine( 18 ) + ( 127 >> 1 ) + 1,
+			pbLine(
+				pbOffsetChar( 60 ) + ( ( pad_dupe.Lx - PADUTIL_CENTER_X  ) >> 1 ),
+				pbOffsetLine( 18 ) - ( 127 >> 1 ) - 1,
+				pbOffsetChar( 60 ) + ( ( pad_dupe.Lx - PADUTIL_CENTER_X  ) >> 1 ),
+				pbOffsetLine( 18 ) + ( 127 >> 1 ) + 1,
 				( MF_COLOR_TEXT_FG & 0x00ffffff ) | 0x66000000
 			);
-			gbLine(
-				gbOffsetChar( 60 ) - ( 127 >> 1 ) - 1,
-				gbOffsetLine( 18 ) + ( ( pad_dupe.Ly - PADUTIL_CENTER_Y ) >> 1 ),
-				gbOffsetChar( 60 ) + ( 127 >> 1 ) + 1,
-				gbOffsetLine( 18 ) + ( ( pad_dupe.Ly - PADUTIL_CENTER_Y ) >> 1 ),
+			pbLine(
+				pbOffsetChar( 60 ) - ( 127 >> 1 ) - 1,
+				pbOffsetLine( 18 ) + ( ( pad_dupe.Ly - PADUTIL_CENTER_Y ) >> 1 ),
+				pbOffsetChar( 60 ) + ( 127 >> 1 ) + 1,
+				pbOffsetLine( 18 ) + ( ( pad_dupe.Ly - PADUTIL_CENTER_Y ) >> 1 ),
 				( MF_COLOR_TEXT_FG & 0x00ffffff ) | 0x66000000
 			);
-			gbPoint( gbOffsetChar( 60 ) + ( ( pad_dupe.Lx - PADUTIL_CENTER_X  ) >> 1 ), gbOffsetLine( 18 ) + ( ( pad_dupe.Ly - PADUTIL_CENTER_Y ) >> 1 ), MF_COLOR_TEXT_FG );
+			pbPoint( pbOffsetChar( 60 ) + ( ( pad_dupe.Lx - PADUTIL_CENTER_X  ) >> 1 ), pbOffsetLine( 18 ) + ( ( pad_dupe.Ly - PADUTIL_CENTER_Y ) >> 1 ), MF_COLOR_TEXT_FG );
 			
 			pad_dupe.Buttons |= padutilGetAnalogStickDirection( pad_dupe.Lx, pad_dupe.Ly, 0 );
-			gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 24 ),  MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, "Test of analog stick direction:" );
-			gbPrint( gbOffsetChar( 32 + 5 ), gbOffsetLine( 23 ),  pad_dupe.Buttons & PADUTIL_CTRL_ANALOG_UP    ? MF_COLOR_TEXT_FC : MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, "\x80" );
-			gbPrint( gbOffsetChar( 32 + 7 ), gbOffsetLine( 24 ),  pad_dupe.Buttons & PADUTIL_CTRL_ANALOG_RIGHT ? MF_COLOR_TEXT_FC : MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, "\x81" );
-			gbPrint( gbOffsetChar( 32 + 5 ), gbOffsetLine( 25 ),  pad_dupe.Buttons & PADUTIL_CTRL_ANALOG_DOWN  ? MF_COLOR_TEXT_FC : MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, "\x82" );
-			gbPrint( gbOffsetChar( 32 + 3 ), gbOffsetLine( 24 ),  pad_dupe.Buttons & PADUTIL_CTRL_ANALOG_LEFT  ? MF_COLOR_TEXT_FC : MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, "\x83" );
-			gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 27 ),  MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, "Test of analog stick movement:" );
-			gbPrintf( gbOffsetChar( 5 ), gbOffsetLine( 28 ), MF_COLOR_TEXT_FC, MF_COLOR_TEXT_BG, "     Raw coordinate (X,Y) = ( %03d , %03d )", pad->Lx, pad->Ly );
-			gbPrintf( gbOffsetChar( 5 ), gbOffsetLine( 29 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, "Adjusted coordinate (X,Y) = ( %03d , %03d )", pad_dupe.Lx, pad_dupe.Ly );
+			pbPrint( pbOffsetChar( 3 ), pbOffsetLine( 24 ),  MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, MF_STR_ASA_TEST_DIR );
+			pbPrint( pbOffsetChar( 32 + 5 ), pbOffsetLine( 23 ), pad_dupe.Buttons & PADUTIL_CTRL_ANALOG_UP    ? MF_COLOR_TEXT_FC : MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, PB_SYM_PSP_UP );
+			pbPrint( pbOffsetChar( 32 + 7 ), pbOffsetLine( 24 ), pad_dupe.Buttons & PADUTIL_CTRL_ANALOG_RIGHT ? MF_COLOR_TEXT_FC : MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, PB_SYM_PSP_RIGHT );
+			pbPrint( pbOffsetChar( 32 + 5 ), pbOffsetLine( 25 ), pad_dupe.Buttons & PADUTIL_CTRL_ANALOG_DOWN  ? MF_COLOR_TEXT_FC : MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, PB_SYM_PSP_DOWN );
+			pbPrint( pbOffsetChar( 32 + 3 ), pbOffsetLine( 24 ), pad_dupe.Buttons & PADUTIL_CTRL_ANALOG_LEFT  ? MF_COLOR_TEXT_FC : MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, PB_SYM_PSP_LEFT );
+			pbPrint( pbOffsetChar( 3 ), pbOffsetLine( 27 ),  MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, MF_STR_ASA_TEST_MOVE );
+			pbPrintf( pbOffsetChar( 5 ), pbOffsetLine( 28 ), MF_COLOR_TEXT_FC, MF_COLOR_TEXT_BG, "%s (X,Y) = ( %03d , %03d )", MF_STR_ASA_TEST_MOVE_RAW, pad->Lx, pad->Ly );
+			pbPrintf( pbOffsetChar( 5 ), pbOffsetLine( 29 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, "%s (X,Y) = ( %03d , %03d )", MF_STR_ASA_TEST_MOVE_ADJ, pad_dupe.Lx, pad_dupe.Ly );
 			
 			if( ! mfMenuDrawTable( menu, MF_MENU_NO_OPTIONS ) ) mfMenuProc( NULL );
 			break;

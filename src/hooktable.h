@@ -43,6 +43,8 @@ MfHookEntry hooktable[] = {
 	{ { NULL }, "sceHP_Remote_Driver",   "sceHprm",      0x1910B327, mfHprmPeekCurrentKey },
 	{ { NULL }, "sceHP_Remote_Driver",   "sceHprm",      0x2BCEC83E, mfHprmPeekLatch },
 	{ { NULL }, "sceHP_Remote_Driver",   "sceHprm",      0x40D2F9F0, mfHprmReadLatch },
+	
+	{ { NULL }, "sceImpose_driver",      "sceImpose",    0x381BD9E7, mfImposeHomeButton },
 };
 
 unsigned int hooktableEntryCount = sizeof( hooktable ) / sizeof( MfHookEntry );

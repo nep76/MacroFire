@@ -16,7 +16,13 @@
 #include "utils/strutil.h"
 #include "psp/padctrl.h"
 #include "psp/padutil.h"
-#include "psp/gb.h"
+#include "psp/pb.h"
+
+#ifdef PB_SJIS_SUPPORT
+#include "lang_jp.h"
+#else
+#include "lang_en.h"
+#endif
 
 #define CDIALOG_FUNCTION
 #include "psp/cdialog.h"

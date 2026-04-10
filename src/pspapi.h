@@ -47,22 +47,4 @@ int  sceDmacMemcpy( void *dest, const void *src, SceSize size );
 int scePowerVolatileMemTryLock( int unk, void **ptr, int *size );
 int scePowerVolatileMemUnlock( int unk );
 
-/*-----------------------------------------------
-	sceSysregAudioIoEnable
-	sceSysregAudioIoDisable
-	
-	オーディオ入出力の有効化/無効化。
-	どちらもpspSdkSetK1( 0 )実行後でないと不思議な動作をする。
------------------------------------------------*/
-int sceSysregAudioIoEnable( void );
-int sceSysregAudioIoDisable( void );
-
-/*-----------------------------------------------
-	sceImposeHomeButton
-	
-	Homeボタンの実体。
-	引数の詳細は不明だが、1を渡さないとHOMEとして働かない模様。
------------------------------------------------*/
-int sceImposeHomeButton( int unk );
-
 #endif

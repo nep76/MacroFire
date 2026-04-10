@@ -94,7 +94,7 @@ int cdialogGetfilenameStartNoLock( unsigned short x, unsigned short y )
 {
 	int ret;
 	
-	//st_params->base.status = CDIALOG_INIT;
+	st_params->base.status = CDIALOG_INIT;
 	
 	st_params->showDialog = CDIALOG_GETFILENAME_DIALOG_NONE;
 	st_params->shutdown   = false;
@@ -105,10 +105,10 @@ int cdialogGetfilenameStartNoLock( unsigned short x, unsigned short y )
 	st_params->work.selectPos  = 0;
 	st_params->work.filename   = NULL;
 	
-	st_params->base.x      = gbOffsetChar( x );
-	st_params->base.y      = gbOffsetLine( y );
-	st_params->base.width  = gbOffsetChar( CDIALOG_GETFILENAME_WIDTH + 2 );
-	st_params->base.height = gbOffsetLine( CDIALOG_GETFILENAME_HEIGHT );
+	st_params->base.x      = pbOffsetChar( x );
+	st_params->base.y      = pbOffsetLine( y );
+	st_params->base.width  = pbOffsetChar( CDIALOG_GETFILENAME_WIDTH + 2 );
+	st_params->base.height = pbOffsetLine( CDIALOG_GETFILENAME_HEIGHT );
 	
 	ret = cdialogDevPrepareToStart( &(st_params->base), st_params->data.options );
 	if( ret != CG_ERROR_OK ) return ret;
@@ -181,12 +181,12 @@ int cdialogGetfilenameUpdate( void )
 		char *delim;
 		
 		if( strpbrk( st_params->work.filename, "\\/:*?\"<>|" ) ){
-			if( cdialog_getfilename_init_message( "Invalid filename", "Filename contains illegal characters\n\nIllegal characters: \\/:?\"<>|", false ) ){
+			if( cdialog_getfilename_init_message( CDIALOG_STR_GETFILENAME_ERROR_INVALID_FILENAME, CDIALOG_STR_GETFILENAME_ERROR_ILLEGAL_CHAR, false ) ){
 				st_params->showDialog = CDIALOG_GETFILENAME_DIALOG_MESSAGE;
 				return 0;
 			}
 		} else if( st_params->work.filename[0] == '\0' ){
-			if( cdialog_getfilename_init_message( "Invalid filename", "Filename is empty", false ) ){
+			if( cdialog_getfilename_init_message( CDIALOG_STR_GETFILENAME_ERROR_INVALID_FILENAME, CDIALOG_STR_GETFILENAME_ERROR_EMPTY, false ) ){
 				st_params->showDialog = CDIALOG_GETFILENAME_DIALOG_MESSAGE;
 				return 0;
 			}
@@ -199,24 +199,24 @@ int cdialogGetfilenameUpdate( void )
 		
 		if( ftype == DIRH_FILE ){
 			if( st_params->data.options & CDIALOG_GETFILENAME_OVERWRITEPROMPT ){
-				if( cdialog_getfilename_init_message( "Overwrite", "File already exist.\nAre you sure you want to overwrite it?", true ) ){
+				if( cdialog_getfilename_init_message( CDIALOG_STR_GETFILENAME_CONFIRM_OVERWRITE_LABEL, CDIALOG_STR_GETFILENAME_CONFIRM_OVERWRITE, true ) ){
 					st_params->showDialog = CDIALOG_GETFILENAME_DIALOG_CONFIRM;
 					return 0;
 				}
 			}
 		} else if( ftype == DIRH_DIR ){
-			if( cdialog_getfilename_init_message( "Invalid filename", "This filename already exist as directory name in the current directory.", false ) ){
+			if( cdialog_getfilename_init_message( CDIALOG_STR_GETFILENAME_ERROR_INVALID_FILENAME, CDIALOG_STR_GETFILENAME_ERROR_SAME_AS_DIR_NAME, false ) ){
 				st_params->showDialog = CDIALOG_GETFILENAME_DIALOG_MESSAGE;
 				return 0;
 			}
 		} else{
 			if( st_params->data.options & CDIALOG_GETFILENAME_FILEMUSTEXIST ){
-				if( cdialog_getfilename_init_message( "Invalid filename", "File does not exist.", false ) ){
+				if( cdialog_getfilename_init_message( CDIALOG_STR_GETFILENAME_ERROR_INVALID_FILENAME, CDIALOG_STR_GETFILENAME_ERROR_NOT_FOUND, false ) ){
 					st_params->showDialog = CDIALOG_GETFILENAME_DIALOG_MESSAGE;
 					return 0;
 				}
 			} else if( st_params->data.options & CDIALOG_GETFILENAME_CREATEPROMPT ){
-				if( cdialog_getfilename_init_message( "Creation", "File does not exist.\nDo you want to create it?", true ) ){
+				if( cdialog_getfilename_init_message( CDIALOG_STR_GETFILENAME_CONFIRM_CREATE_LABEL, CDIALOG_STR_GETFILENAME_CONFIRM_CREATE, true ) ){
 					st_params->showDialog = CDIALOG_GETFILENAME_DIALOG_CONFIRM;
 					return 0;
 				}
@@ -227,7 +227,7 @@ int cdialogGetfilenameUpdate( void )
 		st_params->data.path[0] = '\0';
 		st_params->base.result = CDIALOG_CANCEL;
 	} else if( pad.Buttons & PSP_CTRL_HOME ){
-		if( cdialog_getfilename_init_message( "Help", "L/R   = MoveFocus\nSTART = Accept\n\x86     = Cancel\n\n*Filelist\n\n  \x80\x82     = Move\n  \x83\x81     = MovePage\n  \x85      = Enter\n  \x84      = Parent Directory\n  SELECT = Extra menu (Not implemented yet)\n\n*Filename\n\n  \x85 = Input", false ) ){
+		if( cdialog_getfilename_init_message( CDIALOG_STR_HELP_LABEL, CDIALOG_STR_GETFILENAME_HELP, false ) ){
 			st_params->showDialog = CDIALOG_GETFILENAME_DIALOG_MESSAGE;
 		}
 	} else if( pad.Buttons & ( PSP_CTRL_LTRIGGER | PSP_CTRL_RTRIGGER ) ){
@@ -265,13 +265,13 @@ int cdialogGetfilenameUpdate( void )
 			cdialog_getfilename_path_back( st_params->data.path, &(st_params->work) );
 			st_params->work.allEntries = 0;
 		} else if( pad.Buttons & PSP_CTRL_SELECT ){
-			if( cdialog_getfilename_init_message( "Extra menu", "Sorry. Not implemented yet.", false ) ){
+			if( cdialog_getfilename_init_message( CDIALOG_STR_GETFILENAME_EXTRA_MENU_LABEL, CDIALOG_STR_GETFILENAME_EXTRA_MENU, false ) ){
 				st_params->showDialog = CDIALOG_GETFILENAME_DIALOG_MESSAGE;
 			}
 		}
 	} else if( st_params->work.area == CDIALOG_GETFILENAME_AREA_INPUT ){
 		if( pad.Buttons & PSP_CTRL_CIRCLE ){
-			if( cdialog_getfilename_init_keyboard( "Input filename", st_params->work.filename, st_params->data.path + st_params->data.pathMax - st_params->work.filename, CDIALOG_SOSK_INPUTTYPE_FILENAME ) ){
+			if( cdialog_getfilename_init_keyboard( CDIALOG_STR_GETFILENAME_INPUT, st_params->work.filename, st_params->data.path + st_params->data.pathMax - st_params->work.filename, CDIALOG_SOSK_INPUTTYPE_FILENAME ) ){
 				st_params->showDialog = CDIALOG_GETFILENAME_DIALOG_KEYBOARD;
 			}
 		}
@@ -317,43 +317,44 @@ static void cdialog_getfilename_draw( struct cdialog_dev_base_params *base, Cdia
 	DirhFileInfo *file;
 	
 	/* 枠を描画 */
-	gbFillRectRel( base->x, base->y, base->width, base->height, base->color->bg );
-	gbLineRectRel( base->x, base->y, base->width, base->height, base->color->border );
+	pbFillRectRel( base->x, base->y, base->width, base->height, base->color->bg );
+	pbLineRectRel( base->x, base->y, base->width, base->height, base->color->border );
 	
 	/* タイトル描画 */
-	gbPrint(
-		base->x + ( base->width >> 1 ) - gbOffsetChar( strlen( data->title ) >> 1 ),
-		base->y + gbOffsetLine( 1 ),
+	pbPrint(
+		base->x + ( base->width >> 1 ) -  ( pbMeasureString( data->title ) >> 1 ),
+		base->y + pbOffsetLine( 1 ),
 		base->color->title,
-		GB_TRANSPARENT,
+		PB_TRANSPARENT,
 		data->title
 	);
 	
 	/* ファイルリストボーダー */
-	gbLineRect(
-		base->x + gbOffsetChar( 1 ),
-		base->y + gbOffsetLine( 4 ),
-		base->x + base->width - gbOffsetChar( 1 ),
-		base->y + gbOffsetLine( 4 ) + gbOffsetLine( CDIALOG_GETFILENAME_LIST_LINES + 1 ),
+	pbLineRect(
+		base->x + pbOffsetChar( 1 ),
+		base->y + pbOffsetLine( 4 ),
+		base->x + base->width - pbOffsetChar( 1 ),
+		base->y + pbOffsetLine( 4 ) + pbOffsetLine( CDIALOG_GETFILENAME_LIST_LINES + 1 ),
 		work->area == CDIALOG_GETFILENAME_AREA_LIST ? base->color->fcfg : base->color->border
 	);
 	
 	/* ファイル名ボーダー */
-	gbLineRect(
-		base->x + gbOffsetChar( 1 ),
-		base->y + base->height - gbOffsetLine( 4 ),
-		base->x + base->width - gbOffsetChar( 1 ),
-		base->y + base->height - gbOffsetLine( 4 ) + gbOffsetLine( CDIALOG_GETFILENAME_INPUT_LINES + 1 ),
+	pbLineRect(
+		base->x + pbOffsetChar( 1 ),
+		base->y + base->height - pbOffsetLine( 4 ),
+		base->x + base->width - pbOffsetChar( 1 ),
+		base->y + base->height - pbOffsetLine( 4 ) + pbOffsetLine( CDIALOG_GETFILENAME_INPUT_LINES + 1 ),
 		work->area == CDIALOG_GETFILENAME_AREA_INPUT ? base->color->fcfg : base->color->border
 	);
 	
 	/* HELP */
-	gbPrint(
-		base->x + base->width - gbOffsetChar( 11 ),
-		base->y + base->height - ( gbOffsetLine( 1 ) + ( gbOffsetLine( 1 ) >> 1 ) ),
+	pbPrintf(
+		base->x + base->width - pbOffsetChar( 11 ),
+		base->y + base->height - ( pbOffsetLine( 1 ) + ( pbOffsetLine( 1 ) >> 1 ) ),
 		base->color->help,
-		GB_TRANSPARENT,
-		"HOME: HELP"
+		PB_TRANSPARENT,
+		"HOME: %s",
+		CDIALOG_STR_HELP_LABEL
 	);
 	
 	/* カレントディレクトリを取得し、文字数を揃える */
@@ -365,33 +366,33 @@ static void cdialog_getfilename_draw( struct cdialog_dev_base_params *base, Cdia
 	}
 	if( buflen - 1 > CDIALOG_GETFILENAME_WIDTH - 9 ) cdialog_getfilename_str_shrink_with_extender( buf, CDIALOG_GETFILENAME_WIDTH - 9 );
 	
-	gbPrintf( 
-		base->x + gbOffsetChar( 1 ),
-		base->y + gbOffsetLine( 3 ),
+	pbPrintf( 
+		base->x + pbOffsetChar( 1 ),
+		base->y + pbOffsetLine( 3 ),
 		base->color->fg,
-		GB_TRANSPARENT,
+		PB_TRANSPARENT,
 		"%s: %s",
-		data->options & CDIALOG_GETFILENAME_SAVE ? "Save in" : "Look in",
+		data->options & CDIALOG_GETFILENAME_SAVE ? CDIALOG_STR_GETFILENAME_SAVE_IN : CDIALOG_STR_GETFILENAME_LOOK_IN,
 		buf
 	);
 	
-	gbPrint(
-		base->x + gbOffsetChar( 1 ),
-		base->y + base->height - gbOffsetLine( 5 ),
+	pbPrint(
+		base->x + pbOffsetChar( 1 ),
+		base->y + base->height - pbOffsetLine( 5 ),
 		base->color->fg,
-		GB_TRANSPARENT,
-		"Filename:"
+		PB_TRANSPARENT,
+		CDIALOG_STR_GETFILENAME_FILENAME
 	);
 	
 	/* ファイル名の長さを揃える */
 	buflen = strutilCopy( buf, work->filename, sizeof( buf ) ) - 1;
 	if( buflen > CDIALOG_GETFILENAME_WIDTH ) cdialog_getfilename_str_shrink_with_extender( buf, CDIALOG_GETFILENAME_WIDTH );
 	
-	gbPrint(
-		base->x + gbOffsetChar( 1 ) + ( gbOffsetChar( 1 ) >> 1 ),
-		base->y + base->height - ( gbOffsetLine( 3 ) + ( gbOffsetChar( 1 ) >> 1 ) ),
+	pbPrint(
+		base->x + pbOffsetChar( 1 ) + ( pbOffsetChar( 1 ) >> 1 ),
+		base->y + base->height - ( pbOffsetLine( 3 ) + ( pbOffsetChar( 1 ) >> 1 ) ),
 		base->color->fcfg,
-		GB_TRANSPARENT,
+		PB_TRANSPARENT,
 		buf
 	);
 	
@@ -404,20 +405,20 @@ static void cdialog_getfilename_draw( struct cdialog_dev_base_params *base, Cdia
 	}
 	
 	if( line ){
-		gbPutChar(
-			base->x + base->width - ( gbOffsetChar( 2 ) + ( gbOffsetChar( 1 ) >> 1 ) ),
-			base->y + ( gbOffsetLine( 1 ) >> 1 ) + gbOffsetLine( 4 ),
+		pbPutChar(
+			base->x + base->width - ( pbOffsetChar( 2 ) + ( pbOffsetChar( 1 ) >> 1 ) ),
+			base->y + ( pbOffsetLine( 1 ) >> 1 ) + pbOffsetLine( 4 ),
 			base->color->fg,
-			GB_TRANSPARENT,
+			PB_TRANSPARENT,
 			'\x80'
 		);
 	}
 	if( line + CDIALOG_GETFILENAME_LIST_LINES < work->allEntries ){
-		gbPutChar(
-			base->x + base->width - ( gbOffsetChar( 2 ) + ( gbOffsetChar( 1 ) >> 1 ) ),
-			base->y + ( gbOffsetLine( 1 ) >> 1 ) + gbOffsetLine( 3 + CDIALOG_GETFILENAME_LIST_LINES ),
+		pbPutChar(
+			base->x + base->width - ( pbOffsetChar( 2 ) + ( pbOffsetChar( 1 ) >> 1 ) ),
+			base->y + ( pbOffsetLine( 1 ) >> 1 ) + pbOffsetLine( 3 + CDIALOG_GETFILENAME_LIST_LINES ),
 			base->color->fg,
-			GB_TRANSPARENT,
+			PB_TRANSPARENT,
 			'\x82'
 		);
 	}
@@ -429,11 +430,11 @@ static void cdialog_getfilename_draw( struct cdialog_dev_base_params *base, Cdia
 			buflen = strutilCopy( buf, file->name, sizeof( buf ) ) - 1;
 			if( buflen > CDIALOG_GETFILENAME_WIDTH ) cdialog_getfilename_str_shrink_with_extender( buf, CDIALOG_GETFILENAME_WIDTH );
 			
-			gbPrintf(
-				base->x + ( gbOffsetChar( 1 ) >> 1 ) + gbOffsetChar( 1 ),
-				base->y + ( gbOffsetLine( 1 ) >> 1 ) + gbOffsetLine( 4 + line_offset ),
+			pbPrintf(
+				base->x + ( pbOffsetChar( 1 ) >> 1 ) + pbOffsetChar( 1 ),
+				base->y + ( pbOffsetLine( 1 ) >> 1 ) + pbOffsetLine( 4 + line_offset ),
 				work->selectPos == line ? base->color->fcfg : file->type == DIRH_DIR ? base->color->extra : base->color->fg,
-				GB_TRANSPARENT,
+				PB_TRANSPARENT,
 				file->type == DIRH_DIR ? "%s/" : "%s",
 				buf
 			);

@@ -6,7 +6,13 @@
 
 =========================================================*/
 #include "mfmenu.h"
+#include <pspge.h>
 #include <pspimpose_driver.h>
+#include <pspsdk.h>
+#include <pspsuspend.h>
+#include <stdarg.h>
+#include "psp/memory.h"
+#include "psp/heap.h"
 
 /*=========================================================
 	ローカル定数
@@ -41,15 +47,16 @@
 	ローカル型宣言
 =========================================================*/
 struct mf_frame_buffers {
-	void *vrambase;
-	void *origaddr;
+	void         *origaddr;
+	unsigned int frameSize;
+	int  bufferWidth;
+	int  pixelFormat;
 	
+	void *vrambase;
 	void *vram;
 	void *display;
 	void *draw;
 	void *clear;
-	
-	unsigned int frameSize;
 	bool volatileMem;
 };
 
@@ -107,7 +114,6 @@ struct mf_menu_params {
 struct mf_menu_restore_params {
 	bool hookEnabled;
 	int  muteEnabled;
-	int  backlightOffInterval;
 };
 
 enum mf_menu_stack_ctrl {
@@ -169,8 +175,22 @@ static PadutilButtonName *st_symbols;
 #ifdef DEBUG_ENABLED
 static void mf_debug( void )
 {
-	gbPrintf( gbOffsetChar( 5 ), gbOffsetLine( 2 ), 0xff00ffff, MF_COLOR_TEXT_BG,
-		"T:%d M:%d ( KH:%d U:%d KL:%d V:%d )",
+	static int fps = 0;
+	static int st_fps = 0;
+	static uint64_t st_fps_tick_now = 0;
+	static uint64_t st_fps_tick_last = 0;
+	
+	st_fps++;
+	sceRtcGetCurrentTick( &st_fps_tick_now );
+	if( (st_fps_tick_now - st_fps_tick_last) >= 1000000 ){
+		st_fps_tick_last = st_fps_tick_now;
+		fps = st_fps;
+		st_fps = 0;
+	}
+		
+	pbPrintf( pbOffsetChar( 5 ), pbOffsetLine( 2 ), 0xff00ffff, MF_COLOR_TEXT_BG,
+		"FPS:%d T:%d M:%d (KH:%d U:%d KL:%d V:%d)",
+		fps,
 		sceKernelTotalFreeMemSize(),
 		sceKernelMaxFreeMemSize(),
 		sceKernelPartitionTotalFreeMemSize( 1 ),
@@ -178,7 +198,7 @@ static void mf_debug( void )
 		sceKernelPartitionTotalFreeMemSize( 4 ),
 		sceKernelPartitionTotalFreeMemSize( 5 )
 	);
-	gbPrintf( gbOffsetChar( 1 ), gbOffsetLine( 0 ), 0xff0000ff, MF_COLOR_TEXT_BG, "Development build - %s", __DATE__ );
+	pbPrintf( pbOffsetChar( 1 ), pbOffsetLine( 0 ), 0xff0000ff, MF_COLOR_TEXT_BG, "Development build - %s", __DATE__ );
 }
 #endif
 
@@ -780,11 +800,11 @@ static bool mf_menu_select_table_horizontal( MfMenuTable *menu, unsigned short t
 		pos->currentCol = pos->currentCol ? 0 : menu[targ_tid].cols - 1;
 	} else{
 		unsigned short i, targ_row = 0, targ_col = 0;
-		unsigned int current_y = menu[pos->currentTable].y + gbOffsetLine( pos->currentRow );
+		unsigned int current_y = menu[pos->currentTable].y + pbOffsetLine( pos->currentRow );
 		unsigned int diff_y, last_diff_y = ~0;
 		
 		for( i = 0; i < menu[targ_tid].rows; i++ ){
-			diff_y = abs( current_y - ( menu[targ_tid].y + gbOffsetLine( i ) ) );
+			diff_y = abs( current_y - ( menu[targ_tid].y + pbOffsetLine( i ) ) );
 			if( last_diff_y == ~0 || last_diff_y > diff_y ){
 				last_diff_y = diff_y;
 				targ_row = i;
@@ -894,17 +914,17 @@ static void mf_menu_draw_tables( MfMenuTable *menu, unsigned short menucnt, stru
 	
 	for( i = 0; i < menucnt; i++ ){
 		if( menu[i].label ){
-			col_offset = gbOffsetChar( 2 );
-			row_offset = gbOffsetLine( 1 ) + 2;
-			gbPrint( menu[i].x, menu[i].y,  MF_COLOR_TEXT_LABEL, MF_COLOR_TEXT_BG, menu[i].label );
-			gbLineRel( menu[i].x, menu[i].y + gbOffsetLine( 1 ), gbOffsetChar( 40 ), 0, MF_COLOR_TEXT_LABEL );
+			col_offset = pbOffsetChar( 2 );
+			row_offset = pbOffsetLine( 1 ) + 2;
+			pbPrint( menu[i].x, menu[i].y,  MF_COLOR_TEXT_LABEL, MF_COLOR_TEXT_BG, menu[i].label );
+			pbLineRel( menu[i].x, menu[i].y + pbOffsetLine( 1 ), pbOffsetChar( 40 ), 0, MF_COLOR_TEXT_LABEL );
 		} else{
 			col_offset = 0;
 			row_offset = 0;
 		}
 		for( col = 0; col < menu[i].cols; col++ ){
 			col_width = ( menu[i].colsWidth && ( menu[i].colsWidth[col] == 0 ) ) ? &(menu[i].colsWidth[col]) : NULL;
-			if( menu[i].colsWidth && col ) col_offset += gbOffsetChar( menu[i].colsWidth[col - 1] + 1 );
+			if( menu[i].colsWidth && col ) col_offset += pbOffsetChar( menu[i].colsWidth[col - 1] + 1 );
 			for( row = 0; row < menu[i].rows; row++ ){
 				labelbuf[0] = '\0';
 				if( menu[i].entry[row][col].ctrl ){
@@ -919,9 +939,9 @@ static void mf_menu_draw_tables( MfMenuTable *menu, unsigned short menucnt, stru
 				if( labelbuf[0] == '\0' ) strutilCopy( labelbuf, menu[i].entry[row][col].label, sizeof( labelbuf ) );
 				
 				if( labelbuf[0] != '\0' ){
-					gbPrint(
+					pbPrint(
 						menu[i].x + col_offset,
-						menu[i].y + row_offset + gbOffsetLine( row ),
+						menu[i].y + row_offset + pbOffsetLine( row ),
 						(
 							i == pos->currentTable && row == pos->currentRow && col == pos->currentCol ? MF_COLOR_TEXT_FC :
 							menu[i].entry[row][col].active ? MF_COLOR_TEXT_FG :
@@ -976,18 +996,18 @@ static void mf_root_menu( MfMenuMessage message )
 				
 				hotkey_pref->availButtons = MF_HOTKEY_BUTTONS;
 				
-				mfMenuSetTablePosition( menu, 1, gbOffsetChar( 5 ), gbOffsetLine( 4 ) + 2 );
-				mfMenuSetTableEntry( menu, 1, 1, 1, "MacroFire Engine", mf_menu_ctrl_engine_stat, &(main_pref->engine), NULL );
+				mfMenuSetTablePosition( menu, 1, pbOffsetChar( 5 ), pbOffsetLine( 4 ) + 2 );
+				mfMenuSetTableEntry( menu, 1, 1, 1, MF_STR_HOME_MACROFIRE_ENGINE, mf_menu_ctrl_engine_stat, &(main_pref->engine), NULL );
 				
-				mfMenuSetTablePosition( menu, 2, gbOffsetChar( 5 ), gbOffsetLine( 6 ) + 2 );
-				mfMenuSetTableLabel( menu, 2, "MacroFire preference" );
-				mfMenuSetTableEntry( menu, 2, 1, 1, "Buttons to launch the menu", mfCtrlDefGetButtons, &(main_pref->menu), hotkey_pref );
-				mfMenuSetTableEntry( menu, 2, 2, 1, "Buttons to toggle the engine state", mfCtrlDefGetButtons, &(main_pref->toggle), hotkey_pref );
-				mfMenuSetTableEntry( menu, 2, 3, 1, "Engine status notification", mfCtrlDefBool, &(main_pref->statusNotification), NULL );
-				mfMenuSetTableEntry( menu, 2, 4, 1, "Analog stick sensitivity adjustment", mfCtrlDefCallback, mfAnalogStickProc( MF_MS_MENU ), NULL );
+				mfMenuSetTablePosition( menu, 2, pbOffsetChar( 5 ), pbOffsetLine( 6 ) + 2 );
+				mfMenuSetTableLabel( menu, 2, MF_STR_HOME_MACROFIRE_PREFERENCE );
+				mfMenuSetTableEntry( menu, 2, 1, 1, MF_STR_HOME_SET_MENU_BUTTON, mfCtrlDefGetButtons, &(main_pref->menu), hotkey_pref );
+				mfMenuSetTableEntry( menu, 2, 2, 1, MF_STR_HOME_SET_TOGGLE_BUTTON, mfCtrlDefGetButtons, &(main_pref->toggle), hotkey_pref );
+				mfMenuSetTableEntry( menu, 2, 3, 1, MF_STR_HOME_STAT_NOTIFICATION, mfCtrlDefBool, &(main_pref->statusNotification), NULL );
+				mfMenuSetTableEntry( menu, 2, 4, 1, MF_STR_HOME_ANALOG_STICK_ADJUSTMENT, mfCtrlDefCallback, mfAnalogStickProc( MF_MS_MENU ), NULL );
 				
-				mfMenuSetTablePosition( menu, 3, gbOffsetChar( 5 ), gbOffsetLine( 12 ) + 2 );
-				mfMenuSetTableLabel( menu, 3, "Functions" );
+				mfMenuSetTablePosition( menu, 3, pbOffsetChar( 5 ), pbOffsetLine( 12 ) + 2 );
+				mfMenuSetTableLabel( menu, 3, MF_STR_HOME_FUNCTION );
 				for( row = 0; row < gMftabEntryCount; row++ ){
 					if( gMftab[row].proc && ( menuproc = ( gMftab[row].proc )( MF_MS_MENU ) ) ){
 						mfMenuSetTableEntry( menu, 3, row + 1, 1, gMftab[row].name, mfCtrlDefCallback, menuproc, NULL );
@@ -1023,8 +1043,7 @@ void mfMenuMain( SceCtrlData *pad, MfHprmKey *hk )
 {
 	struct mf_menu_restore_params restore_params = {
 		mfIsEnabled(),
-		sceImposeGetParam( PSP_IMPOSE_MUTE ),
-		sceImposeGetBacklightOffTime()
+		sceImposeGetParam( PSP_IMPOSE_MUTE )
 	};
 	
 	dbgprintf( "Memory block %d leaked", memoryGetAllocCount() );
@@ -1040,9 +1059,8 @@ void mfMenuMain( SceCtrlData *pad, MfHprmKey *hk )
 	memset( st_params, 0, sizeof( struct mf_menu_params ) );
 	st_params->screenUpdate = true;
 	
-	/* サウンドをミュートにして、自動バックライトオフを無効にする */
+	/* サウンドをミュートにする */
 	if( ! restore_params.muteEnabled ) sceImposeSetParam( PSP_IMPOSE_MUTE, 1 );
-	sceImposeSetBacklightOffTime( 0 );
 	
 	/* サスペンド/リジュームするスレッドの一覧を作成し、サスペンドする */
 	if( ! mf_menu_get_target_threads( st_params->threads.list, &(st_params->threads.count) ) ) goto DESTROY;
@@ -1061,36 +1079,40 @@ void mfMenuMain( SceCtrlData *pad, MfHprmKey *hk )
 	st_symbols = padutilCreateButtonSymbols();
 	if( ! st_symbols ) goto DESTROY;
 	
-	/* gbライブラリ初期化 */
-	dbgprint( "Initializing gb..." );
-	if( gbBind() < 0 ) goto DESTROY;
-	gbSetOpt( GB_AUTOFLUSH | GB_ALPHABLEND | GB_AUTO_LINEBREAK );
-	gbUse8BitFont( GB_FONT_PSPSYM );
-	gbPrepare();
-	
-	/* フレームバッファとして使用するメモリを確保 */
-	dbgprint( "Allocating memory for frame buffers..." );
-	if( ! mf_alloc_buffers( &(st_params->frameBuffer), st_pref.useGraphicsMem, st_pref.useVolatileMem ) ) goto DESTROY;
-	
-	/* クリア用背景作成 */
-	if( st_params->frameBuffer.clear ){
-		/* 描画準備 */
-		gbSetDisplayBuf( st_params->frameBuffer.clear );
-		gbSetDrawBuf( NULL );
-		gbPrepare();
+	/* pbライブラリ初期化 */
+	dbgprint( "Initializing pb..." );
+	{
+		if( sceDisplayGetFrameBuf( &(st_params->frameBuffer.origaddr), &(st_params->frameBuffer.bufferWidth), &(st_params->frameBuffer.pixelFormat), PSP_DISPLAY_SETBUF_IMMEDIATE ) != 0 || ! st_params->frameBuffer.origaddr || ! st_params->frameBuffer.bufferWidth ) goto DESTROY;
 		
-		/* 現在表示されている画面をクリア用背景にコピー */
-		sceDisplayWaitVblankStart();
-		sceDmacMemcpy( st_params->frameBuffer.clear, st_params->frameBuffer.origaddr, gbGetDataFrameSize() );
+		pbInit();
+		pbEnable( PB_NO_CACHE | PB_BLEND );
 		
-		gbFillRect( 0, 0, SCR_WIDTH, SCR_HEIGHT, MF_COLOR_BG );
-		mf_draw_frame();
+		/* フレームバッファとして使用するメモリを確保 */
+		dbgprint( "Allocating memory for frame buffers..." );
+		st_params->frameBuffer.frameSize = pbGetFrameBufferDataSize( st_params->frameBuffer.pixelFormat, st_params->frameBuffer.bufferWidth );
+		if( ! mf_alloc_buffers( &(st_params->frameBuffer), st_pref.useGraphicsMem, st_pref.useVolatileMem ) ) goto DESTROY;
+		
+		/* クリア用背景作成 */
+		if( st_params->frameBuffer.clear ){
+			/* 描画準備 */
+			pbSetDisplayBuffer( st_params->frameBuffer.pixelFormat, st_params->frameBuffer.clear, st_params->frameBuffer.bufferWidth );
+			pbSetDrawBuffer( PB_UNDEF_FRAMEBUF );
+			pbApply();
+			
+			/* 現在表示されている画面をクリア用背景にコピー */
+			sceDisplayWaitVblankStart();
+			sceDmacMemcpy( st_params->frameBuffer.clear, st_params->frameBuffer.origaddr, st_params->frameBuffer.frameSize );
+			
+			pbFillRect( 0, 0, SCR_WIDTH, SCR_HEIGHT, MF_COLOR_BG );
+			mf_draw_frame();
+		}
+		pbSetDisplayBuffer( st_params->frameBuffer.pixelFormat, st_params->frameBuffer.display, st_params->frameBuffer.bufferWidth );
+		pbSetDrawBuffer( st_params->frameBuffer.pixelFormat, st_params->frameBuffer.draw, st_params->frameBuffer.bufferWidth );
+		
+		/* 設定したフレームバッファで描画準備 */
+		pbApply();
+		pbSync( PB_BUFSYNC_IMMEDIATE );
 	}
-	gbSetDisplayBuf( st_params->frameBuffer.display );
-	gbSetDrawBuf( st_params->frameBuffer.draw );
-	
-	/* 設定したフレームバッファで描画準備 */
-	gbPrepare();
 	
 	/* ダイアログ初期化 */
 	mfDialogInit( st_pref.remap );
@@ -1123,18 +1145,18 @@ void mfMenuMain( SceCtrlData *pad, MfHprmKey *hk )
 	while( gRunning ){
 		/* 背景を描画 */
 		if( st_params->frameBuffer.clear ){
-			sceDmacMemcpy( gbGetCurrentDrawBuf(), st_params->frameBuffer.clear, st_params->frameBuffer.frameSize );
+			sceDmacMemcpy( pbGetCurrentDrawBufferAddr(), st_params->frameBuffer.clear, st_params->frameBuffer.frameSize );
 		} else if( st_params->frameBuffer.draw ){
-			memset( gbGetCurrentDrawBuf(), 0, st_params->frameBuffer.frameSize );
+			memset( pbGetCurrentDrawBufferAddr(), 0, st_params->frameBuffer.frameSize );
 			mf_draw_frame();
 		} else{
 			if( ( st_params->ctrl.pad->Buttons & MF_HOTKEY_BUTTONS ) || st_params->screenUpdate ){
-				gbWakeup();
+				//pbWakeup();
 				st_params->screenUpdate = false;
-				memset( gbGetCurrentDrawBuf(), 0, st_params->frameBuffer.frameSize );
+				memset( pbGetCurrentDrawBufferAddr(), 0, st_params->frameBuffer.frameSize );
 				mf_draw_frame();
 			} else{
-				gbSleep();
+				//pbSleep();
 			}
 		}
 		
@@ -1159,9 +1181,9 @@ void mfMenuMain( SceCtrlData *pad, MfHprmKey *hk )
 		
 		/* 情報バーを描画 */
 		
-		gbPrint(
-			gbOffsetChar( 3 ),
-			gbOffsetLine( 32 ) - ( st_params->info.options & MF_MENU_INFOTEXT_SET_MIDDLE_LINE ? 0 : ( GB_CHAR_HEIGHT >> 1 ) ),
+		pbPrint(
+			pbOffsetChar( 3 ),
+			pbOffsetLine( 32 ) - ( st_params->info.options & MF_MENU_INFOTEXT_SET_MIDDLE_LINE ? 0 : ( pbOffsetLine( 1 ) >> 1 ) ),
 			st_params->info.options & MF_MENU_INFOTEXT_ERROR ? MF_COLOR_TEXT_FC : MF_COLOR_TEXT_FG,
 			MF_COLOR_TEXT_BG,
 			st_params->info.text
@@ -1180,7 +1202,7 @@ void mfMenuMain( SceCtrlData *pad, MfHprmKey *hk )
 		
 		/* 表示バッファと描画バッファを切り替える */
 		sceDisplayWaitVblankStart();
-		gbSwapBuffers();
+		pbSwapBuffers( PB_BUFSYNC_IMMEDIATE );
 		
 		/* 指定時間待つ */
 		if( st_params->waitMicroSecForUpdate ){
@@ -1191,9 +1213,9 @@ void mfMenuMain( SceCtrlData *pad, MfHprmKey *hk )
 		}
 	}
 	
-	gbPrint( gbOffsetChar( 30 ), gbOffsetLine( 17 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, "Returning to the game..." );
+	pbPrint( pbOffsetChar( 30 ), pbOffsetLine( 17 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, "Returning to the game..." );
 	sceDisplayWaitVblankStart();
-	gbSwapBuffers();
+	pbSwapBuffers( PB_BUFSYNC_IMMEDIATE );
 	sceKernelDelayThread( 300000 );
 	
 	/* メニュースタックに詰まれているメニュー全てにMF_MM_TERMを送る */
@@ -1217,9 +1239,8 @@ void mfMenuMain( SceCtrlData *pad, MfHprmKey *hk )
 		
 		mf_free_buffers( &(st_params->frameBuffer) );
 		
-		/* サウンドと自動バックライトオフを戻す */
+		/* サウンドを戻す */
 		if( ! restore_params.muteEnabled ) sceImposeSetParam( PSP_IMPOSE_MUTE, 0 );
-		sceImposeSetBacklightOffTime( restore_params.backlightOffInterval );
 		
 		/* メニュー起動前にAPIをフックしていた場合は、フックしなおす */
 		if( restore_params.hookEnabled ) mfHook();
@@ -1231,6 +1252,11 @@ void mfMenuMain( SceCtrlData *pad, MfHprmKey *hk )
 		/* スレッドリスト用のメモリを解放 */
 		dbgprint( "Free memory for menu" );
 		memoryFree( st_params );
+		
+		/* ディスプレイを点灯させる */
+		sceDisplayWaitVblankStart();
+		sceDisplayWaitVblankStart();
+		sceDisplayEnable();
 		
 		dbgprintf( "Memory block remain count %d", memoryGetAllocCount() );
 }
@@ -1246,14 +1272,14 @@ void mfMenuSetInfoText( unsigned int options, char *format, ... )
 	
 	if( ( options & MF_MENU_INFOTEXT_COMMON_CTRL ) ){
 		if( options & MF_MENU_INFOTEXT_MULTICOLUMN_CTRL ){
-			strtop += snprintf( strtop, MF_MENU_INFOTEXT_LENGTH, "(\x80\x81\x82\x83)Move, " );
+			strtop += snprintf( strtop, MF_MENU_INFOTEXT_LENGTH, "(%s%s%s%s)%s, ", PB_SYM_PSP_UP, PB_SYM_PSP_RIGHT, PB_SYM_PSP_DOWN, PB_SYM_PSP_LEFT, MF_STR_CTRL_MOVE );
 		} else if( options & MF_MENU_INFOTEXT_MOVABLEPAGE_CTRL ){
-			strtop += snprintf( strtop, MF_MENU_INFOTEXT_LENGTH, "(\x80\x82)Move, (\x83\x81)PageMove, " );
+			strtop += snprintf( strtop, MF_MENU_INFOTEXT_LENGTH, "(%s%s)%s, (%s%s)%s, ", PB_SYM_PSP_UP, PB_SYM_PSP_DOWN, PB_SYM_PSP_LEFT, PB_SYM_PSP_RIGHT, MF_STR_CTRL_MOVE, MF_STR_CTRL_PAGEMOVE );
 		} else{
-			strtop += snprintf( strtop, MF_MENU_INFOTEXT_LENGTH, "(\x80\x82)Move, " );
+			strtop += snprintf( strtop, MF_MENU_INFOTEXT_LENGTH, "(%s%s)%s, ", PB_SYM_PSP_UP, PB_SYM_PSP_DOWN, MF_STR_CTRL_MOVE );
 		}
 		
-		strtop += snprintf( strtop, MF_MENU_INFOTEXT_LENGTH, "(\x86)Back, (START/HOME)Exit" );
+		strtop += snprintf( strtop, MF_MENU_INFOTEXT_LENGTH, "(%s)%s, (START/HOME)%s", PB_SYM_PSP_CROSS, MF_STR_CTRL_BACK, MF_STR_CTRL_EXIT );
 	}
 	
 	if( options & MF_MENU_INFOTEXT_SET_LOWER_LINE ){
@@ -1380,7 +1406,7 @@ static void mf_menu_indicator( void )
 	
 	if( lst_working_indicator[lst_working_indicator_index] == '\0' ) lst_working_indicator_index = 0;
 	
-	gbPutChar( gbOffsetChar( 1 ), gbOffsetLine( 1 ), MF_COLOR_TITLE, GB_TRANSPARENT, lst_working_indicator[lst_working_indicator_index++] );
+	pbPutChar( pbOffsetChar( 1 ), pbOffsetLine( 1 ), MF_COLOR_TITLE, MF_COLOR_TRANSPARENT, lst_working_indicator[lst_working_indicator_index++] );
 }
 
 static bool mf_menu_stack( struct mf_menu_stack *stack, enum mf_menu_stack_ctrl ctrl, void *menu )
@@ -1471,11 +1497,7 @@ static bool mf_alloc_buffers( struct mf_frame_buffers *fb, bool graphics_mem, bo
 {
 	int vram_size = sceGeEdramGetSize();
 	
-	memset( fb, 0, sizeof( struct mf_frame_buffers ) );
-	
-	fb->vrambase  = (void *)( (unsigned int)sceGeEdramGetAddr() | GB_NOCACHE );
-	fb->origaddr  = gbGetCurrentDisplayBuf();
-	fb->frameSize = gbGetDataFrameSize();
+	fb->vrambase  = (void *)( (unsigned int)sceGeEdramGetAddr() | PB_DISABLE_CACHE );
 	
 	dbgprintf( "Detect current display buffer addr: %p", fb->origaddr );
 	
@@ -1529,7 +1551,7 @@ static void mf_free_buffers( struct mf_frame_buffers *fb )
 	}
 	
 	dbgprintf( "Reset frame buffer addr: %p", fb->origaddr );
-	sceDisplaySetFrameBuf( fb->origaddr, gbGetBufferWidth(), gbGetPixelFormat(), PSP_DISPLAY_SETBUF_IMMEDIATE );
+	sceDisplaySetFrameBuf( fb->origaddr, fb->bufferWidth, fb->pixelFormat, PSP_DISPLAY_SETBUF_IMMEDIATE );
 	
 	dbgprint( "Free memory for frame buffers" );
 	if( fb->volatileMem ){
@@ -1547,23 +1569,23 @@ static void mf_draw_frame( void )
 	const char *targid = mfGetIniTargetSection();
 	const char *loadid = mfGetIniSection();
 	
-	gbFillRect( 0, 0, SCR_WIDTH, gbOffsetLine( 3 ), MF_COLOR_TITLE_BAR );
-	gbFillRect( 0, SCR_HEIGHT - gbOffsetLine( 3 ), SCR_WIDTH, SCR_HEIGHT, MF_COLOR_INFO_BAR );
-	gbPrintf( gbOffsetChar( 3 ), gbOffsetLine( 1 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, MF_TITLE, MF_VERSION );
-	gbPrint( gbOffsetChar( 47 ), SCR_HEIGHT - gbOffsetLine( 1 ), ( MF_COLOR_TEXT_FG & 0x00ffffff ) | 0x33000000, MF_COLOR_TEXT_BG, MF_AUTHOR );
+	pbFillRect( 0, 0, SCR_WIDTH, pbOffsetLine( 3 ), MF_COLOR_TITLE_BAR );
+	pbFillRect( 0, SCR_HEIGHT - pbOffsetLine( 3 ), SCR_WIDTH, SCR_HEIGHT, MF_COLOR_INFO_BAR );
+	pbPrintf( pbOffsetChar( 3 ), pbOffsetLine( 1 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, MF_TITLE, MF_VERSION );
+	pbPrint( pbOffsetChar( 47 ), SCR_HEIGHT - pbOffsetLine( 1 ), ( MF_COLOR_TEXT_FG & 0x00ffffff ) | 0x33000000, MF_COLOR_TEXT_BG, MF_AUTHOR );
 	
-	gbPrintf( gbOffsetChar( 32 ), gbOffsetLine( 1 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, "[ID: %s", targid );
+	pbPrintf( pbOffsetChar( 32 ), pbOffsetLine( 1 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, "[ID: %s", targid );
 	if( targid == loadid ){
-		gbPrint( gbOffsetChar( 32 + 5 + strlen( targid ) ), gbOffsetLine( 1 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, "]" );
+		pbPrint( pbOffsetChar( 32 + 5 + strlen( targid ) ), pbOffsetLine( 1 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, "]" );
 	} else{
-		gbPrintf( gbOffsetChar( 32 + 5 + strlen( targid ) ), gbOffsetLine( 1 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, " / Loaded: %s]", loadid );
+		pbPrintf( pbOffsetChar( 32 + 5 + strlen( targid ) ), pbOffsetLine( 1 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, " / Loaded: %s]", loadid );
 	}
 	
 	if( mfHookIncomplete() ){
-		gbPrint( gbOffsetChar( 44 ), gbOffsetLine( 2 ) + ( gbOffsetLine( 1 ) >> 1 ), MF_COLOR_EX4, MF_COLOR_TEXT_BG, "MacroFire is not working perfectly." );
+		pbPrint( pbOffsetChar( 44 ), pbOffsetLine( 2 ) + ( pbOffsetLine( 1 ) >> 1 ), MF_COLOR_EX4, MF_COLOR_TEXT_BG, "MacroFire is not working perfectly." );
 	}
 	
 #ifdef MF_WITH_EXCEPTION_HANDLER
-		gbPrint( 0, 0, MF_COLOR_EX4, MF_COLOR_TEXT_BG, "<for DEBUG>" );
+		pbPrint( 0, 0, MF_COLOR_EX4, MF_COLOR_TEXT_BG, "<for DEBUG>" );
 #endif
 }

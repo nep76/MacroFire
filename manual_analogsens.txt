@@ -1,4 +1,4 @@
-MacroFire 3.0.5
+MacroFire 3.0.6
 
 
 Analog stick sensitivity adjustment
@@ -16,7 +16,7 @@ Analog stick sensitivity adjustment
     入力値を捨てる原点からの半径を指定します。
     この円の内側にアナログスティックが存在する場合は、常に原点に修正します。
 
-  Sesitivity
+  Sensitivity
     感度を設定します。
     実際の移動距離よりもここで設定した割合だけ乗算します。
 

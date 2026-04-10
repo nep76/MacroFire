@@ -6,6 +6,7 @@
 
 =========================================================*/
 #include "padutil.h"
+#include "psp/pb.h"
 
 /*=========================================================
 	ローカルマクロ
@@ -42,22 +43,22 @@ PadutilButtonName *padutilCreateButtonSymbols( void )
 	st_symbols[1].name   = "START";
 	
 	st_symbols[2].button = padutilSetPad( PSP_CTRL_UP );
-	st_symbols[2].name   = "\x80";
+	st_symbols[2].name   = PB_SYM_PSP_UP;
 	st_symbols[3].button = padutilSetPad( PSP_CTRL_RIGHT );
-	st_symbols[3].name   = "\x81";
+	st_symbols[3].name   = PB_SYM_PSP_RIGHT;
 	st_symbols[4].button = padutilSetPad( PSP_CTRL_DOWN );
-	st_symbols[4].name   = "\x82";
+	st_symbols[4].name   = PB_SYM_PSP_DOWN;
 	st_symbols[5].button = padutilSetPad( PSP_CTRL_LEFT );
-	st_symbols[5].name   = "\x83";
+	st_symbols[5].name   = PB_SYM_PSP_LEFT;
 	
 	st_symbols[6].button = padutilSetPad( PADUTIL_CTRL_ANALOG_UP );
-	st_symbols[6].name   = "A\x80";
+	st_symbols[6].name   = "A"PB_SYM_PSP_UP;
 	st_symbols[7].button = padutilSetPad( PADUTIL_CTRL_ANALOG_RIGHT );
-	st_symbols[7].name   = "A\x81";
+	st_symbols[7].name   = "A"PB_SYM_PSP_RIGHT;
 	st_symbols[8].button = padutilSetPad( PADUTIL_CTRL_ANALOG_DOWN );
-	st_symbols[8].name   = "A\x82";
+	st_symbols[8].name   = "A"PB_SYM_PSP_DOWN;
 	st_symbols[9].button = padutilSetPad( PADUTIL_CTRL_ANALOG_LEFT );
-	st_symbols[9].name   = "A\x83";
+	st_symbols[9].name   = "A"PB_SYM_PSP_LEFT;
 	
 	st_symbols[10].button = padutilSetPad( PSP_CTRL_LTRIGGER );
 	st_symbols[10].name   = "L";
@@ -65,20 +66,20 @@ PadutilButtonName *padutilCreateButtonSymbols( void )
 	st_symbols[11].name   = "R";
 	
 	st_symbols[12].button = padutilSetPad( PSP_CTRL_TRIANGLE );
-	st_symbols[12].name   = "\x84";
+	st_symbols[12].name   = PB_SYM_PSP_TRIANGLE;
 	st_symbols[13].button = padutilSetPad( PSP_CTRL_CIRCLE );
-	st_symbols[13].name   = "\x85";
+	st_symbols[13].name   = PB_SYM_PSP_CIRCLE;
 	st_symbols[14].button = padutilSetPad( PSP_CTRL_CROSS );
-	st_symbols[14].name   = "\x86";
+	st_symbols[14].name   = PB_SYM_PSP_CROSS;
 	st_symbols[15].button = padutilSetPad( PSP_CTRL_SQUARE );
-	st_symbols[15].name   = "\x87";
+	st_symbols[15].name   = PB_SYM_PSP_SQUARE;
 	
 	st_symbols[16].button = padutilSetPad( PSP_CTRL_HOME );
 	st_symbols[16].name   = "HOME";
 	st_symbols[17].button = padutilSetPad( PSP_CTRL_HOLD );
 	st_symbols[17].name   = "HOLD";
 	st_symbols[18].button = padutilSetPad( PSP_CTRL_NOTE );
-	st_symbols[18].name   = "\x88";
+	st_symbols[18].name   = PB_SYM_PSP_NOTE;
 	st_symbols[19].button = padutilSetPad( PSP_CTRL_SCREEN );
 	st_symbols[19].name   = "SCREEN";
 	
@@ -406,6 +407,7 @@ void padutilAdjustAnalogStick( PadutilAnalogStick *analogstick, SceCtrlData *pad
 	){
 		pad->Lx = PADUTIL_CENTER_X;
 	}
+	
 	if(
 		( analogstick->originY < PADUTIL_CENTER_Y && pad->Ly > analogstick->originY && pad->Ly < PADUTIL_CENTER_Y ) ||
 		( analogstick->originY > PADUTIL_CENTER_Y && pad->Ly < analogstick->originY && pad->Ly > PADUTIL_CENTER_Y )

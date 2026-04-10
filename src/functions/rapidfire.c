@@ -108,7 +108,7 @@ void rapidfireMenu( MfMessage message )
 	
 	if( mfIsRunningApp( MF_APP_WEBBROWSER ) ){
 		if( message == MF_MM_PROC ){
-			gbPrint( gbOffsetChar( 3 ), gbOffsetLine(  4 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, "Cannot use this function on the web-browser." );
+			pbPrint( pbOffsetChar( 3 ), pbOffsetLine(  4 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, MF_STR_LIMIT_WEBBROWSER );
 			mfMenuWait( MF_ERROR_DELAY );
 			mfMenuProc( NULL );
 		}
@@ -158,8 +158,8 @@ void rapidfireMenu( MfMessage message )
 				options[4] = rapidfire_get_mode_name_by_idn( RAPIDFIRE_AUTOHOLD );
 				options[5] = NULL;
 				
-				mfMenuSetTablePosition( menu, 1, gbOffsetChar( 5 ), gbOffsetLine( 6 ) );
-				mfMenuSetTableLabel( menu, 1, "Mode" );
+				mfMenuSetTablePosition( menu, 1, pbOffsetChar( 5 ), pbOffsetLine( 6 ) );
+				mfMenuSetTableLabel( menu, 1, MF_STR_RAPIDFIRE_MODE_LABEL );
 				mfMenuSetColumnWidth( menu, 1, 1, 20 );
 				
 				/* MacroFireコアから設定値を読み出す */
@@ -173,31 +173,31 @@ void rapidfireMenu( MfMessage message )
 					}
 					
 					switch( st_mode[i].button ){
-						case PSP_CTRL_TRIANGLE: mfMenuSetTableEntry( menu, 1, 1, 1, "Triangle", mfCtrlDefOptions, &(st_mode[i].mode), options ); break;
-						case PSP_CTRL_CIRCLE:   mfMenuSetTableEntry( menu, 1, 2, 1, "Circle  ", mfCtrlDefOptions, &(st_mode[i].mode), options ); break;
-						case PSP_CTRL_CROSS:    mfMenuSetTableEntry( menu, 1, 3, 1, "Cross   ", mfCtrlDefOptions, &(st_mode[i].mode), options ); break;
-						case PSP_CTRL_SQUARE:   mfMenuSetTableEntry( menu, 1, 4, 1, "Square  ", mfCtrlDefOptions, &(st_mode[i].mode), options ); break;
-						case PSP_CTRL_LTRIGGER: mfMenuSetTableEntry( menu, 1, 6, 1, "L-trig  ", mfCtrlDefOptions, &(st_mode[i].mode), options ); break;
-						case PSP_CTRL_RTRIGGER: mfMenuSetTableEntry( menu, 1, 7, 1, "R-trig  ", mfCtrlDefOptions, &(st_mode[i].mode), options ); break;
-						case PSP_CTRL_UP:       mfMenuSetTableEntry( menu, 1, 1, 2, "Up    ", mfCtrlDefOptions, &(st_mode[i].mode), options ); break;
-						case PSP_CTRL_RIGHT:    mfMenuSetTableEntry( menu, 1, 2, 2, "Right ", mfCtrlDefOptions, &(st_mode[i].mode), options ); break;
-						case PSP_CTRL_DOWN:     mfMenuSetTableEntry( menu, 1, 3, 2, "Down  ", mfCtrlDefOptions, &(st_mode[i].mode), options ); break;
-						case PSP_CTRL_LEFT:     mfMenuSetTableEntry( menu, 1, 4, 2, "Left  ", mfCtrlDefOptions, &(st_mode[i].mode), options ); break;
-						case PSP_CTRL_START:    mfMenuSetTableEntry( menu, 1, 6, 2, "Start ", mfCtrlDefOptions, &(st_mode[i].mode), options ); break;
-						case PSP_CTRL_SELECT:   mfMenuSetTableEntry( menu, 1, 7, 2, "Select", mfCtrlDefOptions, &(st_mode[i].mode), options ); break;
+						case PSP_CTRL_TRIANGLE: mfMenuSetTableEntry( menu, 1, 1, 1, MF_STR_RAPIDFIRE_BUTTON_TRIANGLE, mfCtrlDefOptions, &(st_mode[i].mode), options ); break;
+						case PSP_CTRL_CIRCLE:   mfMenuSetTableEntry( menu, 1, 2, 1, MF_STR_RAPIDFIRE_BUTTON_CIRCLE,   mfCtrlDefOptions, &(st_mode[i].mode), options ); break;
+						case PSP_CTRL_CROSS:    mfMenuSetTableEntry( menu, 1, 3, 1, MF_STR_RAPIDFIRE_BUTTON_CROSS,    mfCtrlDefOptions, &(st_mode[i].mode), options ); break;
+						case PSP_CTRL_SQUARE:   mfMenuSetTableEntry( menu, 1, 4, 1, MF_STR_RAPIDFIRE_BUTTON_SQUARE,   mfCtrlDefOptions, &(st_mode[i].mode), options ); break;
+						case PSP_CTRL_LTRIGGER: mfMenuSetTableEntry( menu, 1, 6, 1, MF_STR_RAPIDFIRE_BUTTON_LTRIGGER, mfCtrlDefOptions, &(st_mode[i].mode), options ); break;
+						case PSP_CTRL_RTRIGGER: mfMenuSetTableEntry( menu, 1, 7, 1, MF_STR_RAPIDFIRE_BUTTON_RTRIGGER, mfCtrlDefOptions, &(st_mode[i].mode), options ); break;
+						case PSP_CTRL_UP:       mfMenuSetTableEntry( menu, 1, 1, 2, MF_STR_RAPIDFIRE_BUTTON_UP,       mfCtrlDefOptions, &(st_mode[i].mode), options ); break;
+						case PSP_CTRL_RIGHT:    mfMenuSetTableEntry( menu, 1, 2, 2, MF_STR_RAPIDFIRE_BUTTON_RIGHT,    mfCtrlDefOptions, &(st_mode[i].mode), options ); break;
+						case PSP_CTRL_DOWN:     mfMenuSetTableEntry( menu, 1, 3, 2, MF_STR_RAPIDFIRE_BUTTON_DOWN,     mfCtrlDefOptions, &(st_mode[i].mode), options ); break;
+						case PSP_CTRL_LEFT:     mfMenuSetTableEntry( menu, 1, 4, 2, MF_STR_RAPIDFIRE_BUTTON_LEFT,     mfCtrlDefOptions, &(st_mode[i].mode), options ); break;
+						case PSP_CTRL_START:    mfMenuSetTableEntry( menu, 1, 6, 2, MF_STR_RAPIDFIRE_BUTTON_START,    mfCtrlDefOptions, &(st_mode[i].mode), options ); break;
+						case PSP_CTRL_SELECT:   mfMenuSetTableEntry( menu, 1, 7, 2, MF_STR_RAPIDFIRE_BUTTON_SELECT,   mfCtrlDefOptions, &(st_mode[i].mode), options ); break;
 						default: continue;
 					}
 				}
 				
-				mfMenuSetTablePosition( menu, 2, gbOffsetChar( 5 ), gbOffsetLine( 15 ) );
-				mfMenuSetTableLabel( menu, 2, "Wait Control" );
-				mfMenuSetTableEntry( menu, 2, 1, 1, "Press delay  ", mfCtrlDefGetNumber, &(st_delay.pressDelay), delaypref );
-				mfMenuSetTableEntry( menu, 2, 2, 1, "Release delay", mfCtrlDefGetNumber, &(st_delay.releaseDelay), delaypref );
+				mfMenuSetTablePosition( menu, 2, pbOffsetChar( 5 ), pbOffsetLine( 15 ) );
+				mfMenuSetTableLabel( menu, 2, MF_STR_RAPIDFIRE_WAITCONTROL_LABEL );
+				mfMenuSetTableEntry( menu, 2, 1, 1, MF_STR_RAPIDFIRE_WAITCONTROL_PRESS_DELAY,   mfCtrlDefGetNumber, &(st_delay.pressDelay), delaypref );
+				mfMenuSetTableEntry( menu, 2, 2, 1, MF_STR_RAPIDFIRE_WAITCONTROL_RELEASE_DELAY, mfCtrlDefGetNumber, &(st_delay.releaseDelay), delaypref );
 				
-				mfMenuSetTablePosition( menu, 3, gbOffsetChar( 5 ), gbOffsetLine( 19 ) );
-				mfMenuSetTableLabel( menu, 3, "File" );
-				mfMenuSetTableEntry( menu, 3, 1, 1, "Load", mfCtrlDefExtra, rapidfire_menu_load, NULL );
-				mfMenuSetTableEntry( menu, 3, 2, 1, "Save", mfCtrlDefExtra, rapidfire_menu_save, NULL );
+				mfMenuSetTablePosition( menu, 3, pbOffsetChar( 5 ), pbOffsetLine( 19 ) );
+				mfMenuSetTableLabel( menu, 3, MF_STR_RAPIDFIRE_FILE_LABEL );
+				mfMenuSetTableEntry( menu, 3, 1, 1, MF_STR_LOAD, mfCtrlDefExtra, rapidfire_menu_load, NULL );
+				mfMenuSetTableEntry( menu, 3, 2, 1, MF_STR_SAVE, mfCtrlDefExtra, rapidfire_menu_save, NULL );
 			}
 			mfMenuInitTables( menu, 3 );
 			break;
@@ -207,12 +207,12 @@ void rapidfireMenu( MfMessage message )
 			mfHeapDestroy( st_heap );
 			return;
 		default:
-			gbPrint( gbOffsetChar( 3 ), gbOffsetLine(  4 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, "Please choose a rapidfire mode per buttons." );
-			gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 25 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, "NORMAL    : Nothing to do." );
-			gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 26 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, "RAPID     : Rapidfire while pressing." );
-			gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 27 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, "AUTO-RAPID: Always rapidfire." );
-			gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 28 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, "HOLD      : Toggle the hold/release state." );
-			gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 29 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, "AUTO-HOLD : Always to hold." );
+			pbPrint( pbOffsetChar( 3 ), pbOffsetLine(  4 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, MF_STR_RAPIDFIRE_DESC );
+			pbPrint( pbOffsetChar( 3 ), pbOffsetLine( 25 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, MF_STR_RAPIDFIRE_MANUAL_NORMAL );
+			pbPrint( pbOffsetChar( 3 ), pbOffsetLine( 26 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, MF_STR_RAPIDFIRE_MANUAL_RAPID );
+			pbPrint( pbOffsetChar( 3 ), pbOffsetLine( 27 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, MF_STR_RAPIDFIRE_MANUAL_AUTORAPID );
+			pbPrint( pbOffsetChar( 3 ), pbOffsetLine( 28 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, MF_STR_RAPIDFIRE_MANUAL_HOLD );
+			pbPrint( pbOffsetChar( 3 ), pbOffsetLine( 29 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, MF_STR_RAPIDFIRE_MANUAL_AUTOHOLD );
 			if( ! mfMenuDrawTables( menu, 3, MF_MENU_NO_OPTIONS ) ) mfMenuProc( NULL );
 	}
 }
@@ -288,7 +288,7 @@ static void rapidfire_menu_save( MfMenuMessage message )
 	if( message == MF_MM_INIT ){
 		path = mfHeapAlloc( st_heap, MF_PATH_MAX );
 		
-		if( ! mfDialogGetfilenameInit( "Save rapidfire preference", "ms0:", "rapidfire.ini", path, 255, CDIALOG_GETFILENAME_SAVE | CDIALOG_GETFILENAME_OVERWRITEPROMPT  ) ){
+		if( ! mfDialogGetfilenameInit( MF_STR_RAPIDFIRE_DIAGGETFN_SAVE, "ms0:", "rapidfire.ini", path, 255, CDIALOG_GETFILENAME_SAVE | CDIALOG_GETFILENAME_OVERWRITEPROMPT  ) ){
 			mfHeapFree( st_heap, path );
 			path = NULL;
 			mfMenuExitExtra();
@@ -299,11 +299,10 @@ static void rapidfire_menu_save( MfMenuMessage message )
 				if( ! mfDialogGetfilenameResult() ){
 					mfHeapFree( st_heap, path );
 					path = NULL;
-				} else{
-					mfMenuSetInfoText( MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "Saving %s...", path );
 				}
 			}
 		} else if( path ){
+			mfMenuSetInfoText( MF_MENU_INFOTEXT_SET_MIDDLE_LINE, MF_STR_SAVING, path );
 			rapidfire_save( path, st_mode, &st_delay );
 			mfHeapFree( st_heap, path );
 			path = NULL;
@@ -320,7 +319,7 @@ static void rapidfire_menu_load( MfMenuMessage message )
 	if( message == MF_MM_INIT ){
 		path = mfHeapAlloc( st_heap, MF_PATH_MAX );
 		
-		if( ! mfDialogGetfilenameInit( "Load rapidfire preference", "ms0:", "", path, 255, CDIALOG_GETFILENAME_OPEN | CDIALOG_GETFILENAME_FILEMUSTEXIST ) ){
+		if( ! mfDialogGetfilenameInit( MF_STR_RAPIDFIRE_DIAGGETFN_LOAD, "ms0:", "", path, 255, CDIALOG_GETFILENAME_OPEN | CDIALOG_GETFILENAME_FILEMUSTEXIST ) ){
 			mfHeapFree( st_heap, path );
 			path = NULL;
 			mfMenuExitExtra();
@@ -331,11 +330,10 @@ static void rapidfire_menu_load( MfMenuMessage message )
 				if( ! mfDialogGetfilenameResult() ){
 					mfHeapFree( st_heap, path );
 					path = NULL;
-				} else{
-					mfMenuSetInfoText( MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "Loading %s...", path );
 				}
 			}
 		} else if( path ){
+			mfMenuSetInfoText( MF_MENU_INFOTEXT_SET_MIDDLE_LINE, MF_STR_LOADING, path );
 			rapidfire_load( path, st_mode, &st_delay );
 			mfHeapFree( st_heap, path );
 			path = NULL;
@@ -365,18 +363,18 @@ static bool rapidfire_save( const char *path, struct rapidfire_mode *mode, struc
 			inimgrDestroy( ini );
 			
 			if( ret != 0 ){
-				mfMenuSetInfoText( MF_MENU_INFOTEXT_ERROR | MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "inimgr Error: %X", ret );
+				mfMenuSetInfoText( MF_MENU_INFOTEXT_ERROR | MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "inimgr %s: %X", MF_STR_ERROR, ret );
 				mfMenuWait( MF_ERROR_DELAY );
 			} else{
 				return true;
 			}
 		} else{
-			mfMenuSetInfoText( MF_MENU_INFOTEXT_ERROR | MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "Failure: Not enough memory." );
+			mfMenuSetInfoText( MF_MENU_INFOTEXT_ERROR | MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "%s: %s.", MF_STR_ERROR, MF_STR_ERROR_NOT_ENOUGH_MEMORY );
 			mfMenuWait( MF_ERROR_DELAY );
 		}
 		inimgrDestroy( ini );
 	} else{
-		mfMenuSetInfoText( MF_MENU_INFOTEXT_ERROR | MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "inimgr Error: Not enough memory." );
+		mfMenuSetInfoText( MF_MENU_INFOTEXT_ERROR | MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "inimgr %s: %s.", MF_STR_ERROR, MF_STR_ERROR_NOT_ENOUGH_MEMORY );
 		mfMenuWait( MF_ERROR_DELAY );
 	}
 	
@@ -392,11 +390,11 @@ static bool rapidfire_load( const char *path, struct rapidfire_mode *mode, struc
 		ret = inimgrLoad( ini, path, RAPIDFIRE_INI_SIGNATURE, RAPIDFIRE_INI_VERSION, 0, 0 );
 		if( ret != 0 ){
 			if( ret == INIMGR_ERROR_INVALID_SIGNATURE ){
-				mfMenuSetInfoText( MF_MENU_INFOTEXT_ERROR | MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "Failure: Not a MacroFire rapidfire file." );
+				mfMenuSetInfoText( MF_MENU_INFOTEXT_ERROR | MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "%s: %s.", MF_STR_ERROR, MF_STR_ERROR_INVALID_CONF );
 			} else if( ret == INIMGR_ERROR_INVALID_VERSION ){
-				mfMenuSetInfoText( MF_MENU_INFOTEXT_ERROR | MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "Failure: Unsupported file version." );
+				mfMenuSetInfoText( MF_MENU_INFOTEXT_ERROR | MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "%s: %s.", MF_STR_ERROR, MF_STR_ERROR_UNSUPPORTED_VERSION );
 			} else {
-				mfMenuSetInfoText( MF_MENU_INFOTEXT_ERROR | MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "inimgr Error: %X", ret );
+				mfMenuSetInfoText( MF_MENU_INFOTEXT_ERROR | MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "inimgr %s: %X", MF_STR_ERROR, ret );
 			}
 			mfMenuWait( MF_ERROR_DELAY );
 		} else if( mfConvertButtonReady() ){
@@ -419,12 +417,12 @@ static bool rapidfire_load( const char *path, struct rapidfire_mode *mode, struc
 			inimgrDestroy( ini );
 			return true;
 		} else{
-			mfMenuSetInfoText( MF_MENU_INFOTEXT_ERROR | MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "Failure: Not enough memory." );
+			mfMenuSetInfoText( MF_MENU_INFOTEXT_ERROR | MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "%s: %s.", MF_STR_ERROR, MF_STR_ERROR_NOT_ENOUGH_MEMORY );
 			mfMenuWait( MF_ERROR_DELAY );
 		}
 		inimgrDestroy( ini );
 	} else{
-		mfMenuSetInfoText( MF_MENU_INFOTEXT_ERROR | MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "inimgr Error: Not enough memory." );
+		mfMenuSetInfoText( MF_MENU_INFOTEXT_ERROR | MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "inimgr %s: %s.", MF_STR_ERROR, MF_STR_ERROR_NOT_ENOUGH_MEMORY );
 		mfMenuWait( MF_ERROR_DELAY );
 	}
 	

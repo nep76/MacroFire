@@ -12,13 +12,6 @@
 #include "macrofire.h"
 #undef MFEXCLUDE_MENU
 
-#include <pspsdk.h>
-//#include <pspsysmem_kernel.h>
-#include <pspsuspend.h>
-#include <stdarg.h>
-#include "psp/memory.h"
-#include "psp/heap.h"
-
 /*=========================================================
 	É}ÉNÉç
 =========================================================*/

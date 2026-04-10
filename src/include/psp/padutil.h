@@ -71,6 +71,76 @@
 	PSP_HPRM_HOLD \
 )
 
+#define PADUTIL_BUTTON_SYMBOLS \
+	{ padutilSetPad( PSP_CTRL_SELECT ),           "SELECT" },\
+	{ padutilSetPad( PSP_CTRL_START ),            "START"  },\
+	{ padutilSetPad( PSP_CTRL_UP ),               "\x80"   },\
+	{ padutilSetPad( PSP_CTRL_RIGHT ),            "\x81"   },\
+	{ padutilSetPad( PSP_CTRL_DOWN ),             "\x82"   },\
+	{ padutilSetPad( PSP_CTRL_LEFT ),             "\x83"   },\
+	{ padutilSetPad( PADUTIL_CTRL_ANALOG_UP ),    "A\x80"  },\
+	{ padutilSetPad( PADUTIL_CTRL_ANALOG_RIGHT ), "A\x81"  },\
+	{ padutilSetPad( PADUTIL_CTRL_ANALOG_DOWN ),  "A\x82"  },\
+	{ padutilSetPad( PADUTIL_CTRL_ANALOG_LEFT ),  "A\x83"  },\
+	{ padutilSetPad( PSP_CTRL_LTRIGGER ),         "L"      },\
+	{ padutilSetPad( PSP_CTRL_RTRIGGER ),         "R"      },\
+	{ padutilSetPad( PSP_CTRL_TRIANGLE ),         "\x84"   },\
+	{ padutilSetPad( PSP_CTRL_CIRCLE ),           "\x85"   },\
+	{ padutilSetPad( PSP_CTRL_CROSS ),            "\x86"   },\
+	{ padutilSetPad( PSP_CTRL_SQUARE ),           "\x87"   },\
+	{ padutilSetPad( PSP_CTRL_HOME ),             "HOME"   },\
+	{ padutilSetPad( PSP_CTRL_HOLD ),             "HOLD"   },\
+	{ padutilSetPad( PSP_CTRL_NOTE ),             "\x88"   },\
+	{ padutilSetPad( PSP_CTRL_SCREEN ),           "SCREEN" },\
+	{ padutilSetPad( PSP_CTRL_VOLUP ),            "VOL+"   },\
+	{ padutilSetPad( PSP_CTRL_VOLDOWN ),          "VOL-"   },\
+	{ padutilSetPad( PSP_CTRL_WLAN_UP ),          "WLAN"   },\
+	{ padutilSetPad( PSP_CTRL_REMOTE ),           "REMOTE" },\
+	{ padutilSetPad( PSP_CTRL_DISC ),             "DISC"   },\
+	{ padutilSetPad( PSP_CTRL_MS ),               "MS"     },\
+	{ padutilSetHprm( PSP_HPRM_PLAYPAUSE ),       "RPLAY"  },\
+	{ padutilSetHprm( PSP_HPRM_FORWARD ),         "RNEXT"  },\
+	{ padutilSetHprm( PSP_HPRM_BACK ),            "RPREV"  },\
+	{ padutilSetHprm( PSP_HPRM_VOL_UP ),          "RVOL+"  },\
+	{ padutilSetHprm( PSP_HPRM_VOL_DOWN ),        "RVOL-"  },\
+	{ padutilSetHprm( PSP_HPRM_HOLD ),            "RHOLD"  },\
+	{ 0, NULL }
+
+#define PADUTIL_BUTTON_NAMES \
+	{ padutilSetPad( PSP_CTRL_SELECT ),           "SELECT"      },\
+	{ padutilSetPad( PSP_CTRL_START ),            "START"       },\
+	{ padutilSetPad( PSP_CTRL_UP ),               "Up"          },\
+	{ padutilSetPad( PSP_CTRL_RIGHT ),            "Right"       },\
+	{ padutilSetPad( PSP_CTRL_DOWN ),             "Down"        },\
+	{ padutilSetPad( PSP_CTRL_LEFT ),             "Left"        },\
+	{ padutilSetPad( PADUTIL_CTRL_ANALOG_UP ),    "AnalogUp"    },\
+	{ padutilSetPad( PADUTIL_CTRL_ANALOG_RIGHT ), "AnalogRight" },\
+	{ padutilSetPad( PADUTIL_CTRL_ANALOG_DOWN ),  "AnalogDown"  },\
+	{ padutilSetPad( PADUTIL_CTRL_ANALOG_LEFT ),  "AnalogLeft"  },\
+	{ padutilSetPad( PSP_CTRL_LTRIGGER ),         "LTrigger"    },\
+	{ padutilSetPad( PSP_CTRL_RTRIGGER ),         "RTrigger"    },\
+	{ padutilSetPad( PSP_CTRL_TRIANGLE ),         "Triangle"    },\
+	{ padutilSetPad( PSP_CTRL_CIRCLE ),           "Circle"      },\
+	{ padutilSetPad( PSP_CTRL_CROSS ),            "Cross"       },\
+	{ padutilSetPad( PSP_CTRL_SQUARE ),           "Square"      },\
+	{ padutilSetPad( PSP_CTRL_HOME ),             "HOME"        },\
+	{ padutilSetPad( PSP_CTRL_HOLD ),             "HOLD"        },\
+	{ padutilSetPad( PSP_CTRL_NOTE ),             "NOTE"        },\
+	{ padutilSetPad( PSP_CTRL_SCREEN ),           "SCREEN"      },\
+	{ padutilSetPad( PSP_CTRL_VOLUP ),            "VolUp"       },\
+	{ padutilSetPad( PSP_CTRL_VOLDOWN ),          "VolDown"     },\
+	{ padutilSetPad( PSP_CTRL_WLAN_UP ),          "WLAN"        },\
+	{ padutilSetPad( PSP_CTRL_REMOTE ),           "REMOTE"      },\
+	{ padutilSetPad( PSP_CTRL_DISC ),             "DISC"        },\
+	{ padutilSetPad( PSP_CTRL_MS ),               "MS"          },\
+	{ padutilSetHprm( PSP_HPRM_PLAYPAUSE ),       "RPlayPause"  },\
+	{ padutilSetHprm( PSP_HPRM_FORWARD ),         "RForward"    },\
+	{ padutilSetHprm( PSP_HPRM_BACK ),            "RBack"       },\
+	{ padutilSetHprm( PSP_HPRM_VOL_UP ),          "RVolUp"      },\
+	{ padutilSetHprm( PSP_HPRM_VOL_DOWN ),        "RVolDown"    },\
+	{ padutilSetHprm( PSP_HPRM_HOLD ),            "RHOLD"       },\
+	{ 0, NULL }
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -80,6 +150,7 @@ extern "C" {
 =========================================================*/
 typedef uint64_t      PadutilButtons;
 typedef unsigned char PadutilCoord;
+typedef char          PadutilRelCoord;
 typedef float         PadutilSensitivity;
 
 typedef struct {

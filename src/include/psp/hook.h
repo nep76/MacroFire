@@ -21,10 +21,10 @@ extern "C" {
 /* PSPLinkから拝借 */
 struct hook_syscall_table_header
 {
-	void *unknown;        /* 不明 */
-	unsigned int basenum; /* 何の値? */
-	unsigned int topnum;  /* 何の値? */
-	unsigned int size;    /* テーブル全体のサイズ(バイト単位) */
+	struct hook_syscall_table_header *next; /* 次のテーブル(って何?)へのポインタ */
+	unsigned int offset;                    /* offset to substract from syscall code (substractって何?) */
+	unsigned int num;                       /* テーブルの全エントリ数 */
+	unsigned int size;                      /* テーブル全体のサイズ(バイト単位) */
 };
 
 /*-----------------------------------------------

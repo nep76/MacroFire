@@ -11,8 +11,8 @@
 	ローカルマクロ
 =========================================================*/
 #define CDIALOG_SOSK_LAST_INPUTTYPE CDIALOG_SOSK_INPUTTYPE_FILENAME_SYMBOL
-#define CDIALOG_SOSK_BASE_HEIGHT    gbOffsetLine( 7 )
-#define CDIALOG_SOSK_OVERLAY_HEIGHT gbOffsetLine( 1 )
+#define CDIALOG_SOSK_BASE_HEIGHT    pbOffsetLine( 7 )
+#define CDIALOG_SOSK_OVERLAY_HEIGHT pbOffsetLine( 1 )
 
 /*=========================================================
 	ローカル関数
@@ -103,7 +103,7 @@ int cdialogSoskStartNoLock( unsigned short x, unsigned short y )
 {
 	int ret;
 	
-	//st_params->base.status = CDIALOG_INIT;
+	st_params->base.status = CDIALOG_INIT;
 	
 	st_params->edited      = false;
 	st_params->showMessage = false;
@@ -138,9 +138,9 @@ int cdialogSoskStartNoLock( unsigned short x, unsigned short y )
 	st_params->work.chtab.pos     = 0;
 	if( ! cdialog_sosk_select_next_table( st_params->data.types, &(st_params->work.chtab) ) ) return CG_ERROR_INVALID_ARGUMENT;
 	
-	st_params->base.x      = gbOffsetChar( x );
-	st_params->base.y      = gbOffsetLine( y );
-	st_params->base.width  = gbOffsetChar( CDIALOG_SOSK_INPUT_AREA_WIDTH + 4 );
+	st_params->base.x      = pbOffsetChar( x );
+	st_params->base.y      = pbOffsetLine( y );
+	st_params->base.width  = pbOffsetChar( CDIALOG_SOSK_INPUT_AREA_WIDTH + 4 );
 	st_params->base.height = cdialog_sosk_calc_height( st_params->data.types );
 	
 	ret = cdialogDevPrepareToStart( &(st_params->base), st_params->data.options );
@@ -198,8 +198,8 @@ int cdialogSoskUpdate( void )
 		st_params->cancel = true;
 		if( st_params->edited && cdialogMessageInit( NULL ) == 0 ){
 			CdialogMessageData *data = cdialogMessageGetData();
-			strutilCopy( data->title,   "Cancellation",   CDIALOG_MESSAGE_TITLE_LENGTH );
-			strutilCopy( data->message, "Are you sure you want to cancel?", CDIALOG_MESSAGE_LENGTH );
+			strutilCopy( data->title,   CDIALOG_STR_SOSK_CANCEL_LABEL, CDIALOG_MESSAGE_TITLE_LENGTH );
+			strutilCopy( data->message, CDIALOG_STR_SOSK_CANCEL, CDIALOG_MESSAGE_LENGTH );
 			data->options = CDIALOG_DISPLAY_CENTER | CDIALOG_MESSAGE_YESNO;
 			if( cdialogMessageStartNoLock( 0, 0 ) < 0 ){
 				cdialogMessageShutdownStartNoLock();
@@ -236,8 +236,8 @@ int cdialogSoskUpdate( void )
 	} else if( pad.Buttons & PSP_CTRL_HOME ){
 		if( cdialogMessageInit( NULL ) == 0 ){
 			CdialogMessageData *data = cdialogMessageGetData();
-			strutilCopy( data->title,   "Help",   CDIALOG_MESSAGE_TITLE_LENGTH );
-			strutilCopy( data->message, "\x80\x82\x83\x81 = Move\nL/R  = MoveCursor\n\n\x85 = Input\n\x84 = Space\n\x87 = Backspace\n\nSELECT = Change layout\n\nSTART = Accept\n\x86     = Cancel", CDIALOG_MESSAGE_LENGTH );
+			strutilCopy( data->title,   CDIALOG_STR_HELP_LABEL,   CDIALOG_MESSAGE_TITLE_LENGTH );
+			strutilCopy( data->message, CDIALOG_STR_SOSK_HELP, CDIALOG_MESSAGE_LENGTH );
 			data->options = CDIALOG_DISPLAY_CENTER;
 			if( cdialogMessageStartNoLock( 0, 0 ) < 0 ){
 				cdialogMessageShutdownStartNoLock();
@@ -333,7 +333,7 @@ static short cdialog_sosk_calc_height( unsigned int types )
 		cdialog_sosk_select_next_table( types, &chtab );
 	} while( chtab.type != type );
 	
-	return gbOffsetLine( height + 1 ) + CDIALOG_SOSK_BASE_HEIGHT;
+	return pbOffsetLine( height + 1 ) + CDIALOG_SOSK_BASE_HEIGHT;
 }
 
 static void cdialog_sosk_draw( struct cdialog_dev_base_params *base, CdialogSoskData *data, struct cdialog_sosk_work *work )
@@ -354,119 +354,120 @@ static void cdialog_sosk_draw( struct cdialog_dev_base_params *base, CdialogSosk
 		y = 1;
 	}
 	
-	x   = gbOffsetChar( x * ( work->chtab.data->letterSpace + 1 ) + 1 );
-	y   = gbOffsetLine( y * ( work->chtab.data->lineHeight  + 1 ) + 1 );
+	x   = pbOffsetChar( x * ( work->chtab.data->letterSpace + 1 ) + 1 );
+	y   = pbOffsetLine( y * ( work->chtab.data->lineHeight  + 1 ) + 1 );
 	kbx = base->x + ( base->width  >> 1 ) - ( x >> 1 );
-	kby = base->y + CDIALOG_SOSK_BASE_HEIGHT + ( gbOffsetLine( 1 ) >> 1 );
+	kby = base->y + CDIALOG_SOSK_BASE_HEIGHT + ( pbOffsetLine( 1 ) >> 1 );
 	
-	gbFillRectRel( kbx, kby - CDIALOG_SOSK_OVERLAY_HEIGHT, x, y + CDIALOG_SOSK_OVERLAY_HEIGHT + gbOffsetLine( 2 ), base->color->bg );
-	gbLineRectRel( kbx, kby - CDIALOG_SOSK_OVERLAY_HEIGHT, x, y + CDIALOG_SOSK_OVERLAY_HEIGHT + gbOffsetLine( 2 ), base->color->border );
+	pbFillRectRel( kbx, kby - CDIALOG_SOSK_OVERLAY_HEIGHT, x, y + CDIALOG_SOSK_OVERLAY_HEIGHT + pbOffsetLine( 2 ), base->color->bg );
+	pbLineRectRel( kbx, kby - CDIALOG_SOSK_OVERLAY_HEIGHT, x, y + CDIALOG_SOSK_OVERLAY_HEIGHT + pbOffsetLine( 2 ), base->color->border );
 	
-	gbPrintf( kbx + x - gbOffsetChar( 12 ), kby + y, base->color->help, GB_TRANSPARENT, "SELECT: [%c]", work->chtab.data->codes[0] );
+	pbPrintf( kbx + x - pbOffsetChar( 12 ), kby + y, base->color->help, PB_TRANSPARENT, "SELECT: [%c]", work->chtab.data->codes[0] );
 	
 	/* 枠を描画 */
-	gbFillRectRel( base->x, base->y, base->width, CDIALOG_SOSK_BASE_HEIGHT, base->color->bg );
-	gbLineRectRel( base->x, base->y, base->width, CDIALOG_SOSK_BASE_HEIGHT, base->color->border );
+	pbFillRectRel( base->x, base->y, base->width, CDIALOG_SOSK_BASE_HEIGHT, base->color->bg );
+	pbLineRectRel( base->x, base->y, base->width, CDIALOG_SOSK_BASE_HEIGHT, base->color->border );
 	
 	/* タイトル描画 */
-	gbPrint(
-		base->x + ( base->width >> 1 ) - gbOffsetChar( strlen( data->title ) >> 1 ),
-		base->y + gbOffsetLine( 1 ),
+	pbPrint(
+		base->x + ( base->width >> 1 ) - pbOffsetChar( strlen( data->title ) >> 1 ),
+		base->y + pbOffsetLine( 1 ),
 		base->color->title,
-		GB_TRANSPARENT,
+		PB_TRANSPARENT,
 		data->title
 	);
 	
 	/* 文字の残りを表示 */
 	if( work->text.offset ){
-		gbPrint(
-			base->x + gbOffsetChar( 1 ) - ( GB_CHAR_WIDTH >> 1 ),
-			base->y + gbOffsetLine( 3 ),
+		pbPrint(
+			base->x + pbOffsetChar( 1 ) - ( pbOffsetChar( 1 ) >> 1 ),
+			base->y + pbOffsetLine( 3 ),
 			base->color->fg,
-			GB_TRANSPARENT,
+			PB_TRANSPARENT,
 			"\x83"
 		);
 	}
 	if( work->text.length > CDIALOG_SOSK_INPUT_AREA_WIDTH && work->text.offset < work->text.length - CDIALOG_SOSK_INPUT_AREA_WIDTH ){
-		gbPrint(
-			base->x + gbOffsetChar( 2 + CDIALOG_SOSK_INPUT_AREA_WIDTH ) + ( GB_CHAR_WIDTH >> 1 ),
-			base->y + gbOffsetLine( 3 ),
+		pbPrint(
+			base->x + pbOffsetChar( 2 + CDIALOG_SOSK_INPUT_AREA_WIDTH ) + ( pbOffsetChar( 1 ) >> 1 ),
+			base->y + pbOffsetLine( 3 ),
 			base->color->fg,
-			GB_TRANSPARENT,
+			PB_TRANSPARENT,
 			"\x81"
 		);
 	}
 	
 	/* 入力欄表示 */
-	gbLineRel( 
-		base->x + gbOffsetChar( 2 ),
-		base->y + gbOffsetLine( 4 ) + 1,
-		gbOffsetChar( CDIALOG_SOSK_INPUT_AREA_WIDTH ),
+	pbLineRel( 
+		base->x + pbOffsetChar( 2 ),
+		base->y + pbOffsetLine( 4 ) + 1,
+		pbOffsetChar( CDIALOG_SOSK_INPUT_AREA_WIDTH ),
 		0,
 		base->color->fg
 	);
 	
 	/* カーソル表示 */
-	gbPrint(
-		base->x + gbOffsetChar( 2 + work->text.cursorPos ),
-		base->y + gbOffsetLine( 3 ),
-		GB_TRANSPARENT,
+	pbPrint(
+		base->x + pbOffsetChar( 2 + work->text.cursorPos ),
+		base->y + pbOffsetLine( 3 ),
+		PB_TRANSPARENT,
 		base->color->fcbg,
 		" "
 	);
 	
-	gbPrint(
-		base->x + gbOffsetChar( 2 + work->text.cursorPos ),
-		base->y + gbOffsetLine( 3 ) + 2,
+	pbPrint(
+		base->x + pbOffsetChar( 2 + work->text.cursorPos ),
+		base->y + pbOffsetLine( 3 ) + 2,
 		base->color->fcfg,
-		GB_TRANSPARENT,
+		PB_TRANSPARENT,
 		"_"
 	);
 	
 	/* 文字列表示 */
-	gbPrint(
-		base->x + gbOffsetChar( 2 ),
-		base->y + gbOffsetLine( 3 ),
+	pbPrint(
+		base->x + pbOffsetChar( 2 ),
+		base->y + pbOffsetLine( 3 ),
 		base->color->fg,
-		GB_TRANSPARENT,
+		PB_TRANSPARENT,
 		textblock
 	);
 	
 	/* 文字数表示 */
-	gbPrintf(
-		base->x + gbOffsetChar( 1 ),
-		base->y + gbOffsetLine( 4 ) + ( GB_CHAR_HEIGHT >> 1 ),
+	pbPrintf(
+		base->x + pbOffsetChar( 1 ),
+		base->y + pbOffsetLine( 4 ) + ( pbOffsetLine( 1 ) >> 1 ),
 		base->color->fg,
-		GB_TRANSPARENT,
+		PB_TRANSPARENT,
 		"( %d / %d )",
 		work->text.length - 1,
 		data->textMax - 1
 	);
 	
 	/* ヘルプ案内表示 */
-	gbPrint(
-		base->x + gbOffsetChar( 24 ),
-		base->y + gbOffsetLine( 4 ) + ( GB_CHAR_HEIGHT >> 1 ),
+	pbPrintf(
+		base->x + pbOffsetChar( 24 ),
+		base->y + pbOffsetLine( 4 ) + ( pbOffsetLine( 1 ) >> 1 ),
 		base->color->help,
-		GB_TRANSPARENT,
-		"HOME: Help"
+		PB_TRANSPARENT,
+		"HOME: %s",
+		CDIALOG_STR_HELP_LABEL
 	);
 	
 	for( i = 0, x = 0, y = 0; i <= work->chtab.count; i++ ){
 		if( work->chtab.pos == i ){
-			gbPutChar(
-				kbx + gbOffsetChar( 1 + x ),
-				kby + gbOffsetLine( 1 + y ),
+			pbPutChar(
+				kbx + pbOffsetChar( 1 + x ),
+				kby + pbOffsetLine( 1 + y ),
 				base->color->fcfg,
 				base->color->fcbg,
 				work->chtab.data->codes[i]
 			);
 		} else{
-			gbPutChar(
-				kbx + gbOffsetChar( 1 + x ),
-				kby + gbOffsetLine( 1 + y ),
+			pbPutChar(
+				kbx + pbOffsetChar( 1 + x ),
+				kby + pbOffsetLine( 1 + y ),
 				base->color->fg,
-				GB_TRANSPARENT,
+				PB_TRANSPARENT,
 				work->chtab.data->codes[i]
 			);
 		}

@@ -128,8 +128,8 @@ void macroeditorTerm( void )
 	st_params = NULL;
 }
 
-#define PRINT_CMD( xoff, yoff, color, str )       gbPrint( gbOffsetChar( 3 + xoff ), gbOffsetLine( 4 + yoff ), color, MF_COLOR_TEXT_BG, str )
-#define PRINTF_CMD( xoff, yoff, color, str, ... ) gbPrintf( gbOffsetChar( 3 + xoff ), gbOffsetLine( 4 + yoff ), color, MF_COLOR_TEXT_BG, str, __VA_ARGS__ )
+#define PRINT_CMD( xoff, yoff, color, str )       pbPrint( pbOffsetChar( 3 + xoff ), pbOffsetLine( 4 + yoff ), color, MF_COLOR_TEXT_BG, str )
+#define PRINTF_CMD( xoff, yoff, color, str, ... ) pbPrintf( pbOffsetChar( 3 + xoff ), pbOffsetLine( 4 + yoff ), color, MF_COLOR_TEXT_BG, str, __VA_ARGS__ )
 bool macroeditorMain( void )
 {
 	MacromgrCommand *cmd;
@@ -238,7 +238,7 @@ bool macroeditorMain( void )
 		}
 		macromgrSetCommand( st_params->selected.cmd, st_params->selected.action, st_params->selected.data, st_params->selected.sub );
 	} else{
-		mfMenuSetInfoText( MF_MENU_INFOTEXT_COMMON_CTRL | MF_MENU_INFOTEXT_MOVABLEPAGE_CTRL | MF_MENU_INFOTEXT_SET_LOWER_LINE, "(\x85)Edit data, (\x84)Change type, (\x87)Delete (L)Insert before, (R)Insert after" );
+		mfMenuSetInfoText( MF_MENU_INFOTEXT_COMMON_CTRL | MF_MENU_INFOTEXT_MOVABLEPAGE_CTRL | MF_MENU_INFOTEXT_SET_LOWER_LINE, "(%s)Edit data, (%s)Change type, (%s)Delete (L)Insert before, (R)Insert after", PB_SYM_PSP_CIRCLE, PB_SYM_PSP_TRIANGLE, PB_SYM_PSP_SQUARE );
 		if( mfMenuIsPressed( PSP_CTRL_CROSS ) ){
 			return false;
 		} else if( mfMenuIsPressed( PSP_CTRL_CIRCLE ) ) {
@@ -257,7 +257,7 @@ bool macroeditorMain( void )
 					break;
 				case MACROMGR_ANALOG_MOVE:
 					st_params->menu.tables = mfMenuCreateTables( 1, 2, 1 );
-					mfMenuSetTablePosition( st_params->menu.tables, 1, gbOffsetChar( 40 ), gbOffsetLine( 26 ) );
+					mfMenuSetTablePosition( st_params->menu.tables, 1, pbOffsetChar( 40 ), pbOffsetLine( 26 ) );
 					mfMenuSetTableLabel( st_params->menu.tables, 1, "Analog move" );
 					mfMenuSetTableEntry( st_params->menu.tables, 1, 1, 1, "Edit X-coordinate", macroeditor_ctrl_edit_analog_x, &(st_params->selected), &(st_params->dialogPref.coord) );
 					mfMenuSetTableEntry( st_params->menu.tables, 1, 2, 1, "Edit Y-coordinate", macroeditor_ctrl_edit_analog_y, &(st_params->selected), &(st_params->dialogPref.coord) );
@@ -265,7 +265,7 @@ bool macroeditorMain( void )
 					break;
 				case MACROMGR_RAPIDFIRE_START:
 					st_params->menu.tables = mfMenuCreateTables( 1, 3, 1 );
-					mfMenuSetTablePosition( st_params->menu.tables, 1, gbOffsetChar( 40 ), gbOffsetLine( 25 ) );
+					mfMenuSetTablePosition( st_params->menu.tables, 1, pbOffsetChar( 40 ), pbOffsetLine( 25 ) );
 					mfMenuSetTableLabel( st_params->menu.tables, 1, "Rapidfire start" );
 					mfMenuSetTableEntry( st_params->menu.tables, 1, 1, 1, "Edit buttons",           macroeditor_ctrl_set_buttons, &(st_params->selected.data), &(st_params->dialogPref.buttons) );
 					mfMenuSetTableEntry( st_params->menu.tables, 1, 2, 1, "Edit press delay(PD)",   macroeditor_ctrl_edit_rapid_pd, &(st_params->selected), &(st_params->dialogPref.rapiddelay) );
@@ -287,7 +287,7 @@ bool macroeditorMain( void )
 			}
 		} else if( mfMenuIsPressed( PSP_CTRL_TRIANGLE ) ){
 			st_params->menu.tables = mfMenuCreateTables( 1, 7, 1 );
-			mfMenuSetTablePosition( st_params->menu.tables, 1, gbOffsetChar( 40 ), gbOffsetLine( 21 ) );
+			mfMenuSetTablePosition( st_params->menu.tables, 1, pbOffsetChar( 40 ), pbOffsetLine( 21 ) );
 			mfMenuSetTableLabel( st_params->menu.tables, 1, "Change type" );
 			mfMenuSetTableEntry( st_params->menu.tables, 1, 1, 1, "Delay",           macroeditor_ctrl_set_type, &(st_params->selected), (void *)MACROMGR_DELAY );
 			mfMenuSetTableEntry( st_params->menu.tables, 1, 2, 1, "Buttons press",   macroeditor_ctrl_set_type, &(st_params->selected), (void *)MACROMGR_BUTTONS_PRESS );
@@ -344,7 +344,7 @@ static bool macroeditor_ctrl_edit_analog_x( MfMessage message, const char *label
 		((struct macroeditor_command_data *)var)->data = MACROMGR_SET_ANALOG_XY( ((struct macroeditor_command_data *)var)->temp, MACROMGR_GET_ANALOG_Y( ((struct macroeditor_command_data *)var)->data ) );
 		return false;
 	} else if( message == MF_CM_INFO ){
-		mfMenuSetInfoText( MF_MENU_INFOTEXT_COMMON_CTRL | MF_MENU_INFOTEXT_SET_LOWER_LINE, "(\x85)Edit" );
+		mfMenuSetInfoText( MF_MENU_INFOTEXT_COMMON_CTRL | MF_MENU_INFOTEXT_SET_LOWER_LINE, "(%s)Edit", PB_SYM_PSP_CIRCLE );
 	} else if( message == MF_CM_PROC ){
 		if( mfMenuIsPressed( PSP_CTRL_CIRCLE ) ){
 			MfCtrlDefGetNumberPref *numpref = pref;
@@ -361,7 +361,7 @@ static bool macroeditor_ctrl_edit_analog_y( MfMessage message, const char *label
 		((struct macroeditor_command_data *)var)->data = MACROMGR_SET_ANALOG_XY( MACROMGR_GET_ANALOG_X( ((struct macroeditor_command_data *)var)->data ), ((struct macroeditor_command_data *)var)->temp );
 		return false;
 	} else if( message == MF_CM_INFO ){
-		mfMenuSetInfoText( MF_MENU_INFOTEXT_COMMON_CTRL | MF_MENU_INFOTEXT_SET_LOWER_LINE, "(\x85)Edit" );
+		mfMenuSetInfoText( MF_MENU_INFOTEXT_COMMON_CTRL | MF_MENU_INFOTEXT_SET_LOWER_LINE, "(%s)Edit", PB_SYM_PSP_CIRCLE );
 	} else if( message == MF_CM_PROC ){
 		if( mfMenuIsPressed( PSP_CTRL_CIRCLE ) ){
 			MfCtrlDefGetNumberPref *numpref = pref;
@@ -379,7 +379,7 @@ static bool macroeditor_ctrl_edit_rapid_pd( MfMessage message, const char *label
 		((struct macroeditor_command_data *)var)->sub = MACROMGR_SET_RAPIDDELAY( ((struct macroeditor_command_data *)var)->temp, MACROMGR_GET_RAPIDRDELAY( ((struct macroeditor_command_data *)var)->sub ) );
 		return false;
 	} else if( message == MF_CM_INFO ){
-		mfMenuSetInfoText( MF_MENU_INFOTEXT_COMMON_CTRL | MF_MENU_INFOTEXT_SET_LOWER_LINE, "(\x85)Edit" );
+		mfMenuSetInfoText( MF_MENU_INFOTEXT_COMMON_CTRL | MF_MENU_INFOTEXT_SET_LOWER_LINE, "(%s)Edit", PB_SYM_PSP_CIRCLE );
 	} else if( message == MF_CM_PROC ){
 		if( mfMenuIsPressed( PSP_CTRL_CIRCLE ) ){
 			MfCtrlDefGetNumberPref *numpref = pref;
@@ -397,7 +397,7 @@ static bool macroeditor_ctrl_edit_rapid_rd( MfMessage message, const char *label
 		((struct macroeditor_command_data *)var)->sub = MACROMGR_SET_RAPIDDELAY( MACROMGR_GET_RAPIDPDELAY( ((struct macroeditor_command_data *)var)->sub ), ((struct macroeditor_command_data *)var)->temp );
 		return false;
 	} else if( message == MF_CM_INFO ){
-		mfMenuSetInfoText( MF_MENU_INFOTEXT_COMMON_CTRL | MF_MENU_INFOTEXT_SET_LOWER_LINE, "(\x85)Edit" );
+		mfMenuSetInfoText( MF_MENU_INFOTEXT_COMMON_CTRL | MF_MENU_INFOTEXT_SET_LOWER_LINE, "(%s)Edit", PB_SYM_PSP_CIRCLE );
 	} else if( message == MF_CM_PROC ){
 		if( mfMenuIsPressed( PSP_CTRL_CIRCLE ) ){
 			MfCtrlDefGetNumberPref *numpref = pref;
@@ -420,7 +420,7 @@ static bool macroeditor_ctrl_set_buttons( MfMessage message, const char *label, 
 static bool macroeditor_ctrl_set_type( MfMessage message, const char *label, void *var, void *pref, void *ex )
 {
 	if( message == MF_CM_INFO ){
-		mfMenuSetInfoText( MF_MENU_INFOTEXT_COMMON_CTRL | MF_MENU_INFOTEXT_SET_LOWER_LINE, "(\x85)Change" );
+		mfMenuSetInfoText( MF_MENU_INFOTEXT_COMMON_CTRL | MF_MENU_INFOTEXT_SET_LOWER_LINE, "(%s)Change", PB_SYM_PSP_CIRCLE );
 	} else if( message == MF_CM_PROC ){
 		if( mfMenuIsPressed( PSP_CTRL_CIRCLE ) ){
 			if( ((struct macroeditor_command_data *)var)->action != (MacromgrAction)pref ){

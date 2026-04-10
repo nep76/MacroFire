@@ -12,6 +12,12 @@
 #include "psp/sysclib/sysclib.h"
 #endif
 
+#ifdef PB_SJIS_SUPPORT
+#include "mfstrings_jp.h"
+#else
+#include "mfstrings.h"
+#endif
+
 #include "pspapi.h"
 #include "mftypes.h"
 #include "mftab.h"
@@ -19,8 +25,8 @@
 /*==========================================================
 	íËêî
 ==========================================================*/
-#define MF_TITLE        "MacroFire %s In-game menu"
-#define MF_VERSION      "3.0.5"
+#define MF_TITLE        MF_STR_TITLE
+#define MF_VERSION      "3.0.6"
 #define MF_AUTHOR       "ClassG (http://classg.sytes.net)"
 
 #define MF_INI_PATH_DEFAULT    "ms0:/seplugins/"
@@ -31,7 +37,7 @@
 #define MF_INI_SECTION_GAME    "GAME"
 #define MF_INI_LOAD_FAILED     "Built-in"
 
-#define MF_COLOR_TRANSPARENT GB_TRANSPARENT
+#define MF_COLOR_TRANSPARENT PB_TRANSPARENT
 #define MF_COLOR_TEXT_FG     0xffffffff
 #define MF_COLOR_TEXT_BG     MF_COLOR_TRANSPARENT
 #define MF_COLOR_TEXT_FC     0xff0000ff

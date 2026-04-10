@@ -14,7 +14,7 @@
 /*=========================================================
 	ローカル関数
 =========================================================*/
-static void cdialog_message_count_width_and_height( const char *str, unsigned short *width, unsigned short *height );
+static void cdialog_message_count_width_and_height( const char *str, unsigned int *width, unsigned int *height );
 static void cdialog_message_draw( struct cdialog_dev_base_params *base, CdialogMessageData *data );
 
 /*=========================================================
@@ -79,19 +79,19 @@ int cdialogMessageStart( unsigned short x, unsigned short y )
 int cdialogMessageStartNoLock( unsigned short x, unsigned short y )
 {
 	int ret;
-	unsigned short w, h;
+	unsigned int w, h;
 	
-	//st_params->base.status = CDIALOG_INIT;
+	st_params->base.status = CDIALOG_INIT;
 	
 	/* ダイアログの幅と高さを検出 */
 	cdialog_message_count_width_and_height( st_params->data.message, &w, &h );
 	
 	/* 固定幅と固定行を加算 */
-	st_params->base.width  = gbOffsetChar( w + 2 );
-	st_params->base.height = gbOffsetLine( h + 6 );
+	st_params->base.width  = w + pbOffsetChar( 2 );
+	st_params->base.height = h + pbOffsetLine( 6 );
 	
-	st_params->base.x = gbOffsetChar( x );
-	st_params->base.y = gbOffsetLine( y );
+	st_params->base.x = pbOffsetChar( x );
+	st_params->base.y = pbOffsetLine( y );
 	
 	ret = cdialogDevPrepareToStart( &(st_params->base), st_params->data.options );
 	if( ret != CG_ERROR_OK ) return ret;
@@ -149,30 +149,26 @@ void cdialogMessageDestroy( void )
 	st_params = NULL;
 }
 
-static void cdialog_message_count_width_and_height( const char *str, unsigned short *width, unsigned short *height )
+static void cdialog_message_count_width_and_height( const char *str, unsigned int *width, unsigned int *height )
 {
 	unsigned short cur_width = 0;
 	const char *start = str;
 	const char *end   = NULL;
 	
 	*width  = 0;
-	*height = 1;
+	*height = PB_CHAR_HEIGHT;
 	
 	while( ( end = strchr( start, '\n' ) ) ){
-		*height += 1;
-		cur_width = end - start;
+		*height += PB_CHAR_HEIGHT;
+		cur_width = pbMeasureNString( start, (unsigned int)( end - start ) );
 		
 		if( cur_width > *width ) *width = cur_width;
 		
 		start = end + 1;
 	}
 	
-	if( ! *width ){
-		*width = strlen( str );
-	} else{
-		cur_width = strlen( start );
-		if( cur_width > *width ) *width = cur_width;
-	}
+	cur_width = pbMeasureString( start );
+	if( cur_width > *width ) *width = cur_width;
 }
 
 static void cdialog_message_draw( struct cdialog_dev_base_params *base, CdialogMessageData *data )
@@ -180,31 +176,31 @@ static void cdialog_message_draw( struct cdialog_dev_base_params *base, CdialogM
 	const char *ans = data->options & CDIALOG_MESSAGE_YESNO ? CDIALOG_MESSAGE_ANS_YESNO : CDIALOG_MESSAGE_ANS_OK;
 	
 	/* 枠を描画 */
-	gbFillRectRel( base->x, base->y, base->width, base->height, base->color->bg );
-	gbLineRectRel( base->x, base->y, base->width, base->height, base->color->border );
+	pbFillRectRel( base->x, base->y, base->width, base->height, base->color->bg );
+	pbLineRectRel( base->x, base->y, base->width, base->height, base->color->border );
 	
 	/* タイトル描画 */
-	gbPrint(
-		base->x + ( base->width >> 1 ) - gbOffsetChar( strlen( data->title ) >> 1 ),
-		base->y + gbOffsetLine( 1 ),
+	pbPrint(
+		base->x + ( base->width >> 1 ) - ( pbMeasureString( data->title ) >> 1 ),
+		base->y + pbOffsetLine( 1 ),
 		base->color->title,
-		GB_TRANSPARENT,
+		PB_TRANSPARENT,
 		data->title
 	);
 	
-	gbPrint(
-		base->x + gbOffsetChar( 1 ),
-		base->y + gbOffsetLine( 3 ),
+	pbPrint(
+		base->x + pbOffsetChar( 1 ),
+		base->y + pbOffsetLine( 3 ),
 		base->color->fg,
-		GB_TRANSPARENT,
+		PB_TRANSPARENT,
 		data->message
 	);
 	
-	gbPrint(
-		base->x + ( base->width >> 1 ) - gbOffsetChar( strlen( ans ) >> 1 ),
-		base->y + + base->height - gbOffsetLine( 2 ),
+	pbPrint(
+		base->x + ( base->width >> 1 ) - ( pbMeasureString( ans ) >> 1 ),
+		base->y + + base->height - pbOffsetLine( 2 ),
 		base->color->fcfg,
-		GB_TRANSPARENT,
+		PB_TRANSPARENT,
 		ans
 	);
 }

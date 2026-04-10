@@ -95,10 +95,10 @@ void remapMenu( MfMenuMessage message )
 			);
 			if( ! menu ) return;
 			
-			mfMenuSetTablePosition( menu, 1, gbOffsetChar( 57 ), gbOffsetLine( 7 ) );
-			mfMenuSetTableEntry( menu, 1, 1, 1, "Load", mfCtrlDefExtra, remap_menu_load, NULL );
-			mfMenuSetTableEntry( menu, 1, 2, 1, "Save", mfCtrlDefExtra, remap_menu_save, NULL );
-			mfMenuSetTableEntry( menu, 1, 4, 1, "Clear", mfCtrlDefExtra, remap_menu_clear, NULL );
+			mfMenuSetTablePosition( menu, 1, pbOffsetChar( 57 ), pbOffsetLine( 7 ) );
+			mfMenuSetTableEntry( menu, 1, 1, 1, MF_STR_LOAD, mfCtrlDefExtra, remap_menu_load, NULL );
+			mfMenuSetTableEntry( menu, 1, 2, 1, MF_STR_SAVE, mfCtrlDefExtra, remap_menu_save, NULL );
+			mfMenuSetTableEntry( menu, 1, 4, 1, MF_STR_REMAP_CLEAR, mfCtrlDefExtra, remap_menu_clear, NULL );
 			mfMenuInitTable( menu );
 			break;
 		case MF_MM_TERM:
@@ -109,11 +109,11 @@ void remapMenu( MfMenuMessage message )
 			uint8_t viewlines = 0;
 			unsigned int buttons = mfMenuGetCurrentButtons();
 			
-			gbPrint( gbOffsetChar( 3 ), gbOffsetLine(  4 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, "Remapping buttons list." );
+			pbPrint( pbOffsetChar( 3 ), pbOffsetLine(  4 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, MF_STR_REMAP_DESC );
 			
 			if( ! st_params.remapList ){
 				mfMenuInactiveTableEntry( menu, 1, 2, 1 );
-				gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 7 ), MF_COLOR_TEXT_FC, MF_COLOR_TEXT_BG, "<Press TRIANGLE(\x84) to add a new remap>" );
+				pbPrintf( pbOffsetChar( 3 ), pbOffsetLine( 7 ), MF_COLOR_TEXT_FC, MF_COLOR_TEXT_BG, MF_STR_REMAP_SUGGEST, PB_SYM_PSP_TRIANGLE );
 			} else{
 				PadutilRemap *entry;
 				char         real_buttons[64];
@@ -143,24 +143,24 @@ void remapMenu( MfMenuMessage message )
 					mfMenuButtonsSymbolList( entry->realButtons,  real_buttons,  sizeof( real_buttons ) );
 					//mfMenuButtonsSymbolList( entry->remapButtons, remap_buttons, sizeof( remap_buttons ) );
 					if( pos == line ){
-						//gbPrintf( gbOffsetChar( 3 ), gbOffsetLine( 7 + linepos ), MF_COLOR_TEXT_FC, MF_COLOR_TEXT_BG, "%s: %s", real_buttons, remap_buttons );
-						gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 7 + linepos ), MF_COLOR_TEXT_FC, MF_COLOR_TEXT_BG, real_buttons );
+						//pbPrintf( pbOffsetChar( 3 ), pbOffsetLine( 7 + linepos ), MF_COLOR_TEXT_FC, MF_COLOR_TEXT_BG, "%s: %s", real_buttons, remap_buttons );
+						pbPrint( pbOffsetChar( 3 ), pbOffsetLine( 7 + linepos ), MF_COLOR_TEXT_FC, MF_COLOR_TEXT_BG, real_buttons );
 					} else{
-						//gbPrintf( gbOffsetChar( 3 ), gbOffsetLine( 7 + linepos ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, "%s: %s", real_buttons, remap_buttons );
-						gbPrint( gbOffsetChar( 3 ), gbOffsetLine( 7 + linepos ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, real_buttons );
+						//pbPrintf( pbOffsetChar( 3 ), pbOffsetLine( 7 + linepos ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, "%s: %s", real_buttons, remap_buttons );
+						pbPrint( pbOffsetChar( 3 ), pbOffsetLine( 7 + linepos ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, real_buttons );
 					}
 				}
 							
 				remap_buttons[0] = '\0';
 				mfMenuButtonsSymbolList( st_params.selected->remapButtons, remap_buttons, sizeof( remap_buttons ) );
-				gbLineRectRel( gbOffsetChar( 15 ), gbOffsetLine( 6 + REMAP_LINES_PER_PAGE + 3 ), gbOffsetChar( 64 ), gbOffsetLine( 3 ), MF_COLOR_TEXT_FG );
-				gbPrint( gbOffsetChar( 2 ), gbOffsetLine( 6 + REMAP_LINES_PER_PAGE + 4 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, "Remapping to" );
-				gbPrint( gbOffsetChar( 16 ), gbOffsetLine( 6 + REMAP_LINES_PER_PAGE + 4 ), MF_COLOR_TEXT_FC, MF_COLOR_TEXT_BG, remap_buttons[0] != '\0' ? remap_buttons : "Disable" );
+				pbLineRectRel( pbOffsetChar( 15 ), pbOffsetLine( 6 + REMAP_LINES_PER_PAGE + 3 ), pbOffsetChar( 64 ), pbOffsetLine( 3 ), MF_COLOR_TEXT_FG );
+				pbPrint( pbOffsetChar( 2 ), pbOffsetLine( 6 + REMAP_LINES_PER_PAGE + 4 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, MF_STR_REMAP_BUTTON );
+				pbPrint( pbOffsetChar( 16 ), pbOffsetLine( 6 + REMAP_LINES_PER_PAGE + 4 ), MF_COLOR_TEXT_FC, MF_COLOR_TEXT_BG, remap_buttons[0] != '\0' ? remap_buttons : MF_STR_REMAP_BUTTON_DISABLE );
 			}
 			
 			if( column == REMAP_COLUMN_LIST ){
-				gbLineRectRel( gbOffsetChar(  2 ), gbOffsetLine( 6 ), gbOffsetChar( 53 ), gbOffsetLine( REMAP_LINES_PER_PAGE + 2 ), MF_COLOR_TEXT_FC );
-				gbLineRectRel( gbOffsetChar( 56 ), gbOffsetLine( 6 ), gbOffsetChar( 23 ), gbOffsetLine( REMAP_LINES_PER_PAGE + 2 ), MF_COLOR_TEXT_FG );
+				pbLineRectRel( pbOffsetChar(  2 ), pbOffsetLine( 6 ), pbOffsetChar( 53 ), pbOffsetLine( REMAP_LINES_PER_PAGE + 2 ), MF_COLOR_TEXT_FC );
+				pbLineRectRel( pbOffsetChar( 56 ), pbOffsetLine( 6 ), pbOffsetChar( 23 ), pbOffsetLine( REMAP_LINES_PER_PAGE + 2 ), MF_COLOR_TEXT_FG );
 				
 				mfMenuDrawTable( menu, MF_MENU_DISPLAY_ONLY );
 				
@@ -173,22 +173,22 @@ void remapMenu( MfMenuMessage message )
 					}
 				} else{
 					if( ! st_params.remapList ){
-						mfMenuSetInfoText( MF_MENU_INFOTEXT_COMMON_CTRL | MF_MENU_INFOTEXT_MOVABLEPAGE_CTRL | MF_MENU_INFOTEXT_SET_LOWER_LINE, "(L/R)Switch column, (\x84)Add" );
+						mfMenuSetInfoText( MF_MENU_INFOTEXT_COMMON_CTRL | MF_MENU_INFOTEXT_MOVABLEPAGE_CTRL | MF_MENU_INFOTEXT_SET_LOWER_LINE, "(L/R)%s, (%s)%s", MF_STR_REMAP_CTRL_SWITCH_COLUMN, PB_SYM_PSP_TRIANGLE, MF_STR_REMAP_CTRL_ADD );
 					} else{
-						mfMenuSetInfoText( MF_MENU_INFOTEXT_COMMON_CTRL | MF_MENU_INFOTEXT_MOVABLEPAGE_CTRL | MF_MENU_INFOTEXT_SET_LOWER_LINE, "(L/R)Switch column, (\x84)Add, (\x87)Delete, (\x85)Edit remap buttons" );
+						mfMenuSetInfoText( MF_MENU_INFOTEXT_COMMON_CTRL | MF_MENU_INFOTEXT_MOVABLEPAGE_CTRL | MF_MENU_INFOTEXT_SET_LOWER_LINE, "(L/R)%s, (%s)%s, (%s)%s, (%s)%s", MF_STR_REMAP_CTRL_SWITCH_COLUMN, PB_SYM_PSP_TRIANGLE, MF_STR_REMAP_CTRL_ADD, PB_SYM_PSP_SQUARE, MF_STR_REMAP_CTRL_DELETE, PB_SYM_PSP_CIRCLE, MF_STR_REMAP_CTRL_EDIT_REMAP );
 					}
 					if( buttons ){
 						if( buttons & PSP_CTRL_CROSS ){
 							mfMenuProc( NULL );
 						} else if( buttons & PSP_CTRL_TRIANGLE ){
 							if( remap_add( &st_params ) ){
-								mfDialogDetectbuttonsInit( "Set real buttons", MF_HOTKEY_BUTTONS, &(st_params.selected->realButtons) );
+								mfDialogDetectbuttonsInit( MF_STR_REMAP_DIAGBUTTON_REAL, MF_HOTKEY_BUTTONS, &(st_params.selected->realButtons) );
 							}
 						} else if( buttons & ( PSP_CTRL_LTRIGGER | PSP_CTRL_RTRIGGER ) ){
 							column = REMAP_COLUMN_MENU;
 						} else if( st_params.selected ){
 							if( buttons & PSP_CTRL_CIRCLE ){
-								mfDialogDetectbuttonsInit( "Set remap buttons", MF_TARGET_BUTTONS, &(st_params.selected->remapButtons) );
+								mfDialogDetectbuttonsInit( MF_STR_REMAP_DIAGBUTTON_REMAP, MF_TARGET_BUTTONS, &(st_params.selected->remapButtons) );
 							} else if( buttons & PSP_CTRL_SQUARE ){
 								remap_delete( &st_params );
 							} else if( buttons & PSP_CTRL_UP ){
@@ -212,11 +212,11 @@ void remapMenu( MfMenuMessage message )
 					}
 				}
 			} else{
-				gbLineRectRel( gbOffsetChar(  2 ), gbOffsetLine( 6 ), gbOffsetChar( 53 ), gbOffsetLine( REMAP_LINES_PER_PAGE + 2 ), MF_COLOR_TEXT_FG );
-				gbLineRectRel( gbOffsetChar( 56 ), gbOffsetLine( 6 ), gbOffsetChar( 23 ), gbOffsetLine( REMAP_LINES_PER_PAGE + 2 ), MF_COLOR_TEXT_FC );
+				pbLineRectRel( pbOffsetChar(  2 ), pbOffsetLine( 6 ), pbOffsetChar( 53 ), pbOffsetLine( REMAP_LINES_PER_PAGE + 2 ), MF_COLOR_TEXT_FG );
+				pbLineRectRel( pbOffsetChar( 56 ), pbOffsetLine( 6 ), pbOffsetChar( 23 ), pbOffsetLine( REMAP_LINES_PER_PAGE + 2 ), MF_COLOR_TEXT_FC );
 				
 				if( message != MF_MM_EXTRA ){
-					mfMenuSetInfoText( MF_MENU_INFOTEXT_COMMON_CTRL | MF_MENU_INFOTEXT_SET_LOWER_LINE, "(L/R)Switch column" );
+					mfMenuSetInfoText( MF_MENU_INFOTEXT_COMMON_CTRL | MF_MENU_INFOTEXT_SET_LOWER_LINE, "(L/R)%s", MF_STR_REMAP_CTRL_SWITCH_COLUMN );
 					
 					if( buttons & ( PSP_CTRL_LTRIGGER | PSP_CTRL_RTRIGGER ) ){
 						column = REMAP_COLUMN_LIST;
@@ -310,7 +310,7 @@ static bool remap_save( struct remap_params *params, const char *path )
 		ret = inimgrSave( ini, path, REMAP_INI_SIGNATURE, REMAP_INI_VERSION, 0, 0 );
 		
 		if( ret != 0 ){
-			mfMenuSetInfoText( MF_MENU_INFOTEXT_ERROR | MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "inimgr Error: %X", ret );
+			mfMenuSetInfoText( MF_MENU_INFOTEXT_ERROR | MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "inimgr %s: %X", MF_STR_ERROR, ret );
 			mfMenuWait( MF_ERROR_DELAY );
 		} else{
 			inimgrDestroy( ini );
@@ -318,7 +318,7 @@ static bool remap_save( struct remap_params *params, const char *path )
 		}
 		inimgrDestroy( ini );
 	} else{
-		mfMenuSetInfoText( MF_MENU_INFOTEXT_ERROR | MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "inimgr Error: Not enough memory." );
+		mfMenuSetInfoText( MF_MENU_INFOTEXT_ERROR | MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "inimgr %s: %s.", MF_STR_ERROR, MF_STR_ERROR_NOT_ENOUGH_MEMORY );
 		mfMenuWait( MF_ERROR_DELAY );
 	}
 	return false;
@@ -338,11 +338,11 @@ static bool remap_load( struct remap_params *params, const char *path )
 		
 		if( ret != 0 ){
 			if( ret == INIMGR_ERROR_INVALID_SIGNATURE ){
-				mfMenuSetInfoText( MF_MENU_INFOTEXT_ERROR | MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "Failure: Not a MacroFire remap file." );
+				mfMenuSetInfoText( MF_MENU_INFOTEXT_ERROR | MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "%s: %s.", MF_STR_ERROR, MF_STR_ERROR_INVALID_CONF );
 			} else if( ret == INIMGR_ERROR_INVALID_VERSION ){
-				mfMenuSetInfoText( MF_MENU_INFOTEXT_ERROR | MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "Failure: Unsupported file version." );
+				mfMenuSetInfoText( MF_MENU_INFOTEXT_ERROR | MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "%s: %s.", MF_STR_ERROR, MF_STR_ERROR_UNSUPPORTED_VERSION );
 			} else {
-				mfMenuSetInfoText( MF_MENU_INFOTEXT_ERROR | MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "inimgr Error: %X", ret );
+				mfMenuSetInfoText( MF_MENU_INFOTEXT_ERROR | MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "inimgr %s: %X", MF_STR_ERROR, ret );
 			}
 			mfMenuWait( MF_ERROR_DELAY );
 		} else{
@@ -351,7 +351,7 @@ static bool remap_load( struct remap_params *params, const char *path )
 		}
 		inimgrDestroy( ini );
 	} else{
-		mfMenuSetInfoText( MF_MENU_INFOTEXT_ERROR | MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "inimgr Error: Not enough memory." );
+		mfMenuSetInfoText( MF_MENU_INFOTEXT_ERROR | MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "inimgr %s: %s.", MF_STR_ERROR, MF_STR_ERROR_NOT_ENOUGH_MEMORY );
 		mfMenuWait( MF_ERROR_DELAY );
 	}
 	return false;
@@ -379,13 +379,7 @@ static int remap_loader( InimgrCallbackMode mode, InimgrCallbackParams *cbp, cha
 	
 	while( inimgrCbReadln( cbp, buf, buflen ) ){
 		strutilRemoveChar( buf, "\x20\t" );
-		
-		dbgprintf( "%s", buf );
-		
 		if( ! inimgrParseEntry( buf, &name, &value ) ) continue;
-		
-		dbgprintf( "%s %s", name, value );
-		
 		if( strcasecmp( name, "RealButtons" ) == 0 ){
 			if( ! params->selected->realButtons ){
 				params->selected->realButtons = mfConvertButtonN2C( value );
@@ -453,7 +447,7 @@ static void remap_menu_save( MfMenuMessage message )
 	if( message == MF_MM_INIT ){
 		path = memoryAllocEx( "RemapSave", MEMORY_USER, 0, MF_PATH_MAX, PSP_SMEM_High, NULL );
 		
-		if( ! mfDialogGetfilenameInit( "Save remap preference", "ms0:", "remap.ini", path, 255, CDIALOG_GETFILENAME_SAVE | CDIALOG_GETFILENAME_OVERWRITEPROMPT  ) ){
+		if( ! mfDialogGetfilenameInit( MF_STR_REMAP_DIAGGETFN_SAVE, "ms0:", "remap.ini", path, 255, CDIALOG_GETFILENAME_SAVE | CDIALOG_GETFILENAME_OVERWRITEPROMPT  ) ){
 			memoryFree( path );
 			path = NULL;
 			mfMenuExitExtra();
@@ -465,7 +459,7 @@ static void remap_menu_save( MfMenuMessage message )
 					memoryFree( path );
 					path = NULL;
 				} else{
-					mfMenuSetInfoText( MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "Saving %s...", path );
+					mfMenuSetInfoText( MF_MENU_INFOTEXT_SET_MIDDLE_LINE, MF_STR_SAVING, path );
 				}
 			}
 		} else if( path ){
@@ -485,7 +479,7 @@ static void remap_menu_load( MfMenuMessage message )
 	if( message == MF_MM_INIT ){
 		path = memoryAllocEx( "RemapLoad", MEMORY_USER, 0, MF_PATH_MAX, PSP_SMEM_High, NULL );
 		
-		if( ! mfDialogGetfilenameInit( "Load remap preference", "ms0:", "", path, 255, CDIALOG_GETFILENAME_OPEN | CDIALOG_GETFILENAME_FILEMUSTEXIST ) ){
+		if( ! mfDialogGetfilenameInit( MF_STR_REMAP_DIAGGETFN_LOAD, "ms0:", "", path, 255, CDIALOG_GETFILENAME_OPEN | CDIALOG_GETFILENAME_FILEMUSTEXIST ) ){
 			memoryFree( path );
 			path = NULL;
 			mfMenuExitExtra();
@@ -497,7 +491,7 @@ static void remap_menu_load( MfMenuMessage message )
 					memoryFree( path );
 					path = NULL;
 				} else{
-					mfMenuSetInfoText( MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "Loading %s...", path );
+					mfMenuSetInfoText( MF_MENU_INFOTEXT_SET_MIDDLE_LINE, MF_STR_LOADING, path );
 				}
 			}
 		} else if( path ){
@@ -515,7 +509,7 @@ static void remap_menu_load( MfMenuMessage message )
 static void remap_menu_clear( MfMenuMessage message )
 {
 	if( message == MF_MM_INIT ){
-		if( ! mfDialogMessageInit( "Warning", "Clearing all remap entries.\nAre you sure?", true ) ) return;
+		if( ! mfDialogMessageInit( MF_STR_REMAP_CLEAR_WARN_TITLE, MF_STR_REMAP_CLEAR_WARN_MSG, true ) ) return;
 	} else if( message == MF_MM_PROC ){
 		if( ! mfDialogMessageDraw() ){
 			if( mfDialogMessageResult() ){

@@ -3,13 +3,14 @@
 	ovmsg.c
 	
 	オーバーレイメッセージ。
+	エラー処理が手抜き。
 	
 =========================================================*/
 #include "ovmsg.h"
 
 #include <stdio.h>
 #include "psp/memory.h"
-#include "psp/gb.h"
+#include "psp/pb.h"
 #include "cgerrs.h"
 
 /*=========================================================
@@ -56,7 +57,7 @@ int ovmsgInit( void )
 {
 	st_stat = OVMSG_INIT;
 	
-	st_params = (struct ovmsg_params *)memoryAlloc( sizeof( struct ovmsg_params ) + OVMSG_LENGTH );
+	st_params = (struct ovmsg_params *)memoryAllocEx( "OverlayMessageParams", MEMORY_USER, 0, sizeof( struct ovmsg_params ) + OVMSG_LENGTH, PSP_SMEM_High, NULL );
 	if( ! st_params ) return  CG_ERROR_NOT_ENOUGH_MEMORY;
 	
 	st_params->semaId = sceKernelCreateSema( "CgOverlayMessage", 0, 1, 1, 0 );
@@ -66,7 +67,7 @@ int ovmsgInit( void )
 	st_params->w = 0;
 	st_params->h = 0;
 	st_params->fgcolor = 0xffeeeeee;
-	st_params->bgcolor = 0x88000000;
+	st_params->bgcolor = 0x880000ff;
 	st_params->str = (char *)( (uintptr_t)st_params + sizeof( struct ovmsg_params ) );
 	
 	st_params->running = true;
@@ -79,7 +80,13 @@ int ovmsgInit( void )
 
 int ovmsgThreadMain( SceSize arglen, void *argp )
 {
+	void *addr;
+	int width, pixelformat;
+	
 	st_params->selfThreadId = sceKernelGetThreadId();
+	
+	pbInit();
+	pbEnable( PB_NO_CACHE | PB_BLEND );
 	
 	ovmsg_set_status( st_params, OVMSG_INIT, OVMSG_WORK );
 	
@@ -101,21 +108,19 @@ int ovmsgThreadMain( SceSize arglen, void *argp )
 		st_params->displaySec = ( st_params->w - 1 ) / 7;
 		if( st_params->displaySec < 3 ) st_params->displaySec = 3;
 		
-		st_params->w = gbOffsetChar( st_params->w );
-		st_params->h = gbOffsetLine( st_params->h );
+		st_params->w = pbOffsetChar( st_params->w );
+		st_params->h = pbOffsetLine( st_params->h );
 		
 		while( ovmsg_get_status( st_params ) != OVMSG_INTERRUPT && ( sceKernelLibcTime( NULL ) - st_params->displayStart < st_params->displaySec ) ){
-			if( gbBind() == 0 ){
-				gbUse8BitFont( GB_FONT_PSPSYM );
-				gbSetOpt( GB_AUTOFLUSH | GB_ALPHABLEND );
-				gbPrepare();
-				gbFillRectRel( st_params->x, st_params->y, st_params->w, st_params->h, st_params->bgcolor );
-				gbPrint( st_params->x + ( gbOffsetChar( 1 ) >> 1 ), st_params->y + ( gbOffsetLine( 1 ) >> 1 ), st_params->fgcolor, GB_TRANSPARENT, st_params->str );
-				sceDisplayWaitVblankStart();
-				sceKernelDelayThread( 1000 );
-			} else{
-				ovmsg_set_status( st_params, OVMSG_WORK, OVMSG_INTERRUPT );
+			if( sceDisplayGetFrameBuf( &addr, &width, &pixelformat, PSP_DISPLAY_SETBUF_IMMEDIATE ) == 0 && addr && width ){
+				pbSetDisplayBuffer( pixelformat, addr, width );
+				pbApply();
+				pbSync( PB_BUFSYNC_IMMEDIATE );
+				pbFillRectRel( st_params->x, st_params->y, st_params->w, st_params->h, st_params->bgcolor );
+				pbPrint( st_params->x + ( pbOffsetChar( 1 ) >> 1 ), st_params->y + ( pbOffsetLine( 1 ) >> 1 ), st_params->fgcolor, PB_TRANSPARENT, st_params->str );
 			}
+			sceDisplayWaitVblankStart();
+			sceKernelDelayThread( 1000 );
 		}
 		ovmsg_set_status( st_params, OVMSG_INTERRUPT, OVMSG_WORK );
 	}
@@ -172,6 +177,8 @@ void ovmsgWaitForReady( void )
 	
 	stat = ovmsg_get_status( st_params );
 	
+	if( stat == OVMSG_NONE ) return;
+	
 	while( stat != OVMSG_READY && stat != OVMSG_SHUTDOWN ){
 		sceKernelDelayThread( 5000 );
 		stat = ovmsg_get_status( st_params );
@@ -198,6 +205,8 @@ void ovmsgWaitForReady( void )
 
 void ovmsgShutdownStart( void )
 {
+	if( ovmsg_get_status( st_params ) != OVMSG_NONE ) return;
+	
 	ovmsgWaitForReady();
 	
 	st_params->running = false;
@@ -207,6 +216,8 @@ void ovmsgShutdownStart( void )
 static enum ovmsg_status ovmsg_get_status( struct ovmsg_params *params )
 {
 	enum ovmsg_status ret;
+	
+	if( ! params ) return OVMSG_NONE;
 	
 	sceKernelWaitSema( params->semaId, 1, 0 );
 	ret = st_stat;
@@ -218,6 +229,8 @@ static enum ovmsg_status ovmsg_get_status( struct ovmsg_params *params )
 static bool ovmsg_set_status( struct ovmsg_params *params, enum ovmsg_status old_stat, enum ovmsg_status new_stat )
 {
 	bool ret;
+	
+	if( ! params ) return false;
 	
 	sceKernelWaitSema( params->semaId, 1, 0 );
 	if( st_stat == old_stat ){

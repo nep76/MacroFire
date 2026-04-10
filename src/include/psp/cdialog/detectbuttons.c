@@ -8,18 +8,6 @@
 #include "detectbuttons.h"
 
 /*=========================================================
-	ローカルマクロ
-=========================================================*/
-#define CDIALOG_DETECTBUTTONS_STR_DETECT "  \x85  : Starting to detect"
-#define CDIALOG_DETECTBUTTONS_STR_CLEAR  "  \x87  : Clear current"
-#define CDIALOG_DETECTBUTTONS_STR_CANCEL "  \x86  : Cancel"
-#define CDIALOG_DETECTBUTTONS_STR_START  "START: Accept"
-
-/*=========================================================
-	ローカル宣言
-=========================================================*/
-
-/*=========================================================
 	ローカル関数
 =========================================================*/
 void cdialog_detectbuttons_draw( struct cdialog_dev_base_params *base, CdialogDetectbuttonsData *data, struct cdialog_detectbuttons_work *work );
@@ -100,12 +88,12 @@ int cdialogDetectbuttonsStartNoLock( unsigned short x, unsigned short y )
 	if( ! st_params->work.buttonNames ) return CG_ERROR_NOT_ENOUGH_MEMORY;
 	padutilGetButtonNamesByCode( st_params->work.buttonNames, st_params->work.buttons, " ", 0, st_params->work.buf, CDIALOG_DETECTBUTTONS_BUF_LENGTH );
 	
-	st_params->base.x      = gbOffsetChar( x );
-	st_params->base.y      = gbOffsetLine( y );
+	st_params->base.x      = pbOffsetChar( x );
+	st_params->base.y      = pbOffsetLine( y );
 	st_params->base.width  = strlen( st_params->data.title );
 	if( st_params->base.width < 35 ) st_params->base.width = 35;
-	st_params->base.width  = gbOffsetChar( st_params->base.width + 2 );
-	st_params->base.height = gbOffsetLine( 14 );
+	st_params->base.width  = pbOffsetChar( st_params->base.width + 2 );
+	st_params->base.height = pbOffsetLine( 14 );
 	
 	ret = cdialogDevPrepareToStart( &(st_params->base), st_params->data.options );
 	if( ret != CG_ERROR_OK ) return ret;
@@ -203,77 +191,77 @@ void cdialogDetectbuttonsDestroy( void )
 void cdialog_detectbuttons_draw( struct cdialog_dev_base_params *base, CdialogDetectbuttonsData *data, struct cdialog_detectbuttons_work *work )
 {
 	/* 枠を描画 */
-	gbFillRectRel( base->x, base->y, base->width, base->height, base->color->bg );
-	gbLineRectRel( base->x, base->y, base->width, base->height, base->color->border );
+	pbFillRectRel( base->x, base->y, base->width, base->height, base->color->bg );
+	pbLineRectRel( base->x, base->y, base->width, base->height, base->color->border );
 	
 	/* タイトル描画 */
-	gbPrint(
-		base->x + ( base->width >> 1 ) - gbOffsetChar( strlen( data->title ) >> 1 ),
-		base->y + gbOffsetLine( 1 ),
+	pbPrint(
+		base->x + ( base->width >> 1 ) - ( pbMeasureString( data->title ) >> 1 ),
+		base->y + pbOffsetLine( 1 ),
 		base->color->title,
-		GB_TRANSPARENT,
+		PB_TRANSPARENT,
 		data->title
 	);
 	
-	gbLineRel(
-		base->x + gbOffsetChar( 1 ),
-		base->y + gbOffsetLine( 10 ),
-		base->width - ( gbOffsetChar( 2 ) ),
+	pbLineRel(
+		base->x + pbOffsetChar( 1 ),
+		base->y + pbOffsetLine( 10 ),
+		base->width - ( pbOffsetChar( 2 ) ),
 		0,
 		base->color->fg
 	);
 	
-	gbPrint(
-		base->x + gbOffsetChar( 1 ),
-		base->y + gbOffsetLine( 11 ),
+	pbPrint(
+		base->x + pbOffsetChar( 1 ),
+		base->y + pbOffsetLine( 11 ),
 		base->color->fg,
-		GB_TRANSPARENT,
-		"Current buttons:"
+		PB_TRANSPARENT,
+		CDIALOG_STR_DETECTBUTTONS_CURRENT_BUTTONS
 	);
 	
-	gbPrint(
-		base->x + gbOffsetChar( 3 ),
-		base->y + gbOffsetLine( 12 ),
+	pbPrint(
+		base->x + pbOffsetChar( 3 ),
+		base->y + pbOffsetLine( 12 ),
 		base->color->fg,
 		base->color->fcbg,
 		work->buf
 	);
 	
 	if( work->detecting ){
-		gbPrint(
-			base->x + gbOffsetChar( 1 ),
-			base->y + gbOffsetLine( 3 ),
+		pbPrint(
+			base->x + pbOffsetChar( 1 ),
+			base->y + pbOffsetLine( 3 ),
 			base->color->fg,
-			GB_TRANSPARENT,
-			"Please press the button combination.\n\nWhen you want to exit the dialog,\npress the already pressed button."
+			PB_TRANSPARENT,
+			CDIALOG_STR_DETECTBUTTONS_DETECT_DESC
 		);
 		
-		gbPrint(
-			base->x + gbOffsetChar( 18 ),
-			base->y + gbOffsetLine( 11 ),
+		pbPrint(
+			base->x + pbOffsetChar( 18 ),
+			base->y + pbOffsetLine( 11 ),
 			base->color->fcfg,
-			GB_TRANSPARENT,
-			"Now detecting..."
+			PB_TRANSPARENT,
+			CDIALOG_STR_DETECTBUTTONS_NOW_DETECTING
 		);
 	} else{
-		gbPrint(
-			base->x + gbOffsetChar( 1 ),
-			base->y + gbOffsetLine( 3 ),
+		pbPrint(
+			base->x + pbOffsetChar( 1 ),
+			base->y + pbOffsetLine( 3 ),
 			base->color->fg,
-			GB_TRANSPARENT,
-			"Please choose one."
+			PB_TRANSPARENT,
+			CDIALOG_STR_DETECTBUTTONS_DESC
 		);
 		
-		gbPrintf(
-			base->x + gbOffsetChar( 1 ),
-			base->y + gbOffsetLine( 5 ),
+		pbPrintf(
+			base->x + pbOffsetChar( 1 ),
+			base->y + pbOffsetLine( 5 ),
 			base->color->fg,
-			GB_TRANSPARENT,
+			PB_TRANSPARENT,
 			"%s\n%s\n%s\n%s",
-			CDIALOG_DETECTBUTTONS_STR_DETECT,
-			CDIALOG_DETECTBUTTONS_STR_CLEAR,
-			CDIALOG_DETECTBUTTONS_STR_CANCEL,
-			CDIALOG_DETECTBUTTONS_STR_START
+			CDIALOG_STR_DETECTBUTTONS_START,
+			CDIALOG_STR_DETECTBUTTONS_CLEAR,
+			CDIALOG_STR_DETECTBUTTONS_CANCEL,
+			CDIALOG_STR_DETECTBUTTONS_ACCEPT
 		);
 	}
 }

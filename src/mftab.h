@@ -32,9 +32,9 @@ typedef struct {
 GLOBAL MfFuncEntry gMftab[]
 #ifdef MF_FIRST_INCLUDE
 = {
-	{ "Remap settings",     remapProc },
-	{ "Rapidfire settings", rapidfireProc },
-	{ "Macro settings",     macroProc }
+	{ MF_STR_FUNCTION_REMAP,     remapProc },
+	{ MF_STR_FUNCTION_RAPIDFIRE, rapidfireProc },
+	{ MF_STR_FUNCTION_MACRO,     macroProc }
 }
 #endif
 ;

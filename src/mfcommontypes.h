@@ -18,7 +18,7 @@
 #include "psp/utils/inimgr.h"
 #include "psp/padctrl.h"
 #include "psp/padutil.h"
-#include "psp/gb.h"
+#include "psp/pb.h"
 
 /*=========================================================
 	É}ÉNÉç

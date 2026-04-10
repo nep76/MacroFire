@@ -8,7 +8,7 @@
 #include "mfmain.h"
 #include "psp/ovmsg.h"
 
-PSP_MODULE_INFO( "MacroFire", PSP_MODULE_KERNEL | PSP_MODULE_NO_STOP | PSP_MODULE_SINGLE_LOAD | PSP_MODULE_SINGLE_START, 3, 0 );
+PSP_MODULE_INFO( "MacroFire", PSP_MODULE_KERNEL, 3, 0 );
 
 /*=========================================================
 	ÉçÅ[ÉJÉãä÷êî
@@ -605,6 +605,7 @@ int mfHprmReadLatch( u32 *latch )
 
 int mfImposeHomeButton( int unk )
 {
+	( ( int (*)( int ) )hooktable[10].restore.api )( 0 );
 	return -1;
 }
 
