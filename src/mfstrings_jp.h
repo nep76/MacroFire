@@ -46,6 +46,8 @@
 #define MF_STR_HOME_FUNCTION                "機能\ "
 #define MF_STR_HOME_RETURN_TO_GAME          "ゲームを再開します..."
 #define MF_STR_HOME_NOT_PERFECT_WORK        "MacroFireは正常に動作していません。"
+#define MF_STR_HOME_LOADED                  "ロード"
+#define MF_STR_HOME_LOW_MEMORY_MODE         "省メモリモード"
 
 #define MF_STR_FUNCTION_REMAP     "ボタン再割り当て設定"
 #define MF_STR_FUNCTION_RAPIDFIRE "連射設定"

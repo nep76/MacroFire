@@ -46,6 +46,8 @@
 #define MF_STR_HOME_FUNCTION                "Functions"
 #define MF_STR_HOME_RETURN_TO_GAME          "Returning to the game..."
 #define MF_STR_HOME_NOT_PERFECT_WORK        "MacroFire is not working perfectly."
+#define MF_STR_HOME_LOADED                  "Loaded"
+#define MF_STR_HOME_LOW_MEMORY_MODE         "Low Memory Mode"
 
 #define MF_STR_FUNCTION_REMAP     "Remap settings"
 #define MF_STR_FUNCTION_RAPIDFIRE "Rapidfire settings"

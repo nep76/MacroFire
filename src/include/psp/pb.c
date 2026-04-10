@@ -23,8 +23,6 @@
 /*=========================================================
 	マクロ
 =========================================================*/
-#define PB_DISABLE_CACHE 0x40000000
-
 #define PB_SWAP( a, b ) { \
 	int t = *(int *)a; \
 	*(int *)a = *(int *)b; \
@@ -66,35 +64,6 @@
 	if( st_params.draw->colorConv ) pc = ( st_params.draw->colorConv )( pc, (void *)a ); \
 	memcpy( (void *)a, (void *)&pc, st_params.draw->pixelSize ); \
 }
-
-/*=========================================================
-	型宣言
-=========================================================*/
-typedef unsigned int ( *color_convert  )( unsigned int, void* );
-
-enum pb_blend_target {
-	PB_BLEND_SRC,
-	PB_BLEND_DST
-};
-
-struct pb_frame_buffer {
-	int  format;
-	void *addr;
-	int  width;
-	
-	unsigned char pixelSize;
-	unsigned int  lineSize;
-	
-	color_convert   colorConv;
-};
-
-struct pb_params {
-	struct pb_frame_buffer frame0, frame1;
-	struct pb_frame_buffer *display, *draw;
-	unsigned int   options;
-	unsigned int   blendFactor;
-	unsigned int   linebreakWidth;
-};
 
 /*=========================================================
 	ローカル関数
@@ -179,6 +148,16 @@ void pbInit( void )
 	st_params.options        = 0;
 	st_params.blendFactor    = 0;
 	st_params.linebreakWidth = 0;
+}
+
+void pbSaveContext( PbContext *context )
+{
+	*context = st_params;
+}
+
+void pbRestoreContext( PbContext *context )
+{
+	st_params = *context;
 }
 
 void pbSetDisplayBuffer( int format, void *fbp, int width )

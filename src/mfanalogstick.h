@@ -20,5 +20,6 @@ void mfAnalogStickIniLoad( IniUID ini, char *buf, size_t len );
 void mfAnalogStickIniSave( IniUID ini, char *buf, size_t len );
 void mfAnalogStickAdjust( MfHookAction action, SceCtrlData *pad );
 void mfAnalogStickMenu( MfMessage message );
+const PadutilAnalogStick *mfAnalogStickGetContext( void );
 
 #endif

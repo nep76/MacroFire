@@ -26,7 +26,7 @@
 	íËêî
 ==========================================================*/
 #define MF_TITLE        MF_STR_TITLE
-#define MF_VERSION      "3.0.7"
+#define MF_VERSION      "3.0.8"
 #define MF_AUTHOR       "ClassG (http://classg.sytes.net)"
 
 #define MF_INI_PATH_DEFAULT    "ms0:/seplugins/"
@@ -158,6 +158,8 @@ bool mfOverlayMessageIsRunning( void );
 bool mfOverlayMessagePrintf( const char *format, ... );
 bool mfHookIncomplete( void );
 HeapUID mfHeapCreate( unsigned int count, size_t size );
+const PadutilAnalogStick *mfGetAnalogStickContext( void );
+
 #define mfHeapAlloc   heapAlloc
 #define mfHeapCalloc  heapCalloc
 #define mfHeapFree    heapFree

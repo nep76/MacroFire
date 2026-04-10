@@ -3,6 +3,9 @@
 	mfanalogstick.c
 
 	アナログスティックの調整。
+	
+	他の連射やマクロ機能のような構造になっているが、
+	ここの関数は、メニューから直接呼び出しているため変更する場合は注意する。
 
 =========================================================*/
 #include "mfanalogstick.h"
@@ -187,4 +190,9 @@ void mfAnalogStickMenu( MfMenuMessage message )
 			if( ! mfMenuDrawTable( menu, MF_MENU_NO_OPTIONS ) ) mfMenuProc( NULL );
 			break;
 	}
+}
+
+const PadutilAnalogStick *mfAnalogStickGetContext( void )
+{
+	return &st_analogstick;
 }

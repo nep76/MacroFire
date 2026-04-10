@@ -1,4 +1,4 @@
-コンパイルするにはPSPSDKが必要です。PS2SDKではできません。
+コンパイルするにはPSPSDKが必要です。
 
 通常版のビルド:                        make
 日本語版のビルド:                      make WITH_JAPANESE=1

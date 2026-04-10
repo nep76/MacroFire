@@ -82,11 +82,13 @@ int ovmsgThreadMain( SceSize arglen, void *argp )
 {
 	void *addr;
 	int width, pixelformat;
+	PbContext context;
 	
 	st_params->selfThreadId = sceKernelGetThreadId();
 	
 	pbInit();
 	pbEnable( PB_NO_CACHE | PB_BLEND );
+	pbSaveContext( &context );
 	
 	ovmsg_set_status( st_params, OVMSG_INIT, OVMSG_WORK );
 	
@@ -115,7 +117,8 @@ int ovmsgThreadMain( SceSize arglen, void *argp )
 		st_params->h = pbOffsetLine( st_params->h );
 		
 		while( ovmsg_get_status( st_params ) != OVMSG_INTERRUPT && ( sceKernelLibcTime( NULL ) - st_params->displayStart < st_params->displaySec ) ){
-			if( sceDisplayGetFrameBuf( &addr, &width, &pixelformat, PSP_DISPLAY_SETBUF_IMMEDIATE ) == 0 && addr && width ){
+			if( sceDisplayGetFrameBuf( &addr, &width, &pixelformat, PSP_DISPLAY_SETBUF_NEXTFRAME ) == 0 && addr && width ){
+				pbRestoreContext( &context );
 				pbSetDisplayBuffer( pixelformat, addr, width );
 				pbApply();
 				pbFillRectRel( st_params->x, st_params->y, st_params->w, st_params->h, st_params->bgcolor );

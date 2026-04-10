@@ -248,7 +248,7 @@ PadutilRemap *padutilCreateRemapArray( size_t count );
 -----------------------------------------------*/
 void padutilDestroyRemapArray( PadutilRemap *remap );
 
-void padutilAdjustAnalogStick( PadutilAnalogStick *analogstick, SceCtrlData *pad );
+void padutilAdjustAnalogStick( const PadutilAnalogStick *analogstick, SceCtrlData *pad );
 void padutilRemap( PadutilRemap *remap, PadutilButtons src, SceCtrlData *pad, u32 *hprmkey, bool redefine );
 
 /*-----------------------------------------------

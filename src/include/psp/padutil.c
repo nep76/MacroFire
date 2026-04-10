@@ -376,7 +376,7 @@ void padutilDestroyRemapArray( PadutilRemap *remap )
 	memoryFree( remap );
 }
 
-void padutilAdjustAnalogStick( PadutilAnalogStick *analogstick, SceCtrlData *pad )
+void padutilAdjustAnalogStick( const PadutilAnalogStick *analogstick, SceCtrlData *pad )
 {
 	if( PADUTIL_IN_DEADZONE( abs( pad->Lx - analogstick->originX ), abs( pad->Ly - analogstick->originY ), analogstick->deadzone ) ){
 		pad->Lx = PADUTIL_CENTER_X;
@@ -426,13 +426,13 @@ void padutilRemap( PadutilRemap *remap, PadutilButtons src, SceCtrlData *pad, u3
 	
 	for( ; remap; remap = remap->next ){
 		if( redefine ) rmv_buttons |= remap->remapButtons;
-		if( ( ( src | padutilGetPad( analog_dir ) ) & remap->realButtons ) == remap->realButtons ){
+		if( ( ( src | padutilSetPad( analog_dir ) ) & remap->realButtons ) == remap->realButtons ){
 			if( padutilGetPad( remap->realButtons ) & ( PADUTIL_CTRL_ANALOG_UP | PADUTIL_CTRL_ANALOG_RIGHT | PADUTIL_CTRL_ANALOG_DOWN | PADUTIL_CTRL_ANALOG_LEFT ) ){
 				new_x = PADUTIL_CENTER_X;
 				new_y = PADUTIL_CENTER_Y;
 			}
 			
-			padutilSetAnalogStickDirection( padutilGetPad( remap->realButtons ), &new_x, &new_y );
+			padutilSetAnalogStickDirection( padutilGetPad( remap->remapButtons ), &new_x, &new_y );
 			
 			rmv_buttons |= remap->realButtons;
 			new_buttons |= remap->remapButtons;

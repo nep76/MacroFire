@@ -537,7 +537,7 @@ int mfCtrlPeekLatch( SceCtrlLatch *latch )
 	
 	ret = mf_get_ctrl_buffer( MF_KEEP, MF_CTRL_PEEK_BUFFER_POSITIVE, &pad, &hk );
 	
-	latch->uiMake    |= ( st_prev_buttons ^pad.Buttons ) & pad.Buttons;
+	latch->uiMake    |= ( st_prev_buttons ^ pad.Buttons ) & pad.Buttons;
 	latch->uiBreak   |= ( st_prev_buttons ^ pad.Buttons ) & st_prev_buttons;
 	latch->uiPress   |= pad.Buttons;
 	latch->uiRelease = ~0;
@@ -601,12 +601,6 @@ int mfHprmReadLatch( u32 *latch )
 {
 	/* mfHprmPeekLatch()‚Æ‚Ìˆá‚¢‚ª‚æ‚­•ª‚©‚ç‚È‚¢ */
 	return mfHprmPeekLatch( latch );
-}
-
-int mfImposeHomeButton( int unk )
-{
-	( ( int (*)( int ) )hooktable[10].restore.api )( 0 );
-	return -1;
 }
 
 /*-----------------------------------------------
@@ -759,6 +753,11 @@ bool mfHookIncomplete( void )
 HeapUID mfHeapCreate( unsigned int count, size_t size )
 {
 	return heapCreateEx( "MacroFireHeap", MEMORY_USER, 0, size + HEAP_HEADER_SIZE * count, PSP_SMEM_High, NULL );
+}
+
+const PadutilAnalogStick *mfGetAnalogStickContext( void )
+{
+	return mfAnalogStickGetContext();
 }
 
 /*-----------------------------------------------

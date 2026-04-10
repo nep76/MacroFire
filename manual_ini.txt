@@ -1,4 +1,4 @@
-MacroFire 3.0.7
+MacroFire 3.0.8
 
 目次
 =================================================
@@ -25,6 +25,8 @@ MacroFire 3.0.7
   それぞれの行は以下のフォーマットで書き込まれます。
 
     設定名 = 設定値
+
+  設定名および設定値の前後の空白は全て無視されます。
 
   そしてこれらの設定はさらにセクションごとに別々に管理されます。
   "["と"]"と囲まれた行がセクションの開始を示します。
@@ -251,12 +253,12 @@ HOMEボタンについて
   たとえば以下のように:
   
       [ULJM-05325]
-      UseVolatileMemory = Off
       UseGraphicsMemory = On
-      Remap = analog_to_dpad.ini
-      Rapidfire = SOSE_rf.ini
-      Macro1 = SOSE_auto_creation_shippitsu.ini
-      Macro2 = SOSE_auto_creation_art.ini
+      UseVolatileMemory = Off
+      Remap     = ms0:/macrofire/remap/analog_to_dpad.ini
+      Rapidfire = ms0:/macrofire/rapidfire/SOSE.ini
+      Macro1    = ms0:/macrofire/macro/SOSE/auto_creation_shippitsu.ini
+      Macro2    = ms0:/macrofire/macro/SOSE/auto_creation_art.ini
   
   このように設定することで、ゲームIDがULJM-05325のゲームを起動したときのみ
   設定されているファイルを読み込みます。
@@ -284,6 +286,9 @@ MacroFireメニュー上部の[ID: xxx / Loaded: xxx]の意味
   
   これは、MacroFireが読み込もうとした設定ファイルのセクション名と、
   実際に読み込んだセクション名を表しています。
+
+  この双方が一致すれば単純にIDのみを表示しますが、
+  読み込もうとしたIDが存在せず、別のセクションを読み込んだ場合は「ロード」部分で実際に読み込んだセクション名を表示します。
   
   例えば、
 
@@ -321,13 +326,13 @@ MacroFireメニュー上部の[ID: xxx / Loaded: xxx]の意味
   前述の表示が Loaded: Built-in と表示されている場合、これはmacrofire.iniの読み込みに失敗しています。
 
   macrofire.iniの読み込みに失敗し、更に新規作成も失敗した場合に
-  プログラム中で設定されている初期設定値を使用します。
+  内部で設定されている初期設定値を使用します。
 
   Built-in表示は、その初期設定値を使用していることを示します。
 
-  Built-inというセクションを読んでいるわけではないので、macrofire.iniに
-  [Built-in]というセクションを作ってもそこは使われません。
-  そもそもこの表示の時はmacrofire.iniを読み込めていないので、セクションがどうのという問題ではありません。
+  Built-inというセクションを読んでいるわけではないので、
+  macrofire.iniに[Built-in]というセクションを作ってもそこは使われません。
+  そもそも、これが表示されている時はmacrofire.iniを読み込めていないので、セクションがどうのという問題ではありません。
 
 
 起動時に検索されるセクションの名前と順番

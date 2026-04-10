@@ -38,12 +38,11 @@ INCDIR   = $(DIR_CLASSG)
 CFLAGS   = -Os -G 0 -Wall -fno-strict-aliasing
 ASFLAGS  = $(CFLAGS)
 LIBDIR   = 
-LDFLAGS  = -mno-crt0 -nostartfiles
+LDFLAGS  = 
 LIBS     = -lpsppower_driver -lpsphprm_driver -lpspge -lpsprtc -lm
 
 OBJS = exports.o \
        sceDmac.o \
-       sceImpose.o \
        mfmain.o \
        mfanalogstick.o \
        mfrapidfire.o \

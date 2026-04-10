@@ -47,4 +47,14 @@ int  sceDmacMemcpy( void *dest, const void *src, SceSize size );
 int scePowerVolatileMemTryLock( int unk, void **ptr, int *size );
 int scePowerVolatileMemUnlock( int unk );
 
+/*-----------------------------------------------
+	sceSysregAudioIoEnable
+	sceSysregAudioIoDisable
+	
+	オーディオ入出力の有効化/無効化。
+	どちらもpspSdkSetK1( 0 )実行後でないと不思議な動作をする。
+-----------------------------------------------*/
+int sceSysregAudioIoEnable( int unk );
+int sceSysregAudioIoDisable( int unk );
+
 #endif

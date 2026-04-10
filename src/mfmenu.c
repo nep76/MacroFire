@@ -111,11 +111,6 @@ struct mf_menu_params {
 	MfFuncMenu proc, nextproc;
 };
 
-struct mf_menu_restore_params {
-	bool hookEnabled;
-	int  muteEnabled;
-};
-
 enum mf_menu_stack_ctrl {
 	MF_MENU_STACK_CREATE,
 	MF_MENU_STACK_PUSH,
@@ -147,7 +142,7 @@ static bool mf_menu_get_target_threads( SceUID *thread_id_list, int *thread_id_c
 static void mf_menu_change_threads_stat( bool stat, SceUID *thread_id_list, int thread_id_count );
 static bool mf_alloc_buffers( struct mf_frame_buffers *fb, bool graphics_mem, bool volatile_mem );
 static void mf_free_buffers( struct mf_frame_buffers *fb );
-static void mf_draw_frame( void );
+static void mf_draw_frame( bool lowmem );
 static void mf_menu_init_tables( MfMenuTable *menu, unsigned short menucnt );
 static void mf_menu_draw_tables( MfMenuTable *menu, unsigned short menucnt, struct mf_menu_pos *pos );
 static bool mf_menu_move_table( enum mf_menu_move_directions dir, MfMenuTable *menu, unsigned short menucnt, struct mf_menu_pos *pos );
@@ -159,6 +154,7 @@ static bool mf_menu_stack( struct mf_menu_stack *stack, enum mf_menu_stack_ctrl 
 static unsigned int mf_label_width( char *str );
 static void mf_root_menu( MfMenuMessage message );
 bool mf_menu_ctrl_engine_stat( MfMessage message, const char *label, void *var, void *unused, void *ex );
+static void mf_menu_mute( bool mute );
 static void mf_menu_indicator( void );
 
 /*=========================================================
@@ -1041,11 +1037,6 @@ static void mf_root_menu( MfMenuMessage message )
 -----------------------------------------------*/
 void mfMenuMain( SceCtrlData *pad, MfHprmKey *hk )
 {
-	struct mf_menu_restore_params restore_params = {
-		mfIsEnabled(),
-		sceImposeGetParam( PSP_IMPOSE_MUTE )
-	};
-	
 	dbgprintf( "Memory block %d leaked", memoryGetAllocCount() );
 	sceDisplayWaitVblankStart();
 	
@@ -1060,7 +1051,7 @@ void mfMenuMain( SceCtrlData *pad, MfHprmKey *hk )
 	st_params->screenUpdate = true;
 	
 	/* サウンドをミュートにする */
-	if( ! restore_params.muteEnabled ) sceImposeSetParam( PSP_IMPOSE_MUTE, 1 );
+	mf_menu_mute( true );
 	
 	/* サスペンド/リジュームするスレッドの一覧を作成し、サスペンドする */
 	if( ! mf_menu_get_target_threads( st_params->threads.list, &(st_params->threads.count) ) ) goto DESTROY;
@@ -1070,7 +1061,7 @@ void mfMenuMain( SceCtrlData *pad, MfHprmKey *hk )
 	sceDisplayWaitVblankStart();
 	
 	/* APIがフックされている場合、一時的に元に戻す */
-	if( restore_params.hookEnabled ) mfUnhook();
+	if( mfIsEnabled() ) mfUnhook();
 	
 	/* メニュースタックを確保 */
 	if( ! mf_menu_stack( &(st_params->stack), MF_MENU_STACK_CREATE, NULL ) ) goto DESTROY;
@@ -1081,43 +1072,36 @@ void mfMenuMain( SceCtrlData *pad, MfHprmKey *hk )
 	
 	/* pbライブラリ初期化 */
 	dbgprint( "Initializing pb..." );
-	{
-		if( sceDisplayGetFrameBuf( &(st_params->frameBuffer.origaddr), &(st_params->frameBuffer.bufferWidth), &(st_params->frameBuffer.pixelFormat), PSP_DISPLAY_SETBUF_IMMEDIATE ) != 0 || ! st_params->frameBuffer.origaddr || ! st_params->frameBuffer.bufferWidth ) goto DESTROY;
-		
-		pbInit();
-		pbEnable( PB_NO_CACHE | PB_BLEND );
-		
-		/* フレームバッファとして使用するメモリを確保 */
-		dbgprint( "Allocating memory for frame buffers..." );
-		st_params->frameBuffer.frameSize = pbGetFrameBufferDataSize( st_params->frameBuffer.pixelFormat, st_params->frameBuffer.bufferWidth );
-		if( ! mf_alloc_buffers( &(st_params->frameBuffer), st_pref.useGraphicsMem, st_pref.useVolatileMem ) ) goto DESTROY;
-		
-		/* クリア用背景作成 */
-		if( st_params->frameBuffer.clear ){
-			/* 描画準備 */
-			pbSetDisplayBuffer( st_params->frameBuffer.pixelFormat, st_params->frameBuffer.clear, st_params->frameBuffer.bufferWidth );
-			pbApply();
-			
-			/* 現在表示されている画面をクリア用背景にコピー */
-			sceDisplayWaitVblankStart();
-			sceDmacMemcpy( st_params->frameBuffer.clear, st_params->frameBuffer.origaddr, st_params->frameBuffer.frameSize );
-			
-			pbFillRect( 0, 0, SCR_WIDTH, SCR_HEIGHT, MF_COLOR_BG );
-			mf_draw_frame();
-		}
-		
-		/* ダブルバッファリングを有効化 */
-		if( st_params->frameBuffer.draw ){
-			pbSetDrawBuffer( st_params->frameBuffer.pixelFormat, st_params->frameBuffer.draw, st_params->frameBuffer.bufferWidth );
-			pbEnable( PB_DOUBLE_BUFFER );
-		}
-		pbSetDisplayBuffer( st_params->frameBuffer.pixelFormat, st_params->frameBuffer.display, st_params->frameBuffer.bufferWidth );
-		
-		
-		/* 設定したフレームバッファで描画準備 */
+	if( sceDisplayGetFrameBuf( &(st_params->frameBuffer.origaddr), &(st_params->frameBuffer.bufferWidth), &(st_params->frameBuffer.pixelFormat), PSP_DISPLAY_SETBUF_IMMEDIATE ) != 0 || ! st_params->frameBuffer.origaddr || ! st_params->frameBuffer.bufferWidth ) goto DESTROY;
+	
+	pbInit();
+	pbEnable( PB_NO_CACHE | PB_BLEND );
+	
+	/* フレームバッファとして使用するメモリを確保 */
+	dbgprint( "Allocating memory for frame buffers..." );
+	st_params->frameBuffer.frameSize = pbGetFrameBufferDataSize( st_params->frameBuffer.pixelFormat, st_params->frameBuffer.bufferWidth );
+	if( ! mf_alloc_buffers( &(st_params->frameBuffer), st_pref.useGraphicsMem, st_pref.useVolatileMem ) ) goto DESTROY;
+	
+	/* クリア用背景作成 */
+	if( st_params->frameBuffer.clear ){
+		/* 描画準備 */
+		pbSetDisplayBuffer( st_params->frameBuffer.pixelFormat, st_params->frameBuffer.clear, st_params->frameBuffer.bufferWidth );
 		pbApply();
-		pbSync( PB_BUFSYNC_IMMEDIATE );
+		
+		/* 現在表示されている画面をクリア用背景にコピー */
+		sceDisplayWaitVblankStart();
+		sceDmacMemcpy( st_params->frameBuffer.clear, st_params->frameBuffer.origaddr, st_params->frameBuffer.frameSize );
+		
+		pbFillRect( 0, 0, SCR_WIDTH, SCR_HEIGHT, MF_COLOR_BG );
+		mf_draw_frame( false );
 	}
+	
+	/* ダブルバッファリングを有効化 */
+	if( st_params->frameBuffer.draw ){
+		pbSetDrawBuffer( st_params->frameBuffer.pixelFormat, st_params->frameBuffer.draw, st_params->frameBuffer.bufferWidth );
+		pbEnable( PB_DOUBLE_BUFFER );
+	}
+	pbSetDisplayBuffer( st_params->frameBuffer.pixelFormat, st_params->frameBuffer.display, st_params->frameBuffer.bufferWidth );
 	
 	/* ダイアログ初期化 */
 	mfDialogInit( st_pref.remap );
@@ -1147,6 +1131,10 @@ void mfMenuMain( SceCtrlData *pad, MfHprmKey *hk )
 	dbgprint( "Starting menu-loop" );
 	sceDisplayWaitVblankStart();
 	
+	/* 設定したフレームバッファで描画準備 */
+	pbApply();
+	pbSync( PB_BUFSYNC_NEXTFRAME );
+	
 	while( gRunning ){
 		/* 背景を描画 */
 		if( st_params->frameBuffer.clear ){
@@ -1154,14 +1142,17 @@ void mfMenuMain( SceCtrlData *pad, MfHprmKey *hk )
 			mf_menu_indicator();
 		} else if( st_params->frameBuffer.draw ){
 			memset( pbGetCurrentDrawBufferAddr(), 0, st_params->frameBuffer.frameSize );
-			mf_draw_frame();
+			mf_draw_frame( false );
 			mf_menu_indicator();
 		} else{
-			if( ( st_params->ctrl.pad->Buttons & MF_HOTKEY_BUTTONS ) || st_params->screenUpdate ){
+			SceCtrlData dupe_pad = *(st_params->ctrl.pad);
+			const PadutilAnalogStick *anlg_context = mfGetAnalogStickContext();
+			padutilAdjustAnalogStick( anlg_context, &dupe_pad );
+			if( ( ( dupe_pad.Buttons | padutilGetAnalogStickDirection( dupe_pad.Lx,  dupe_pad.Ly, 0 ) ) & MF_HOTKEY_BUTTONS ) || st_params->screenUpdate ){
 				pbDisable( PB_NO_DRAW );
 				st_params->screenUpdate = false;
 				memset( pbGetCurrentDrawBufferAddr(), 0, st_params->frameBuffer.frameSize );
-				mf_draw_frame();
+				mf_draw_frame( true );
 				mf_menu_indicator();
 			} else{
 				pbEnable( PB_NO_DRAW );
@@ -1220,7 +1211,7 @@ void mfMenuMain( SceCtrlData *pad, MfHprmKey *hk )
 	
 	pbPrint( pbOffsetChar( 30 ), pbOffsetLine( 17 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, MF_STR_HOME_RETURN_TO_GAME );
 	sceDisplayWaitVblankStart();
-	pbSwapBuffers( PB_BUFSYNC_IMMEDIATE );
+	pbSwapBuffers( PB_BUFSYNC_NEXTFRAME );
 	sceKernelDelayThread( 300000 );
 	
 	/* メニュースタックに詰まれているメニュー全てにMF_MM_TERMを送る */
@@ -1245,10 +1236,10 @@ void mfMenuMain( SceCtrlData *pad, MfHprmKey *hk )
 		mf_free_buffers( &(st_params->frameBuffer) );
 		
 		/* サウンドを戻す */
-		if( ! restore_params.muteEnabled ) sceImposeSetParam( PSP_IMPOSE_MUTE, 0 );
+		mf_menu_mute( false );
 		
 		/* メニュー起動前にAPIをフックしていた場合は、フックしなおす */
-		if( restore_params.hookEnabled ) mfHook();
+		if( mfIsEnabled() ) mfHook();
 		
 		/* 他のスレッドをリジューム */
 		sceDisplayWaitVblankStart();
@@ -1404,6 +1395,19 @@ bool mf_menu_ctrl_engine_stat( MfMessage message, const char *label, void *var, 
 	return ret;
 }
 
+static void mf_menu_mute( bool mute )
+{
+	unsigned int k1 = pspSdkSetK1( 0 );
+	
+	if( mute ){
+		sceSysregAudioIoDisable( 0 );
+	} else{
+		sceSysregAudioIoEnable( 0 );
+	}
+	
+	pspSdkSetK1( k1 );
+}
+
 static void mf_menu_indicator( void )
 {
 	static char lst_working_indicator[] = "|/-\\";
@@ -1547,6 +1551,7 @@ static bool mf_alloc_buffers( struct mf_frame_buffers *fb, bool graphics_mem, bo
 static void mf_free_buffers( struct mf_frame_buffers *fb )
 {
 	sceDisplayWaitVblankStart();
+	sceDisplaySetFrameBuf( fb->origaddr, fb->bufferWidth, fb->pixelFormat, PSP_DISPLAY_SETBUF_IMMEDIATE );
 	
 	if( fb->vram ){
 		dbgprint( "Restore vram buffer" );
@@ -1554,9 +1559,6 @@ static void mf_free_buffers( struct mf_frame_buffers *fb )
 	} else if( fb->clear ){
 		sceDmacMemcpy( fb->origaddr, fb->clear, fb->frameSize );
 	}
-	
-	dbgprintf( "Reset frame buffer addr: %p", fb->origaddr );
-	sceDisplaySetFrameBuf( fb->origaddr, fb->bufferWidth, fb->pixelFormat, PSP_DISPLAY_SETBUF_IMMEDIATE );
 	
 	dbgprint( "Free memory for frame buffers" );
 	if( fb->volatileMem ){
@@ -1568,7 +1570,7 @@ static void mf_free_buffers( struct mf_frame_buffers *fb )
 	}
 }
 
-static void mf_draw_frame( void )
+static void mf_draw_frame( bool lowmem )
 {
 	/* これらのセクション名は、内容が同じである場合、ポインタレベルで同じである */
 	const char *targid = mfGetIniTargetSection();
@@ -1583,14 +1585,18 @@ static void mf_draw_frame( void )
 	if( targid == loadid ){
 		pbPrint( pbOffsetChar( 32 + 5 + strlen( targid ) ), pbOffsetLine( 1 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, "]" );
 	} else{
-		pbPrintf( pbOffsetChar( 32 + 5 + strlen( targid ) ), pbOffsetLine( 1 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, " / Loaded: %s]", loadid );
+		pbPrintf( pbOffsetChar( 32 + 5 + strlen( targid ) ), pbOffsetLine( 1 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, " / %s: %s]", MF_STR_HOME_LOADED, loadid );
 	}
 	
 	if( mfHookIncomplete() ){
 		pbPrint( pbOffsetChar( 44 ), pbOffsetLine( 2 ) + ( pbOffsetLine( 1 ) >> 1 ), MF_COLOR_EX4, MF_COLOR_TEXT_BG, MF_STR_HOME_NOT_PERFECT_WORK );
 	}
 	
+	if( lowmem ){
+		pbPrintf( 0, 0, MF_COLOR_EX4, MF_COLOR_TEXT_BG, "<%s>", MF_STR_HOME_LOW_MEMORY_MODE );
+	}
+	
 #ifdef MF_WITH_EXCEPTION_HANDLER
-		pbPrint( 0, 0, MF_COLOR_EX4, MF_COLOR_TEXT_BG, "<for DEBUG>" );
+		pbPrint( SCR_WIDTH - pbOffsetChar( 12 ), 0, MF_COLOR_EX4, MF_COLOR_TEXT_BG, "<for DEBUG>" );
 #endif
 }

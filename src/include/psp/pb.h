@@ -57,7 +57,7 @@
 #define PB_TRANSPARENT 0
 
 /* フレームバッファ設定のクリア */
-#define PB_UNDEF_FRAMEBUF 0, NULL, 0
+#define PB_CLEAR_FRAMEBUF 0, NULL, 0
 
 /* PSPボタン文字 */
 #ifdef PB_SJIS_SUPPORT
@@ -85,6 +85,36 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/*=========================================================
+	ローカル型宣言
+=========================================================*/
+typedef unsigned int ( *color_convert  )( unsigned int, void* );
+
+enum pb_blend_target {
+	PB_BLEND_SRC,
+	PB_BLEND_DST
+};
+
+struct pb_frame_buffer {
+	int  format;
+	void *addr;
+	int  width;
+	
+	unsigned char pixelSize;
+	unsigned int  lineSize;
+	
+	color_convert   colorConv;
+};
+
+struct pb_params {
+	struct pb_frame_buffer frame0, frame1;
+	struct pb_frame_buffer *display, *draw;
+	unsigned int   options;
+	unsigned int   blendFactor;
+	unsigned int   linebreakWidth;
+};
+
 /*=========================================================
 	型宣言
 =========================================================*/
@@ -95,11 +125,14 @@ typedef enum {
 	PB_NO_DRAW       = 0x80000000
 } PbOptions;
 
+typedef struct pb_params PbContext;
 
 /*=========================================================
 	関数
 =========================================================*/
 void pbInit( void );
+void pbSaveContext( PbContext *context );
+void pbRestoreContext( PbContext *context );
 void pbSetDisplayBuffer( int format, void *fbp, int width );
 void pbSetDrawBuffer( int format, void *fbp, int width );
 void pbSetDisplayBufferUndef( void );
