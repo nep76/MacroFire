@@ -598,7 +598,6 @@ static enum inimgr_line_type inimgr_parse_line( const char *line, char **start )
 	*(end + 1) = '\0';
 	
 	return INIMGR_LINE_ENTRY;
-
 }
 
 static char *inimgr_get_value( struct inimgr_params *params, const char *section, const char *key )

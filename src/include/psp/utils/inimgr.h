@@ -22,6 +22,10 @@
 #include "utils/strutil.h"
 #include "cgerrs.h"
 
+#ifdef PSP_USE_KERNEL_LIBC
+#include "psp/sysclib/sysclib.h"
+#endif
+	
 /*-----------------------------------------------
 	íËêî
 -----------------------------------------------*/

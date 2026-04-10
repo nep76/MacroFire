@@ -8,6 +8,10 @@
 #ifndef MACROFIRE_H
 #define MACROFIRE_H
 
+#ifdef PSP_USE_KERNEL_LIBC
+#include "psp/sysclib/sysclib.h"
+#endif
+
 #include "pspapi.h"
 #include "mftypes.h"
 #include "mftab.h"
@@ -16,7 +20,7 @@
 	íËêî
 ==========================================================*/
 #define MF_TITLE        "MacroFire %s In-game menu"
-#define MF_VERSION      "3.0.3"
+#define MF_VERSION      "3.0.4"
 #define MF_AUTHOR       "ClassG (http://classg.sytes.net)"
 
 #define MF_INI_FILENAME        "macrofire.ini"

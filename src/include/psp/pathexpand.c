@@ -91,7 +91,7 @@ bool pathexpandFromBase( const char* basepath, const char *path, char *resolved_
 		/* ドライブ部が無い場合は、basepathの存在によって分岐 */
 		if( ! basepath ){
 			/* basepathが無い場合は、カレントディレクトリをそのまま使用 */
-			getcwd( resolved_path, len );
+			//getcwd( resolved_path, len );
 		} else{
 			/* basepathとresolved_pathのポインタが重なっている可能性を考慮してbasepathを退避 */
 			char *base = (char *)memoryAlloc( strlen( basepath ) + 1 );
@@ -105,7 +105,7 @@ bool pathexpandFromBase( const char* basepath, const char *path, char *resolved_
 				strutilCopy( resolved_path, base, len );
 			} else{
 				/* basepathがドライブ部を含まない場合は、それも相対パスなのでカレントディレクトリを取得 */
-				getcwd( resolved_path, len );
+				//getcwd( resolved_path, len );
 				strutilCat( resolved_path, "/", len );
 				strutilCat( resolved_path, base, len );
 			}

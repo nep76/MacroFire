@@ -14,8 +14,8 @@
 #include <stdbool.h>
 #include <stdarg.h>
 #include <string.h>
-#include "utils/inimgr.h"
 #include "utils/strutil.h"
+#include "psp/utils/inimgr.h"
 #include "psp/padctrl.h"
 #include "psp/padutil.h"
 #include "psp/gb.h"

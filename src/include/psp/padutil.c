@@ -266,7 +266,7 @@ char *padutilGetButtonNamesByCode( PadutilButtonName *availbtn, PadutilButtons b
 PadutilButtons padutilGetButtonCodeByNames( PadutilButtonName *availbtn, char *names, const char *delim, unsigned int opt )
 {
 	int i, nameslen = 0, delimlen = 0;
-	unsigned int buttons = 0;
+	PadutilButtons buttons = 0;
 	char *btn_name, *next = NULL;
 	
 	void *comparer;
@@ -280,7 +280,7 @@ PadutilButtons padutilGetButtonCodeByNames( PadutilButtonName *availbtn, char *n
 	strutilCopy( delimtoken, delim, sizeof( delimtoken ) );
 	
 	if( opt & PADUTIL_OPT_IGNORE_SP ){
-		strutilRemoveChar( names,   "\x20\t" );
+		strutilRemoveChar( names,      "\x20\t" );
 		strutilRemoveChar( delimtoken, "\x20\t" );
 	}
 	if( opt & PADUTIL_OPT_CASE_SENS ){

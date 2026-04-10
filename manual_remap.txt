@@ -1,4 +1,4 @@
-MacroFire 3.0.3
+MacroFire 3.0.4
 
 
 Remap settings

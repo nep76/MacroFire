@@ -18,7 +18,6 @@ static void mf_shutdown( void );
 static void mf_ini( const char *inipath );
 static void mf_ini_load( IniUID ini );
 static void mf_ini_save( IniUID ini );
-static MfCallerMode mf_get_caller_mode( void );
 static int mf_get_ctrl_buffer( MfHookAction action, unsigned int api, SceCtrlData *pad, MfHprmKey *hk );
 static void mf_ctrl_data_copy( SceCtrlData *padarr, int count );
 
@@ -90,10 +89,8 @@ static void mf_init( void )
 		} else if( st_world == MF_WORLD_VSH ){
 			if( i == MF_VSHCTRL_READ_BUFFER_POSITIVE ) st_hook_incomplete = true;
 		} else if( 
-			i == MF_CTRL_PEEK_BUFFER_POSITIVE ||
-			i == MF_CTRL_PEEK_BUFFER_NEGATIVE ||
-			i == MF_CTRL_READ_BUFFER_POSITIVE ||
-			i == MF_CTRL_READ_BUFFER_NEGATIVE
+			i == MF_CTRL_PEEK_BUFFER_POSITIVE || i == MF_CTRL_PEEK_BUFFER_NEGATIVE ||
+			i == MF_CTRL_READ_BUFFER_POSITIVE || i == MF_CTRL_READ_BUFFER_NEGATIVE
 		){
 			st_hook_incomplete = true;
 		}
@@ -171,28 +168,11 @@ static void mf_ini_load( IniUID ini )
 	
 	bool status_notification = MF_INI_STATUS_NOTIFICATION;
 	
+	/* Mainセクション読み出し */
 	inimgrGetBool( ini, "Main", "Startup", &st_is_enabled );
-	
-	if( inimgrGetString( ini, "Main", "MenuButtons", buf, sizeof( buf ) ) > 0 ){
-		st_menu_buttons = mfConvertButtonN2C( buf );
-	}
-	
-	if( inimgrGetString( ini, "Main", "ToggleButtons", buf, sizeof( buf ) ) > 0 ){
-		st_toggle_buttons = mfConvertButtonN2C( buf );
-	}
-	
+	if( inimgrGetString( ini, "Main", "MenuButtons", buf, sizeof( buf ) ) > 0 )   st_menu_buttons = mfConvertButtonN2C( buf );
+	if( inimgrGetString( ini, "Main", "ToggleButtons", buf, sizeof( buf ) ) > 0 ) st_toggle_buttons = mfConvertButtonN2C( buf );
 	inimgrGetBool( ini, "Main", "StatusNotification", &status_notification );
-	
-	mfMenuIniLoad( ini, buf, sizeof( buf ) );
-	mfAnalogStickIniLoad( ini, buf, sizeof( buf ) );
-	
-	dbgprint( "Sending message MF_MS_INI_LOAD to all functions..." );
-	for( i = 0; i < gMftabEntryCount; i++ ){
-		if( gMftab[i].proc ){
-			inifunc = ( gMftab[i].proc )( MF_MS_INI_LOAD );
-			if( inifunc ) inifunc( ini, buf, sizeof( buf ) );
-		}
-	}
 	
 	/* 設定ファイルのロードすべきセクション名を決定 */
 	if( st_game_id[0] == '\0' || ! inimgrExistSection( ini, st_game_id ) ){
@@ -212,6 +192,18 @@ static void mf_ini_load( IniUID ini )
 	} else{
 		st_ini_request_section = st_game_id;
 		st_ini_target_section  = st_game_id;
+	}
+	
+	/* セクション名を確定したので、各機能へロード要求 */
+	mfMenuIniLoad( ini, buf, sizeof( buf ) );
+	mfAnalogStickIniLoad( ini, buf, sizeof( buf ) );
+	
+	dbgprint( "Sending message MF_MS_INI_LOAD to all functions..." );
+	for( i = 0; i < gMftabEntryCount; i++ ){
+		if( gMftab[i].proc ){
+			inifunc = ( gMftab[i].proc )( MF_MS_INI_LOAD );
+			if( inifunc ) inifunc( ini, buf, sizeof( buf ) );
+		}
 	}
 	
 	if( status_notification ) mfOverlayMessageStart();
@@ -246,21 +238,6 @@ static void mf_ini_save( IniUID ini )
 }
 
 /*-----------------------------------------------
-	例外ハンドラを呼び出したスレッドの実効モードを得る、かもしれない。
-	ちゃんと取得できているのか不明。
------------------------------------------------*/
-static MfCallerMode mf_get_caller_mode( void )
-{
-	uint32_t cop0_status_register;
-	
-	/* ステータスレジスタを読み出す */
-	asm( "mfc0 %0, $12;" : "=r"( cop0_status_register ) );
-	
-	/* ステータスレジスタの2ビット目が現在の例外ハンドラの実行モード */
-	return ( cop0_status_register & 0x00000002 ) ? MF_CALLER_KERNEL : MF_CALLER_USER;
-}
-
-/*-----------------------------------------------
 	指定されたAPIでパッドデータを取得し、そのデータをファンクションへ渡す。
 	
 	K1レジスタのメモ
@@ -281,7 +258,6 @@ static int mf_get_ctrl_buffer( MfHookAction action, unsigned int api, SceCtrlDat
 {
 	unsigned int k1_register;
 	int ret;
-	MfCallerMode caller;
 	MfFuncHook hookfunc;
 
 	k1_register = pspSdkSetK1( 0 );
@@ -303,7 +279,6 @@ static int mf_get_ctrl_buffer( MfHookAction action, unsigned int api, SceCtrlDat
 	} else{
 		*hk = 0;
 	}
-	caller = mf_get_caller_mode();
 	
 	pspSdkSetK1( k1_register );
 	
@@ -321,7 +296,7 @@ static int mf_get_ctrl_buffer( MfHookAction action, unsigned int api, SceCtrlDat
 				if( hookfunc ) hookfunc( action, pad, hk );
 			}
 		}
-		if( caller == MF_CALLER_USER ) pad->Buttons &= MF_TARGET_BUTTONS;
+		//if( caller == MF_CALLER_USER ) pad->Buttons &= MF_TARGET_BUTTONS;
 	}
 	
 	return ret;

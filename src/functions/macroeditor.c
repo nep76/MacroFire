@@ -182,7 +182,8 @@ bool macroeditorMain( void )
 			case MACROMGR_DELAY:
 				offset += PRINT_CMD( offset, line_coord, text_color, "Delay" );
 				offset += PRINT_CMD( offset, line_coord, guide_color, " ------------> " );
-				PRINTF_CMD( offset, line_coord, text_color, "%llu %s", data, st_params->dialogPref.delay.unit );
+				/* USE_KERNEL_LIBC ‚¾‚Æ %llu ‚ª‚È‚º‚Èí‚É0 */
+				PRINTF_CMD( offset, line_coord, text_color, "%u %s", (unsigned int)data, st_params->dialogPref.delay.unit );
 				break;
 			case MACROMGR_BUTTONS_PRESS:
 				offset += PRINT_CMD( offset, line_coord, text_color, "Buttons press" );

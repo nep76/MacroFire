@@ -379,7 +379,12 @@ static int remap_loader( InimgrCallbackMode mode, InimgrCallbackParams *cbp, cha
 	
 	while( inimgrCbReadln( cbp, buf, buflen ) ){
 		strutilRemoveChar( buf, "\x20\t" );
+		
+		dbgprintf( "%s", buf );
+		
 		if( ! inimgrParseEntry( buf, &name, &value ) ) continue;
+		
+		dbgprintf( "%s %s", name, value );
 		
 		if( strcasecmp( name, "RealButtons" ) == 0 ){
 			if( ! params->selected->realButtons ){

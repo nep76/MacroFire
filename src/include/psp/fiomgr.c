@@ -166,9 +166,9 @@ int fiomgrReadln( FiomgrHandle fh, char *str, size_t maxlength )
 			params->cache.position += copy_length;
 			read_bytes             += copy_length;
 			
+			str[str_length] = '\0';
+			
 			if( lnbrk ){
-				str[str_length] = '\0';
-				
 				lncode   = *lnbrk;
 				nextcode = 0;
 				if( params->cache.length == params->cache.position ){

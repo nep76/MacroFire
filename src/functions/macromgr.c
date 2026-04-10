@@ -222,7 +222,8 @@ int macromgrSaver( InimgrCallbackMode mode, InimgrCallbackParams *cbp, char *buf
 	for( cmd = params->macro; cmd; cmd = cmd->next ){
 		switch( cmd->action ){
 			case MACROMGR_DELAY:
-				len = snprintf( buf, buflen, "%s = %llu", MACROMGR_INI_KEY_DELAY, (MacromgrData)cmd->data );
+				/* USE_KERNEL_LIBC ‚¾‚Æ %llu ‚ª‚È‚º‚Èí‚É0 */
+				len = snprintf( buf, buflen, "%s = %u", MACROMGR_INI_KEY_DELAY, (unsigned int)cmd->data );
 				break;
 			case MACROMGR_BUTTONS_PRESS:
 				mfConvertButtonC2N( cmd->data, buttons, sizeof( buttons ) );

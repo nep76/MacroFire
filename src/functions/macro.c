@@ -718,6 +718,7 @@ static bool macro_load( struct macro_params *slot, const char *path )
 		ret = inimgrLoad( ini, path, MACRO_INI_SIGNATURE, MACROMGR_MACRO_VERSION, 0, 0 );
 		
 		if( ret != 0 ){
+			macro_clear( slot );
 			if( ret == INIMGR_ERROR_INVALID_SIGNATURE ){
 				mfMenuSetInfoText( MF_MENU_INFOTEXT_ERROR | MF_MENU_INFOTEXT_SET_MIDDLE_LINE, "Failure: Not a MacroFire macro file." );
 			} else if( ret == INIMGR_ERROR_INVALID_VERSION ){

@@ -11,7 +11,6 @@
 #include "../macrofire.h"
 #include "psp/memory.h"
 #include "psp/dmem.h"
-#include "utils/inimgr.h"
 
 /*=========================================================
 	É}ÉNÉç
