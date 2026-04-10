@@ -138,6 +138,7 @@ static bool mf_init( void )
 			if( memcmp( pbp_header.Signature, "\0PBP", 4 ) == 0 ){
 				sceIoLseek( pbp, pbp_header.Offset[PARAM_SFO], PSP_SEEK_SET );
 				mf_get_gameid( pbp, st_game_id );
+				if( st_game_id[0] == '\0' ) mf_get_gameid_from_sha1hash( pbp, st_game_id );
 			}
 			sceIoClose( pbp );
 		}
@@ -202,8 +203,11 @@ static void mf_get_gameid( SceUID fd, char *gameid )
 {
 	struct MfPsfHeader  psf_header;
 	struct MfPsfSection psf_section;
-	SceOff save_section_offset = 0;
+	SceOff psf_start;
+	SceOff save_section_offset;
 	char key[7];
+	
+	psf_start = sceIoLseek( fd, 0, PSP_SEEK_CUR );
 	
 	sceIoRead( fd, &psf_header, sizeof( psf_header ) );
 	save_section_offset = sceIoLseek( fd, 0, PSP_SEEK_CUR );
@@ -212,16 +216,14 @@ static void mf_get_gameid( SceUID fd, char *gameid )
 		save_section_offset = sceIoLseek( fd, save_section_offset, PSP_SEEK_SET ) + sizeof( psf_section );
 		sceIoRead( fd, &psf_section, sizeof( psf_section ) );
 		
-		sceIoLseek( fd, psf_header.KeyTableOffset + psf_section.KeyOffset, PSP_SEEK_SET );
+		sceIoLseek( fd, psf_start + psf_header.KeyTableOffset + psf_section.KeyOffset, PSP_SEEK_SET );
 		sceIoRead( fd, key, sizeof( key ) );
 		if( strncmp( key, "DISC_ID", 7 ) == 0 ){
-			sceIoLseek( fd, psf_header.ValueTableOffset + psf_section.ValueOffset, PSP_SEEK_SET );
+			sceIoLseek( fd, psf_start + psf_header.ValueTableOffset + psf_section.ValueOffset, PSP_SEEK_SET );
 			sceIoRead( fd, gameid, 10 );
 			gameid[9] = '\0';
 		}
 	}
-	
-	if( gameid[0] == '\0' ) mf_get_gameid_from_sha1hash( fd, gameid );
 }
 
 /*-----------------------------------------------
@@ -492,21 +494,22 @@ static void mf_ready( const char *cwd )
 	dbgprint( "Waiting for loading modules..." );
 	if( st_world == MF_WORLD_VSH ){
 		/* sceVshBridge_Driver‚ð‘Ò‚Â */
-		while( sceKernelFindModuleByName( "sceVshBridge_Driver" ) == NULL )
+		while( ! sceKernelFindModuleByName( "sceVshBridge_Driver" ) ){
 			sceKernelDelayThread( 2000000 );
+		}
 	} else if( st_world == MF_WORLD_POPS ){
-		while( sceKernelFindModuleByName( "scePops_Manager" ) == NULL && sceKernelFindModuleByName( "popsloader_trademark" ) == NULL )
+		while( sceKernelFindModuleByName( "scePops_Manager" ) || sceKernelFindModuleByName( "popsloader_trademark" ) ){
 			sceKernelDelayThread( 2000000 );
+		}
 	} else{
+		int stat;
 #ifdef DEBUG
 		if( sceKernelFindModuleByName( "PSPLINK" ) == NULL )
 #endif
-		int stat;
-		
 		sceKernelDelayThread( 12000000 );
 		
 		stat = sceUmdGetDriveStat();
-		if( stat != PSP_UMD_NOT_PRESENT ){
+		if( stat != 0 ){
 			SceUID sfo;
 			if( stat != PSP_UMD_READY ) sceUmdWaitDriveStat( PSP_UMD_READY );
 			
