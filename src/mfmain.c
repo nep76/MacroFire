@@ -492,20 +492,18 @@ static void mf_ready( const char *cwd )
 	
 	/* ‹N“®‘Ò‚¿ (‚È‚ñ‚Æ‚©‚È‚­‚¹‚È‚¢‚à‚Ì‚©?) */
 	dbgprint( "Waiting for loading modules..." );
+	
 	if( st_world == MF_WORLD_VSH ){
-		/* sceVshBridge_Driver‚ð‘Ò‚Â */
-		while( ! sceKernelFindModuleByName( "sceVshBridge_Driver" ) ){
+		while( sceKernelFindModuleByName( "sceVshBridge_Driver" ) == NULL ){
 			sceKernelDelayThread( 2000000 );
 		}
 	} else if( st_world == MF_WORLD_POPS ){
-		while( sceKernelFindModuleByName( "scePops_Manager" ) || sceKernelFindModuleByName( "popsloader_trademark" ) ){
+		while( sceKernelFindModuleByName( "scePops_Manager" ) == NULL && sceKernelFindModuleByName( "popsloader_trademark" ) == NULL ){
 			sceKernelDelayThread( 2000000 );
 		}
 	} else{
 		int stat;
-#ifdef DEBUG
-		if( sceKernelFindModuleByName( "PSPLINK" ) == NULL )
-#endif
+		
 		sceKernelDelayThread( 12000000 );
 		
 		stat = sceUmdGetDriveStat();
@@ -717,7 +715,7 @@ static int mf_main( SceSize arglen, void *argp )
 	
 	dbgprint( "Starting main-loop" );
 	while( gRunning ){
-		sceKernelDelayThread( 50000 );
+		sceKernelDelayThreadCB( 50000 );
 		
 #ifdef DEBUG
 	if( gDebug[0] ){
