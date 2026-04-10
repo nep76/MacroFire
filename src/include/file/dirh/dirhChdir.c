@@ -130,7 +130,7 @@ static int dirh_thread_parse( struct dirh_thread_dopen_params *thdopen, struct d
 	thdopen->data = data;
 	thdopen->status = 0;
 	
-	thid = sceKernelCreateThread( "DirhThDopen", dirh_dopen_thread_main, 32, 0x500, 0, NULL );
+	thid = sceKernelCreateThread( "DirhThDopen", dirh_dopen_thread_main, 32, 0x600, 0, NULL );
 	if( ! CG_IS_VALID_UID( thid ) ) return thid;
 	
 	ret = sceKernelStartThread( thid, sizeof( struct dirh_thread_dopen_params * ), &thdopen );

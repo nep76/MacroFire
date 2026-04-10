@@ -509,7 +509,7 @@ static void mf_ready( const char *cwd )
 		sceKernelDelayThread( 12000000 );
 		
 		stat = sceUmdGetDriveStat();
-		if( stat != 0 ){
+		if( stat > PSP_UMD_NOT_PRESENT ){
 			SceUID sfo;
 			if( stat != PSP_UMD_READY ) sceUmdWaitDriveStat( PSP_UMD_READY );
 			
