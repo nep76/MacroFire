@@ -224,6 +224,7 @@ void macroMain( MfHookAction action, SceCtrlData *pad, MfHprmKey *hk )
 						
 						macro_trace_prepare( &(st_params.work), st_params.work.actionData, macromgrSeek( st_params.work.actionData->macro, 0, MACROMGR_SEEK_SET, NULL ) );
 						macro_trace( &(st_params.work), pad );
+						
 						break;
 					}
 				}

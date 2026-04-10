@@ -125,7 +125,7 @@ enum SceSysconCtrlButtons {
 	SCE_SYSCON_CTRL_MS_EJECT     = 0x00200000,
 	
 	/* あまりビットコード。未知のボタンコードを捨てるとまずそうなのでこれで抽出してセット */
-	SCE_SYSCON_CTRL_UNK_BUTTONS  = 0xFFC00900
+	SCE_SYSCON_CTRL_UNK_BUTTONS  = 0xFFC00000
 } SceSysconCtrlButtons;
 
 void sceSysconSetDebugHandlers( SceSysconDebugHandlers *handlers );

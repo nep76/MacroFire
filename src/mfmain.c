@@ -229,7 +229,7 @@ static unsigned char mf_syscon_make_rx_checksum( SceSysconPacket *packet )
 {
 	/* チェックサムらしき値を計算してセットしないとスリープに入れない模様? */
 	unsigned char checksum = 0xFF - packet->rx_sts - packet->rx_len - packet->rx_response;
-	unsigned char offset  = packet->rx_len - 2 - 1 /* 後ろ二つの0xFFは一体? */;
+	unsigned char offset  = packet->rx_len - 2 - 1 /* 末尾2バイトの0xFFは計算しない */;
 	
 	while( offset-- ) checksum -= packet->rx_data[offset];
 	
@@ -257,7 +257,7 @@ static void mf_syscon_handler_transmit( SceSysconPacket *packet )
 */
 static void mf_syscon_handler_recieve( SceSysconPacket *packet )
 {
-	//覚え書: syscon_pad.TimeStamp = mf_syscom_peek_dword( packet->unk38 );
+	//覚え書: syscon_pad.TimeStamp = mf_syscom_peek_dword( packet->unk38 ) (?);
 	
 	SceCtrlData syscon_pad;
 	MfHprmKey   syscon_hk;

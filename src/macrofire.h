@@ -26,7 +26,7 @@
 	íËêî
 ==========================================================*/
 #define MF_TITLE        MF_STR_TITLE
-#define MF_VERSION      "3.2.2"
+#define MF_VERSION      "3.2.3"
 #define MF_AUTHOR       "ClassG (http://classg.sytes.net)"
 
 #define MF_INI_PATH_DEFAULT    "ms0:/seplugins/"
