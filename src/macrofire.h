@@ -9,7 +9,7 @@
 #define MACROFIRE_H
 
 #ifdef PSP_USE_KERNEL_LIBC
-#include "psp/sysclib/sysclib.h"
+#include "sysclib.h"
 #endif
 
 #ifdef PB_SJIS_SUPPORT
@@ -26,7 +26,7 @@
 	íËêî
 ==========================================================*/
 #define MF_TITLE        MF_STR_TITLE
-#define MF_VERSION      "3.0.12"
+#define MF_VERSION      "3.0.13"
 #define MF_AUTHOR       "ClassG (http://classg.sytes.net)"
 
 #define MF_INI_PATH_DEFAULT    "ms0:/seplugins/"

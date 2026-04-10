@@ -9,8 +9,8 @@
 #define FUNCTION_MACROMGR_H
 
 #include "../macrofire.h"
-#include "psp/memory.h"
-#include "psp/dmem.h"
+#include "memory/memory.h"
+#include "memory/dmem.h"
 
 /*=========================================================
 	É}ÉNÉç

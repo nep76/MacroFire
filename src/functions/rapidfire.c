@@ -149,7 +149,6 @@ void rapidfireMenu( MfMessage message )
 				
 				delaypref->unit = "ms";
 				delaypref->max   = 999;
-				delaypref->width = 17;
 				
 				options[0] = rapidfire_get_mode_name_by_idn( RAPIDFIRE_NORMAL );
 				options[1] = rapidfire_get_mode_name_by_idn( RAPIDFIRE_RAPID );

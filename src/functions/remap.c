@@ -445,7 +445,7 @@ static void remap_menu_save( MfMenuMessage message )
 	static char *path;
 	
 	if( message == MF_MM_INIT ){
-		path = memoryAllocEx( "RemapSave", MEMORY_USER, 0, MF_PATH_MAX, PSP_SMEM_High, NULL );
+		path = memoryExalloc( "RemapSave", MEMORY_USER, 0, MF_PATH_MAX, PSP_SMEM_High, NULL );
 		
 		if( ! mfDialogGetfilenameInit( MF_STR_REMAP_DIAGGETFN_SAVE, "ms0:", "remap.ini", path, 255, CDIALOG_GETFILENAME_SAVE | CDIALOG_GETFILENAME_OVERWRITEPROMPT  ) ){
 			memoryFree( path );
@@ -477,7 +477,7 @@ static void remap_menu_load( MfMenuMessage message )
 	static char *path;
 	
 	if( message == MF_MM_INIT ){
-		path = memoryAllocEx( "RemapLoad", MEMORY_USER, 0, MF_PATH_MAX, PSP_SMEM_High, NULL );
+		path = memoryExalloc( "RemapLoad", MEMORY_USER, 0, MF_PATH_MAX, PSP_SMEM_High, NULL );
 		
 		if( ! mfDialogGetfilenameInit( MF_STR_REMAP_DIAGGETFN_LOAD, "ms0:", "", path, 255, CDIALOG_GETFILENAME_OPEN | CDIALOG_GETFILENAME_FILEMUSTEXIST ) ){
 			memoryFree( path );

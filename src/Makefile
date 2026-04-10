@@ -1,18 +1,43 @@
 #======================================
-# 例外ハンドラを設定する:
-#     make WITH_EXCEPTION_HANDLER=1
+# MacroFireをビルドするためのMakefile.
+# 
+#   使用可能なmakeターゲット:
 #
-# PSPLINK用にデバッグメッセージをprintf出力する:
-#     make WITH_PSPLINK_DEBUG=1
+#   all(default) - MacroFire本体を作成する
+#   clean        - MacroFire本体とオブジェクトファイルを削除
+#   macrofire    - allの別名
 #
-# メモリの割り付け/解放をPSPLINKへ出力 (使用するスタックメモリが増えることに注意)
-#     make WITH_MEMORY_DEBUG=1
+#   libs         - MacroFireをビルドするのに必要なライブラリを作成する
+#   libsclean    - ライブラリ本体とオブジェクトファイルを削除
+#
+#   everything   - libs + macrofire
+#   allclean     - clean + libsclean
+#
+#--------------------------------------
+# 設定可能なオプション
 #
 # 日本語フォントと日本語表示サポート:
-#     make WITH_JAPANESE=1
+#     WITH_JAPANESE=1
 #
 # 日本語フォントのJIS第二水準までサポート:
-#     make WITH_JAPANESE=1 WITH_JIS_LEVEL2=1
+#     WITH_JAPANESE=1 WITH_JIS_LEVEL2=1
+#
+# * 日本語フォントを使用する場合は、
+# * MacroFire本体だけでなくライブラリも同じオプションをつけてビルドする必要があります。
+# * そうでなければダイアログの表示がおかしくなるでしょう。
+# *   make WITH_JAPANESE=1 allclean everything
+#
+#--------------------------------------
+# MacroFire本体にのみ影響のあるオプション
+#
+# 例外ハンドラを設定する:
+#     WITH_EXCEPTION_HANDLER=1
+#
+# PSPLINK用にデバッグメッセージをprintf出力する:
+#     WITH_PSPLINK_DEBUG=1
+#
+# メモリの割り付け/解放をPSPLINKへ出力 (使用するスタックメモリが増えることに注意)
+#     WITH_PSPLINK_DEBUG=1 WITH_MEMORY_DEBUG=1
 #
 #======================================
 
@@ -26,8 +51,6 @@ BUILD_PRX = 1
 PRX_EXPORTS = exports.exp
 
 # 機能が制限されているが軽量なカーネルlibc(sysclib)。
-# printf系関数もないが、prntという関数を提供してくれるため、
-# 自分で再実装するのは容易。
 USE_KERNEL_LIBC = 1
 
 # カーネルモードPRXを作る場合は推奨されているようだ。
@@ -35,49 +58,34 @@ USE_KERNEL_LIBC = 1
 # 優先的にカーネルモードのライブラリ(psp***_driver)をリンクしようとするみたい。
 USE_KERNEL_LIBS = 1
 
-DIR_CLASSG = ./include
+BASEPATH = .
 
-INCDIR   = $(DIR_CLASSG)
-CFLAGS   = -Os -G 0 -Wall -fno-strict-aliasing
-ASFLAGS  = $(CFLAGS)
-LIBDIR   = 
-LDFLAGS  = 
-LIBS     = -lpsppower_driver -lpsphprm_driver -lpspge -lpsprtc -lpsputility -lm
+INCDIR  = $(BASEPATH)/include
+LIBDIR  = $(BASEPATH)/lib
 
-OBJS = exports.o \
-       sceDmac.o \
-       sceUtility.o \
-       mfmain.o \
-       mfanalogstick.o \
-       mfrapidfire.o \
-       mfctrl.o \
-       mfdialog.o \
-       mfmenu.o \
-       functions/remap.o \
-       functions/rapidfire.o \
-       functions/macromgr.o \
-       functions/macro.o \
-       functions/macroeditor.o \
-       $(DIR_CLASSG)/utils/strutil.o \
-       $(DIR_CLASSG)/psp/utils/inimgr.o \
-       $(DIR_CLASSG)/psp/hook.o \
-       $(DIR_CLASSG)/psp/memory.o \
-       $(DIR_CLASSG)/psp/heap.o \
-       $(DIR_CLASSG)/psp/dmem.o \
-       $(DIR_CLASSG)/psp/pb.o \
-       $(DIR_CLASSG)/psp/pathexpand.o \
-       $(DIR_CLASSG)/psp/dirh.o \
-       $(DIR_CLASSG)/psp/fiomgr.o \
-       $(DIR_CLASSG)/psp/ovmsg.o \
-       $(DIR_CLASSG)/psp/padctrl.o \
-       $(DIR_CLASSG)/psp/padutil.o \
-       $(DIR_CLASSG)/psp/cdialog.o \
-       $(DIR_CLASSG)/psp/cdialog/message.o \
-       $(DIR_CLASSG)/psp/cdialog/sosk.o \
-       $(DIR_CLASSG)/psp/cdialog/numedit.o \
-       $(DIR_CLASSG)/psp/cdialog/getfilename.o \
-       $(DIR_CLASSG)/psp/cdialog/detectbuttons.o \
+CFLAGS      = -Os -G0 -Wall -fno-strict-aliasing
+ASFLAGS     = $(CFLAGS)
+LDFLAGS     = 
+LIBS        = -lpsppower_driver -lpsphprm_driver -lpspge -lpsprtc -lpsputility -lm
+CLASSG_LIBS = -lcdialog -lovmsg -linimgr -ldirh -lfiomgr -lpadctrl -lpadutil -lpb -ldmem -lheap -lmemory -lmakepath -lstrutil -lhook
 
+OBJS = \
+	exports.o \
+	sceDmac.o \
+	sceUtility.o \
+	mfmain.o \
+	mfanalogstick.o \
+	mfrapidfire.o \
+	mfctrl.o \
+	mfdialog.o \
+	mfmenu.o \
+	functions/remap.o \
+	functions/rapidfire.o \
+	functions/macromgr.o \
+	functions/macro.o \
+	functions/macroeditor.o 
+
+LIBS := $(CLASSG_LIBS) $(LIBS)
 
 ifdef WITH_PSPLINK_DEBUG
 	CFLAGS += -fno-builtin-printf -g -DDEBUG=1
@@ -100,11 +108,23 @@ endif
 
 ifeq ($(USE_KERNEL_LIBC),1)
     CFLAGS += -DPSP_USE_KERNEL_LIBC
-	OBJS += sceSystemMemoryManager.o \
-            $(DIR_CLASSG)/psp/sysclib/sysclib.o
+	OBJS += sceSystemMemoryManager.o
+	LIBS += -lsysclib
 else
 	LIBS += -lpspkernel -lc -lpspuser
 endif
 
 PSPSDK = $(shell psp-config --pspsdk-path)
 include $(PSPSDK)/lib/build_prx.mak
+
+everything: libs $(TARGET)
+
+allclean: libsclean clean
+
+$(TARGET): all
+
+libs:
+	@$(MAKE) -C $(BASEPATH)/include
+
+libsclean:
+	@$(MAKE) -C $(BASEPATH)/include clean

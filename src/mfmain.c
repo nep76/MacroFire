@@ -6,7 +6,7 @@
 
 ==========================================================*/
 #include "mfmain.h"
-#include "psp/ovmsg.h"
+#include "ovmsg.h"
 
 PSP_MODULE_INFO( "MacroFire", PSP_MODULE_KERNEL, 3, 0 );
 
@@ -68,7 +68,7 @@ static void mf_init( void )
 		if( sceKernelFindModuleByName( "sceVshBridge_Driver" ) != NULL ){
 			st_world = MF_WORLD_VSH;
 			break;
-		} else if( sceKernelFindModuleByName( "scePops_Manager" ) != NULL ){
+		} else if( sceKernelFindModuleByName( "scePops_Manager" ) != NULL || sceKernelFindModuleByName( "popsloader_trademark" ) != NULL ){
 			st_world = MF_WORLD_POPS;
 			break;
 #ifdef DEBUG_ENABLED
@@ -653,7 +653,7 @@ bool mfConvertButtonReady( void )
 void mfConvertButtonFinish( void )
 {
 	if( st_cvbtn ){
-		padutilDestroyButtonList( st_cvbtn );
+		padutilDestroyButtonNames();
 		st_cvbtn = NULL;
 	}
 }
@@ -757,7 +757,7 @@ bool mfHookIncomplete( void )
 
 HeapUID mfHeapCreate( unsigned int count, size_t size )
 {
-	return heapCreateEx( "MacroFireHeap", MEMORY_USER, 0, size + HEAP_HEADER_SIZE * count, PSP_SMEM_High, NULL );
+	return heapExCreate( "MacroFireHeap", MEMORY_USER, 0, size + HEAP_HEADER_SIZE * count, PSP_SMEM_High, NULL );
 }
 
 const PadutilAnalogStick *mfGetAnalogStickContext( void )

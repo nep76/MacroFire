@@ -300,7 +300,7 @@ void macroMenu( MfMenuMessage message )
 				mfMenuSetTableEntry( st_menu, 3, 1, 1, MF_STR_MACRO_CONTROL_RUN,   mfCtrlDefCallback, macro_menu_run, NULL );
 				mfMenuSetTableEntry( st_menu, 3, 2, 1, MF_STR_MACRO_CONTROL_STOP,  mfCtrlDefCallback, macro_menu_stop, NULL );
 				mfMenuSetTableEntry( st_menu, 3, 3, 1, MF_STR_MACRO_CONTROL_EDIT,  mfCtrlDefCallback, macro_menu_edit, NULL );
-				mfMenuSetTableEntry( st_menu, 3, 4, 1, MF_STR_MACRO_CONTROL_CLEAR, mfCtrlDefCallback, macro_menu_clear, NULL );
+				mfMenuSetTableEntry( st_menu, 3, 4, 1, MF_STR_MACRO_CONTROL_CLEAR, mfCtrlDefExtra, macro_menu_clear, NULL );
 				
 				mfMenuSetTablePosition( st_menu, 4, pbOffsetChar( 5 ), pbOffsetLine( 18 ) );
 				mfMenuSetTableLabel( st_menu, 4, MF_STR_MACRO_RECORD_LABEL );
@@ -558,14 +558,16 @@ static void macro_menu_edit( MfMenuMessage message )
 
 static void macro_menu_clear( MfMenuMessage message )
 {
-	if( message == MF_MM_PROC ){
-		pbPrint( pbOffsetChar( 3 ), pbOffsetLine( 4 ), MF_COLOR_TEXT_FG, MF_COLOR_TEXT_BG, MF_STR_MACRO_CLEAR );
-		
-		macro_clear( &(st_slot[st_current_slot]) );
-		macro_select( st_current_slot );
-		
-		mfMenuWait( MF_MESSAGE_DELAY );
-		mfMenuProc( NULL );
+	if( message == MF_MM_INIT ){
+		if( ! mfDialogMessageInit( MF_STR_MACRO_CLEAR_WARN_TITLE, MF_STR_MACRO_CLEAR_WARN_MSG, true ) ) return;
+	} else if( message == MF_MM_PROC ){
+		if( ! mfDialogMessageDraw() ){
+			if( mfDialogMessageResult() ){
+				macro_clear( &(st_slot[st_current_slot]) );
+				macro_select( st_current_slot );
+			}
+			mfMenuExitExtra();
+		}
 	}
 }
 

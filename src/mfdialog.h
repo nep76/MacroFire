@@ -14,8 +14,8 @@
 #undef MFEXCLUDE_MENU
 #undef MFEXCLUDE_DIALOG
 
-#include "psp/cdialog.h"
-#include "utils/strutil.h"
+#include "cdialog.h"
+#include "util/strutil.h"
 
 /*=========================================================
 	å^êÈåæ

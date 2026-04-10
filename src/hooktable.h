@@ -8,7 +8,7 @@
 #ifndef HOOKTABLE_H
 #define HOOKTABLE_H
 
-#include "psp/hook.h"
+#include "util/hook.h"
 
 #define MF_CTRL_PEEK_BUFFER_POSITIVE    0
 #define MF_CTRL_PEEK_BUFFER_NEGATIVE    1

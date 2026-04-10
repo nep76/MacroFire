@@ -9,7 +9,7 @@
 #define FUNCTION_REMAP_H
 
 #include "../macrofire.h"
-#include "psp/dmem.h"
+#include "memory/dmem.h"
 
 /*=========================================================
 	É}ÉNÉç

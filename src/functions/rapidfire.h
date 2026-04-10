@@ -9,7 +9,7 @@
 #define FUNCTION_RAPIDFIRE_H
 
 #include "../macrofire.h"
-#include "psp/heap.h"
+#include "memory/heap.h"
 
 /*=========================================================
 	É}ÉNÉç

@@ -19,8 +19,9 @@ struct mf_rapidfire_pref {
 	MfRapidfireMode mode;         /* モード */
 	unsigned int    pressDelay;   /* 連射時のディレイ */
 	unsigned int    releaseDelay; /* 連射時のディレイ */
+	unsigned int    nextDelay;    /* 次のボタンアクションまでの待ち時間 */
 	bool            autorun;      /* ボタンが押下されていなくとも自動実行するかどうか */
-	unsigned int    bitFlags;   /* モードに応じて必要なフラグがセットされる */
+	unsigned int    bitFlags;     /* モードに応じて必要なフラグがセットされる */
 };
 
 struct mf_rapidfire_params {
@@ -81,6 +82,7 @@ MfRapidfireUID mfRapidfireNew( void )
 		params->pref[i].mode         = MF_RAPIDFIRE_MODE_NORMAL;
 		params->pref[i].pressDelay   = 0;
 		params->pref[i].releaseDelay = 0;
+		params->pref[i].nextDelay    = 0;
 		params->pref[i].autorun      = false;
 		params->pref[i].bitFlags     = 0;
 	}
@@ -225,9 +227,26 @@ void mfRapidfireExec( MfRapidfireUID uid, MfHookAction action, SceCtrlData *pad 
 			uint64_t cur_tick;
 			sceRtcGetCurrentTick( &cur_tick );
 			
-			if( action == MF_UPDATE && ( delay > ( ( params->pref[i].bitFlags & MF_RAPIDFIRE_FLAGS_RAPID_PRESS ) ? params->pref[i].pressDelay : params->pref[i].releaseDelay ) ) ){
+			if( action == MF_UPDATE && ( delay > params->pref[i].nextDelay ) ){
+				unsigned int overtime;
+				
 				params->lastTick = cur_tick;
 				params->pref[i].bitFlags ^= MF_RAPIDFIRE_FLAGS_RAPID_PRESS;
+				
+				overtime = delay - params->pref[i].nextDelay;
+				
+				if( params->pref[i].bitFlags & MF_RAPIDFIRE_FLAGS_RAPID_PRESS ){
+					params->pref[i].nextDelay = params->pref[i].pressDelay;
+				} else{
+					params->pref[i].nextDelay = params->pref[i].releaseDelay;
+				}
+				
+				if( params->pref[i].nextDelay > overtime ){
+					params->pref[i].nextDelay -= overtime;
+				} else{
+					params->pref[i].nextDelay = 0;
+				}
+				
 			}
 			
 			if( params->pref[i].autorun && ( pad->Buttons & params->pref[i].button ) ){

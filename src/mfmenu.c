@@ -12,8 +12,8 @@
 #include <pspsuspend.h>
 #include <psputility.h>
 #include <stdarg.h>
-#include "psp/memory.h"
-#include "psp/heap.h"
+#include "memory/memory.h"
+#include "memory/heap.h"
 
 /*=========================================================
 	ローカル定数
@@ -1080,7 +1080,7 @@ void mfMenuMain( SceCtrlData *pad, MfHprmKey *hk )
 #endif
 	
 	/* ユーザメモリからメニュー用の作業域を確保 */
-	st_params = memoryAllocEx( "MacroFireMenuParams", MEMORY_USER, 0, sizeof( struct mf_menu_params ), PSP_SMEM_High, NULL );
+	st_params = memoryExalloc( "MacroFireMenuParams", MEMORY_USER, 0, sizeof( struct mf_menu_params ), PSP_SMEM_High, NULL );
 	dbgprintf( "Allocating memory for menu: %p: %d bytes", st_params, sizeof( struct mf_menu_params ) );
 	if( ! st_params ){
 		dbgprint( "Not enough available memory for menu" );
@@ -1293,7 +1293,7 @@ void mfMenuMain( SceCtrlData *pad, MfHprmKey *hk )
 		
 		dbgprint( "Memory block return to the system..." );
 		padctrlDestroy( st_params->ctrl.uid );
-		padutilDestroyButtonList( st_symbols );
+		padutilDestroyButtonSymbols();
 		st_symbols = NULL;
 		
 		mf_free_buffers( &(st_params->frameBuffer) );
@@ -1397,7 +1397,7 @@ MfMenuTable *mfMenuCreateTables( unsigned short tables, ... )
 	va_end( ap );
 	
 	dbgprintf( "Allocating memory for menu-tables: %d bytes", allocsize );
-	table = (MfMenuTable *)memoryAllocEx( "MacroFireMenuTables", MEMORY_USER, 0, allocsize, PSP_SMEM_High, NULL );
+	table = (MfMenuTable *)memoryExalloc( "MacroFireMenuTables", MEMORY_USER, 0, allocsize, PSP_SMEM_High, NULL );
 	if( ! table ){
 		dbgprint( "Failed to allocate memory" );
 		return NULL;
@@ -1489,7 +1489,7 @@ static bool mf_menu_stack( struct mf_menu_stack *stack, enum mf_menu_stack_ctrl 
 		case MF_MENU_STACK_CREATE:
 			stack->index = 0;
 			stack->size  = MF_MENU_STACK_SIZE( MF_MENU_STACK_NUM );
-			stack->memory = memoryAllocEx( "MacroFireMenuStack", MEMORY_USER, 0, stack->size, PSP_SMEM_High, NULL );
+			stack->memory = memoryExalloc( "MacroFireMenuStack", MEMORY_USER, 0, stack->size, PSP_SMEM_High, NULL );
 			dbgprintf( "Allocating memory for menu-stack: %p: %d bytes", stack->memory, stack->size );
 			return stack->memory ? true : false;
 		case MF_MENU_STACK_PUSH:
@@ -1593,7 +1593,7 @@ static bool mf_alloc_buffers( struct mf_frame_buffers *fb, bool graphics_mem, bo
 		unsigned char frame_num = graphics_mem ? sceKernelMaxFreeMemSize() / fb->frameSize : 0;
 		
 		if( frame_num >= 3 ){
-			fb->vram = memoryAllocEx( "MacroFireMenuVRAMBackup", MEMORY_USER, 0, fb->frameSize * 3, PSP_SMEM_High, NULL );
+			fb->vram = memoryExalloc( "MacroFireMenuVRAMBackup", MEMORY_USER, 0, fb->frameSize * 3, PSP_SMEM_High, NULL );
 			if( ! fb->vram ) return false;
 			
 			dbgprintf( "Memory allocated: %d bytes", fb->frameSize * 3 );
@@ -1603,13 +1603,13 @@ static bool mf_alloc_buffers( struct mf_frame_buffers *fb, bool graphics_mem, bo
 			fb->clear   = (void *)( (unsigned int)(fb->draw) + fb->frameSize );
 		} else if( frame_num >= 2 ){
 			fb->display = fb->origaddr;
-			fb->draw    = memoryAllocEx( "MacroFireMenuDrawClearBuffers", MEMORY_USER, 16, fb->frameSize * 2, PSP_SMEM_High, NULL );
+			fb->draw    = memoryExalloc( "MacroFireMenuDrawClearBuffers", MEMORY_USER, 16, fb->frameSize * 2, PSP_SMEM_High, NULL );
 			if( ! fb->draw ) return false;
 			dbgprintf( "Memory allocated for draw/clear buffers: %d bytes", fb->frameSize *2 );
 			fb->clear = (void *)( (unsigned int)(fb->draw) + fb->frameSize );
 		} else if( frame_num >= 1 ){
 			fb->display = fb->origaddr;
-			fb->draw    = memoryAllocEx( "MacroFireMenuDrawBuffer", MEMORY_USER, 16, fb->frameSize, PSP_SMEM_High, NULL );
+			fb->draw    = memoryExalloc( "MacroFireMenuDrawBuffer", MEMORY_USER, 16, fb->frameSize, PSP_SMEM_High, NULL );
 			if( ! fb->draw ) return false;
 			dbgprintf( "Memory allocated for draw buffer: %d bytes", fb->frameSize );
 		} else{

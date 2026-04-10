@@ -9,7 +9,7 @@
 #define FUNCTION_MACRO_H
 
 #include "../macrofire.h"
-#include "psp/heap.h"
+#include "memory/heap.h"
 #include "macromgr.h"
 #include "macroeditor.h"
 
