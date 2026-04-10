@@ -38,6 +38,11 @@ typedef enum {
 	MF_MENU_INFOTEXT_MOVABLEPAGE_CTRL = 0x00000040,
 } MfMenuInfoTextOptions;
 
+typedef enum {
+	MF_MENU_SCREEN_UPDATE       = 0x00000001,
+	MF_MENU_FORCED_QUIT         = 0x00000002,
+} MfMenuFlags;
+
 /*=========================================================
 	プロトタイプ
 =========================================================*/
@@ -46,13 +51,15 @@ void mfMenuDestroy( void );
 void mfMenuMain( SceCtrlData *pad, MfHprmKey *hk );
 void mfMenuIniLoad( IniUID ini, char *buf, size_t len );
 void mfMenuIniSave( IniUID ini, char *buf, size_t len );
-void mfMenuQuit( void );
 void mfMenuWait( unsigned int microsec );
 void mfMenuProc( MfMenuProc proc );
 bool mfMenuSetExtra( MfMenuProc extra );
 void mfMenuExitExtra( void );
 void mfMenuEnableQuickQuit( void );
 void mfMenuDisableQuickQuit( void );
+void mfMenuEnable( unsigned int flags );
+void mfMenuDisable( unsigned int flags );
+unsigned int mfMenuGetFlags( void );
 char *mfMenuButtonsSymbolList( PadutilButtons buttons, char *str, size_t len );
 bool mfMenuDrawDialog( MfDialogType dialog, bool update );
 void mfMenuInitTables( MfMenuTable menu[], unsigned short menucnt );
@@ -73,5 +80,9 @@ inline unsigned char mfMenuGetCurrentAnalogStickY( void );
 inline u32 mfMenuGetCurrentHprmKey( void );
 inline void mfMenuResetKeyRepeat( void );
 unsigned int mfMenuScroll( int selected, unsigned int viewlines, unsigned int maxlines );
+
+#define mfMenuQuit()            mfMenuEnable( MF_MENU_FORCED_QUIT )
+#define mfMenuUpdate()          mfMenuEnable( MF_MENU_SCREEN_UPDATE )
+#define mfMenuIsEnabled( f, t ) ( ( ( ( f ) & ( t ) ) == ( t ) ? true : false ) )
 
 #endif

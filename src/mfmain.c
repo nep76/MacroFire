@@ -134,7 +134,7 @@ static void mf_shutdown( void )
 		}
 	}
 	
-	if( mfOverlayMessageIsRunning() ) mfOverlayMessageExit();
+	if( mfNotificationThreadId() ) mfNotificationShutdownStart();
 	
 	mfMenuDestroy();
 }
@@ -240,7 +240,7 @@ static void mf_ini_load( IniUID ini )
 		}
 	}
 	
-	if( status_notification ) mfOverlayMessageStart();
+	if( status_notification ) mfNotificationStart();
 }
 
 static void mf_ini_save( IniUID ini )
@@ -353,8 +353,8 @@ static void mf_sending_toggle_message( bool engine )
 	int i;
 	MfFuncToggle togglefunc;
 	
-	if( mfOverlayMessageIsRunning() ){
-		mfOverlayMessagePrintf( "%s: %s", MF_STR_HOME_MACROFIRE_ENGINE, engine ? MF_STR_CTRL_ON : MF_STR_CTRL_OFF );
+	if( mfNotificationThreadId() ){
+		mfNotificationPrintf( "%s: %s", MF_STR_HOME_MACROFIRE_ENGINE, engine ? MF_STR_CTRL_ON : MF_STR_CTRL_OFF );
 	}
 	
 	dbgprint( "Sending message MF_MS_TOGGLE to all functions..." );
@@ -703,13 +703,13 @@ bool mfIsRunningApp( MfAppId app )
 	return false;
 }
 
-int mfOverlayMessageStart( void )
+int mfNotificationStart( void )
 {
 	SceUID msg_thid;
 	
 	ovmsgInit();
 	
-	msg_thid = sceKernelCreateThread( "MacroFireOverlayMessage", ovmsgThreadMain, 16, 0x200, 0, 0 );
+	msg_thid = sceKernelCreateThread( "MacroFireNotification", ovmsgThreadMain, 16, 0x300, 0, 0 );
 	if( msg_thid > 0 ){
 		sceKernelStartThread( msg_thid, 0, NULL );
 		ovmsgWaitForReady();
@@ -719,25 +719,30 @@ int mfOverlayMessageStart( void )
 	}
 }
 
-void mfOverlayMessageExit( void )
+void mfNotificationShutdownStart( void )
 {
 	ovmsgShutdownStart();
 }
 
-bool mfOverlayMessageIsRunning( void )
+SceUID mfNotificationThreadId( void )
 {
-	return ovmsgIsRunning();
+	return ovmsgGetThreadId();
 }
 
-bool mfOverlayMessagePrintf( const char *format, ... )
+void mfNotificationPrintTerm( void )
+{
+	ovmsgPrintIntrStart();
+	ovmsgWaitForReady();
+}
+
+bool mfNotificationPrintf( const char *format, ... )
 {
 	va_list ap;
 	bool ret;
 	
 	va_start( ap, format );
 	
-	ovmsgPrintIntrStart();
-	ovmsgWaitForReady();
+	mfNotificationPrintTerm();
 	ret = ovmsgVprintf( format, ap );
 	
 	va_end( ap );
@@ -852,7 +857,7 @@ int module_start( SceSize arglen, void *argp )
 	pspDebugInstallErrorHandler( mf_exception );
 #endif
 	
-	thid = sceKernelCreateThread( "MacroFire", mf_main, 32, 0xF00, 0, 0 );
+	thid = sceKernelCreateThread( "MacroFire", mf_main, 32, 0x900, 0, 0 );
 	if( thid > 0 ) sceKernelStartThread( thid, arglen, argp );
 	
 	return 0;

@@ -117,14 +117,14 @@ int memoryFree( void *memblock )
 	
 	if( ! memblock ) return 0;
 	header = (struct memory_header *)( (uintptr_t)memblock - sizeof( struct memory_header ) );
-
+	
 #ifdef MEMORY_DEBUG
 	debug_ret = sceKernelFreePartitionMemory( header->blockId );
 	if( debug_ret < 0 ){
-		printf( "MemoryFree Error (%x): BlockID: %x, HeapAddr %p\n", debug_ret, header->blockId, memblock );
+		printf( "MemoryFree Error (%x): BlockID: %x, HeapAddr: %p\n", debug_ret, header->blockId, memblock );
 	} else{
 		st_alloc_count--;
-		printf( "MemoryFree: BlockID: %x, HeapAddr %p\n", header->blockId, memblock );
+		printf( "MemoryFree: BlockID: %x, HeapAddr: %p\n", header->blockId, memblock );
 	}
 	return debug_ret;
 #else

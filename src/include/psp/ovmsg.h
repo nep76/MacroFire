@@ -25,6 +25,7 @@ extern "C" {
 	ä÷êî
 =========================================================*/
 int ovmsgInit( void );
+SceUID ovmsgGetThreadId( void );
 int ovmsgThreadMain( SceSize arglen, void *argp );
 void ovmsgPrintIntrStart( void );
 bool ovmsgPrintf( const char *format, ... );

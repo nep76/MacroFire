@@ -97,17 +97,16 @@ struct mf_menu_info {
 };
 
 struct mf_menu_params {
-	bool screenUpdate;
-	bool noqq;
-	bool forcedQuit;
-	MfDialogType lastDialogType;
 	struct mf_frame_buffers frameBuffer;
 	struct mf_threads       threads;
 	struct mf_menu_pos      menu;
 	struct mf_menu_input    ctrl;
 	struct mf_menu_stack    stack;
 	struct mf_menu_info     info;
-	unsigned int waitMicroSecForUpdate;
+	MfDialogType lastDialogType;
+	unsigned char noQuickQuitCount;
+	unsigned int  flags;
+	unsigned int  waitMicroSecForUpdate;
 	MfFuncMenu proc, nextproc;
 };
 
@@ -259,24 +258,15 @@ void mfMenuIniSave( IniUID ini, char *buf, size_t len )
 	inimgrSetBool( ini, MF_INI_SECTION_DEFAULT, "UseVolatileMemory", false );
 }
 
-void mfMenuQuit( void )
-{
-	if( ! st_params ) return;
-	
-	st_params->forcedQuit = true;
-}
-
 void mfMenuWait( unsigned int microsec )
 {
 	if( ! st_params ) return;
-	
 	st_params->waitMicroSecForUpdate = microsec;
 }
 
 void mfMenuProc( MfMenuProc proc )
 {
 	if( ! st_params ) return;
-	
 	st_params->nextproc = proc;
 }
 
@@ -306,17 +296,34 @@ void mfMenuEnableQuickQuit( void )
 {
 	if( ! st_params ) return;
 	
-	st_params->noqq--;
-	if( st_params->noqq < 0 ) st_params->noqq = 0;
-	dbgprintf( "Decreased menu-noqq count: %d", st_params->noqq );
+	st_params->noQuickQuitCount--;
+	if( st_params->noQuickQuitCount < 0 ) st_params->noQuickQuitCount = 0;
+	dbgprintf( "Decreased menu-noQuickQuitCount count: %d", st_params->noQuickQuitCount );
 }
 
 void mfMenuDisableQuickQuit( void )
 {
 	if( ! st_params ) return;
 	
-	st_params->noqq++;
-	dbgprintf( "Increased menu-noqq count: %d", st_params->noqq );
+	st_params->noQuickQuitCount++;
+	dbgprintf( "Increased menu-noQuickQuitCount count: %d", st_params->noQuickQuitCount );
+}
+
+void mfMenuEnable( unsigned int flags )
+{
+	if( ! st_params ) return;
+	st_params->flags |= flags;
+}
+
+void mfMenuDisable( unsigned int flags )
+{
+	if( ! st_params ) return;
+	st_params->flags &= ~flags;
+}
+
+unsigned int mfMenuGetFlags( void )
+{
+	return ( st_params ? st_params->flags : 0 );
 }
 
 char *mfMenuButtonsSymbolList( PadutilButtons buttons, char *str, size_t len )
@@ -965,7 +972,7 @@ static void mf_root_menu( MfMenuMessage message )
 	
 	switch( message ){
 		case MF_MM_INIT:
-			dbgprint( "Creating main-menu table" );
+			dbgprint( "Initializing root-menu" );
 			menu = mfMenuCreateTables(
 				3,
 				1, 1,
@@ -985,10 +992,10 @@ static void mf_root_menu( MfMenuMessage message )
 				
 				MfCtrlDefGetButtonsPref *hotkey_pref = mfHeapCalloc( pheap, sizeof( MfCtrlDefGetButtonsPref ) );
 				main_pref = mfHeapCalloc( pheap, sizeof( struct mf_main_pref ) );
-				main_pref->engine      = mfIsEnabled();
-				main_pref->menu        = mfGetMenuButtons();
-				main_pref->toggle      = mfGetToggleButtons();
-				main_pref->statusNotification = mfOverlayMessageIsRunning();
+				main_pref->engine             = mfIsEnabled();
+				main_pref->menu               = mfGetMenuButtons();
+				main_pref->toggle             = mfGetToggleButtons();
+				main_pref->statusNotification = mfNotificationThreadId() ? true : false;
 				
 				hotkey_pref->availButtons = MF_HOTKEY_BUTTONS;
 				
@@ -1015,13 +1022,16 @@ static void mf_root_menu( MfMenuMessage message )
 			mfMenuInitTables( menu, 3 );
 			break;
 		case MF_MM_TERM:
+			dbgprint( "Terminating root-menu" );
 			mfSetMenuButtons( main_pref->menu );
 			mfSetToggleButtons( main_pref->toggle );
 			
-			if( mfOverlayMessageIsRunning() && ! main_pref->statusNotification ){
-				mfOverlayMessageExit();
-			} else if( ! mfOverlayMessageIsRunning() && main_pref->statusNotification ){
-				mfOverlayMessageStart();
+			if( mfNotificationThreadId() && ! main_pref->statusNotification ){
+				dbgprint( "Notification thread shutting down..." );
+				mfNotificationShutdownStart();
+			} else if( ! mfNotificationThreadId() && main_pref->statusNotification ){
+				dbgprint( "Notification thread starting..." );
+				mfNotificationStart();
 			}
 			
 			mfMenuDestroyTables( menu );
@@ -1037,8 +1047,9 @@ static void mf_root_menu( MfMenuMessage message )
 -----------------------------------------------*/
 void mfMenuMain( SceCtrlData *pad, MfHprmKey *hk )
 {
+#ifdef MEMORY_DEBUG
 	dbgprintf( "Memory block %d leaked", memoryGetAllocCount() );
-	sceDisplayWaitVblankStart();
+#endif
 	
 	/* ユーザメモリからメニュー用の作業域を確保 */
 	st_params = memoryAllocEx( "MacroFireMenuParams", MEMORY_USER, 0, sizeof( struct mf_menu_params ), PSP_SMEM_High, NULL );
@@ -1048,17 +1059,15 @@ void mfMenuMain( SceCtrlData *pad, MfHprmKey *hk )
 		return;
 	}
 	memset( st_params, 0, sizeof( struct mf_menu_params ) );
-	st_params->screenUpdate = true;
-	
-	/* サウンドをミュートにする */
-	mf_menu_mute( true );
 	
 	/* サスペンド/リジュームするスレッドの一覧を作成し、サスペンドする */
 	if( ! mf_menu_get_target_threads( st_params->threads.list, &(st_params->threads.count) ) ) goto DESTROY;
 	mf_menu_change_threads_stat( MF_MENU_SUSPEND_THREADS, st_params->threads.list, st_params->threads.count );
-	
 	/* すぐに止まらないスレッドもある? */
 	sceDisplayWaitVblankStart();
+	
+	/* サウンドをミュートにする */
+	mf_menu_mute( true );
 	
 	/* APIがフックされている場合、一時的に元に戻す */
 	if( mfIsEnabled() ) mfUnhook();
@@ -1121,8 +1130,7 @@ void mfMenuMain( SceCtrlData *pad, MfHprmKey *hk )
 		PSP_CTRL_CIRCLE | PSP_CTRL_SQUARE | PSP_CTRL_RTRIGGER | PSP_CTRL_LTRIGGER
 	);
 	
-	/* QuickQuit値を初期化 */
-	st_params->noqq = 0;
+	mfMenuEnable( MF_MENU_SCREEN_UPDATE );
 	
 	/* ルートメニュー */
 	st_params->proc = (MfFuncMenu)mf_root_menu;
@@ -1148,9 +1156,9 @@ void mfMenuMain( SceCtrlData *pad, MfHprmKey *hk )
 			SceCtrlData dupe_pad = *(st_params->ctrl.pad);
 			const PadutilAnalogStick *anlg_context = mfGetAnalogStickContext();
 			padutilAdjustAnalogStick( anlg_context, &dupe_pad );
-			if( ( ( dupe_pad.Buttons | padutilGetAnalogStickDirection( dupe_pad.Lx,  dupe_pad.Ly, 0 ) ) & MF_HOTKEY_BUTTONS ) || st_params->screenUpdate ){
+			if( ( ( dupe_pad.Buttons | padutilGetAnalogStickDirection( dupe_pad.Lx,  dupe_pad.Ly, 0 ) ) & MF_HOTKEY_BUTTONS ) || ( st_params->flags & MF_MENU_SCREEN_UPDATE ) ){
 				pbDisable( PB_NO_DRAW );
-				st_params->screenUpdate = false;
+				mfMenuDisable( MF_MENU_SCREEN_UPDATE );
 				memset( pbGetCurrentDrawBufferAddr(), 0, st_params->frameBuffer.frameSize );
 				mf_draw_frame( true );
 				mf_menu_indicator();
@@ -1166,7 +1174,7 @@ void mfMenuMain( SceCtrlData *pad, MfHprmKey *hk )
 		mf_debug();
 #endif
 		
-		if( st_params->forcedQuit || ! st_params->proc || ( ! st_params->noqq && ( st_params->ctrl.pad->Buttons & ( PSP_CTRL_START | PSP_CTRL_HOME ) ) ) ) break;
+		if( ( st_params->flags & MF_MENU_FORCED_QUIT ) || ! st_params->proc || ( ! st_params->noQuickQuitCount && ( st_params->ctrl.pad->Buttons & ( PSP_CTRL_START | PSP_CTRL_HOME ) ) ) ) break;
 		
 		/* 情報バーをクリア */
 		st_params->info.text[0] = '\0';
@@ -1176,7 +1184,6 @@ void mfMenuMain( SceCtrlData *pad, MfHprmKey *hk )
 		( st_params->proc )( st_params->menu.extra ? MF_MM_EXTRA : MF_MM_PROC );
 		
 		/* 情報バーを描画 */
-		
 		pbPrint(
 			pbOffsetChar( 3 ),
 			pbOffsetLine( 32 ) - ( st_params->info.options & MF_MENU_INFOTEXT_SET_MIDDLE_LINE ? 0 : ( pbOffsetLine( 1 ) >> 1 ) ),
@@ -1204,7 +1211,7 @@ void mfMenuMain( SceCtrlData *pad, MfHprmKey *hk )
 		if( st_params->waitMicroSecForUpdate ){
 			sceKernelDelayThread( st_params->waitMicroSecForUpdate );
 			st_params->waitMicroSecForUpdate = 0;
-			st_params->screenUpdate = true;
+			mfMenuEnable( MF_MENU_SCREEN_UPDATE );
 			sceDisplayWaitVblankStart();
 		}
 	}
@@ -1225,10 +1232,12 @@ void mfMenuMain( SceCtrlData *pad, MfHprmKey *hk )
 	mfDialogFinish();
 	
 	goto DESTROY;
-		
+	
 	DESTROY:
+		dbgprint( "Destroying menu..." );
 		mf_menu_stack( &(st_params->stack), MF_MENU_STACK_DESTROY, NULL );
 		
+		dbgprint( "Memory block return to the system..." );
 		padctrlDestroy( st_params->ctrl.uid );
 		padutilDestroyButtonList( st_symbols );
 		st_symbols = NULL;
@@ -1241,20 +1250,22 @@ void mfMenuMain( SceCtrlData *pad, MfHprmKey *hk )
 		/* メニュー起動前にAPIをフックしていた場合は、フックしなおす */
 		if( mfIsEnabled() ) mfHook();
 		
+		dbgprint( "Resuming threads..." );
 		/* 他のスレッドをリジューム */
 		sceDisplayWaitVblankStart();
 		mf_menu_change_threads_stat( MF_MENU_RESUME_THREADS, st_params->threads.list, st_params->threads.count );
 		
 		/* スレッドリスト用のメモリを解放 */
-		dbgprint( "Free memory for menu" );
+		dbgprint( "Menu finish" );
 		memoryFree( st_params );
 		
 		/* ディスプレイを点灯させる */
 		sceDisplayWaitVblankStart();
 		sceDisplayWaitVblankStart();
 		sceDisplayEnable();
-		
+#ifdef MEMORY_DEBUG
 		dbgprintf( "Memory block remain count %d", memoryGetAllocCount() );
+#endif
 }
 
 void mfMenuSetInfoText( unsigned int options, char *format, ... )
@@ -1465,7 +1476,7 @@ static bool mf_menu_get_target_threads( SceUID *thread_id_list, int *thread_id_c
 	int i, j;
 	SceUID selfid;
 	
-	selfid = sceKernelGetThreadId();
+	selfid    = sceKernelGetThreadId();
 	
 	if( sceKernelGetThreadmanIdList( SCE_KERNEL_TMID_Thread, thread_id_list, MF_MENU_MAX_NUMBER_OF_THREADS, thread_id_count ) < 0 ){
 		dbgprint( "Failed to get a thread-id list" );
@@ -1474,7 +1485,10 @@ static bool mf_menu_get_target_threads( SceUID *thread_id_list, int *thread_id_c
 	
 	for( i = 0; i < *thread_id_count; i++ ){
 		for( j = 0; j < st_thread_id_count_first; j++ ){
-			if( ( thread_id_list[i] == st_thread_id_list_first[j] ) || ( thread_id_list[i] == selfid ) ) thread_id_list[i] = 0;
+			if(
+				( thread_id_list[i] == st_thread_id_list_first[j] ) ||
+				( thread_id_list[i] == selfid )
+			 ) thread_id_list[i] = 0;
 		}
 	}
 	
@@ -1485,6 +1499,7 @@ static void mf_menu_change_threads_stat( bool stat, SceUID *thread_id_list, int 
 {
 	int ( *func )( SceUID ) = NULL;
 	int i;
+	SceUID notific_id = mfNotificationThreadId();
 	
 	if( stat == MF_MENU_SUSPEND_THREADS ){
 		dbgprint( "Get suspend request for all-Threads" );
@@ -1496,10 +1511,13 @@ static void mf_menu_change_threads_stat( bool stat, SceUID *thread_id_list, int 
 	
 	if( ! func || ! thread_id_list || ! thread_id_count ) return;
 	
-	dbgprint( "Controling all-threads" );
+	dbgprint( "Controling all-threads without notification thread..." );
 	for( i = 0; i < thread_id_count; i++ ){
-		if( thread_id_list[i] ) ( func )( thread_id_list[i] );
+		if( ! thread_id_list[i] || thread_id_list[i] == notific_id ) continue;
+		( func )( thread_id_list[i] );
 	}
+	
+	if( notific_id ) mfNotificationPrintTerm();
 }
 
 static bool mf_alloc_buffers( struct mf_frame_buffers *fb, bool graphics_mem, bool volatile_mem )

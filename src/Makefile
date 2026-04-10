@@ -2,8 +2,11 @@
 # 例外ハンドラを設定する:
 #     make WITH_EXCEPTION_HANDLER=1
 #
-# PSPLINK用にデバッグメッセージをprintf出力する:
+# PSPLINK用にデバッグメッセージをprintf出力する (スタックサイズに注意する):
 #     make WITH_PSPLINK_DEBUG=1
+#
+# メモリの割り付け/解放をPSPLINKへ出力 (スタックサイズに注意する):
+#     make WITH_MEMORY_DEBUG=1
 #
 # 日本語フォントと日本語表示サポート:
 #     make WITH_JAPANESE=1
@@ -74,8 +77,13 @@ OBJS = exports.o \
        $(DIR_CLASSG)/psp/cdialog/getfilename.o \
        $(DIR_CLASSG)/psp/cdialog/detectbuttons.o \
 
+
 ifdef WITH_PSPLINK_DEBUG
-	CFLAGS += -fno-builtin-printf -g -DDEBUG=1 -DMEMORY_DEBUG
+	CFLAGS += -fno-builtin-printf -g -DDEBUG=1
+endif
+
+ifdef WITH_MEMORY_DEBUG
+	CFLAGS += -DMEMORY_DEBUG
 endif
 
 ifdef WITH_EXCEPTION_HANDLER
