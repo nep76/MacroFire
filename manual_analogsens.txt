@@ -1,4 +1,4 @@
-MacroFire 3.2.3
+MacroFire 3.2.4
 
 
 Analog stick sensitivity adjustment

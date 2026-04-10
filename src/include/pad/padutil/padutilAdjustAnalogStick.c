@@ -8,8 +8,8 @@ void padutilAdjustAnalogStick( const PadutilAnalogStick *analogstick, SceCtrlDat
 		pad->Lx = PADUTIL_CENTER_X;
 		pad->Ly = PADUTIL_CENTER_Y;
 	} else if( analogstick->sensitivity != 100 ){
-		int x = analogstick->originX + ( ( pad->Lx - analogstick->originX ) * analogstick->sensitivity ) / 100;
-		int y = analogstick->originY + ( ( pad->Ly - analogstick->originY ) * analogstick->sensitivity ) / 100;
+		int x = analogstick->originX + (int)( ( pad->Lx - analogstick->originX ) * analogstick->sensitivity ) / 100;
+		int y = analogstick->originY + (int)( ( pad->Ly - analogstick->originY ) * analogstick->sensitivity ) / 100;
 		
 		if( x > PADUTIL_MAX_COORD ){
 			x = PADUTIL_MAX_COORD;
